@@ -1,0 +1,36 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    # SQLite requires CGO, so we need to build differently for each platform
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+brews:
+  - name: ung
+    homepage: https://github.com/Andriiklymiuk/ung
+    description: "Universal Next-Gen Billing & Tracking CLI - Manage invoices, clients, and time tracking"
+    repository:
+      owner: Andriiklymiuk
+      name: homebrew-tools
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com

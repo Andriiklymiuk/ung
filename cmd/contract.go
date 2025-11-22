@@ -83,6 +83,17 @@ func getClients() ([]models.Client, error) {
 }
 
 func runContractAdd(cmd *cobra.Command, args []string) error {
+	// Ensure prerequisites exist
+	fmt.Println("🚀 Let's create a contract!\n")
+
+	if err := ensureCompanyExists(); err != nil {
+		return err
+	}
+
+	if err := ensureClientExists(); err != nil {
+		return err
+	}
+
 	// Get all clients for selection
 	clients, err := getClients()
 	if err != nil {
@@ -90,7 +101,7 @@ func runContractAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(clients) == 0 {
-		return fmt.Errorf("no clients found. Add a client first with 'ung client add'")
+		return fmt.Errorf("no clients found. This shouldn't happen after ensureClientExists")
 	}
 
 	// Use interactive mode if required fields not provided

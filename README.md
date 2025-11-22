@@ -59,6 +59,29 @@ go build -o ung
 
 ---
 
+## ⚡ Quick Start
+
+New to UNG? Just run this command and follow the prompts:
+
+```bash
+ung contract add
+```
+
+UNG will automatically guide you through:
+1. Adding your company information (if not set up)
+2. Adding your first client (if not set up)
+3. Creating your first contract with hourly rate or fixed price
+
+Then you can immediately start tracking time:
+
+```bash
+ung track log
+```
+
+Select your contract, enter hours worked, and UNG automatically calculates your billable amount!
+
+---
+
 ## ⚙️ Usage Overview
 
 ```bash
@@ -137,7 +160,12 @@ Contracts link clients to specific work agreements with hourly rates or fixed pr
 ung contract add
 ```
 
-This will prompt you to:
+**✨ Smart Guided Setup:** If you haven't added your company info or any clients yet, UNG will guide you through the process step-by-step! Just run the command and it will:
+1. Check if you've added your company → prompt to add it if not
+2. Check if you've added any clients → prompt to add one if not
+3. Then help you create your first contract
+
+This will then prompt you to:
 - Select a client
 - Enter contract name
 - Choose contract type (hourly, fixed_price, retainer)
@@ -219,6 +247,8 @@ The track module lets you record billable or non-billable time.
 ```bash
 ung track log
 ```
+
+**✨ Smart Guided Setup:** If you haven't set up contracts yet, UNG will guide you! It will prompt you to add your company, clients, and create a contract before you can track time.
 
 This will prompt you to:
 - Select a contract (shows hourly rates for easy reference)

@@ -267,6 +267,11 @@ func runTrackList(cmd *cobra.Command, args []string) error {
 }
 
 func runTrackLog(cmd *cobra.Command, args []string) error {
+	// Ensure prerequisites exist (company, client, contract)
+	if err := ensureContractExists(); err != nil {
+		return err
+	}
+
 	// Interactive mode if parameters not provided
 	if trackContractID == 0 || trackHours == 0 {
 		// Fetch active contracts with client info and hourly rates

@@ -1,0 +1,64 @@
+# UNG Configuration File Example
+# Copy this to ~/.ung/config.yaml or .ung.yaml (project-specific)
+
+# Database and storage paths
+database_path: "~/.ung/ung.db"
+invoices_dir: "~/.ung/invoices"
+
+# Language code (en, uk, de, fr, es, etc.)
+language: "en"
+
+# Invoice configuration
+invoice:
+  # Terms & Conditions text
+  terms: "Please make the payment by the due date."
+
+  # Payment note/instruction
+  payment_note: "Payment is due within the specified term."
+
+  # Labels (customize for your language)
+  notes_label: "Notes"
+  terms_label: "Terms & Conditions"
+  invoice_label: "INVOICE"
+  from_label: "From"
+  bill_to_label: "Bill To"
+  description_label: "Description"
+  total_label: "Total"
+  item_label: "Item"
+  quantity_label: "Quantity"
+  rate_label: "Rate"
+  amount_label: "Amount"
+
+# ===== Ukrainian Example =====
+# language: "uk"
+# invoice:
+#   terms: "Будь ласка, здійсніть оплату до вказаного терміну."
+#   payment_note: "Оплата має бути здійснена в зазначений термін."
+#   notes_label: "Примітки"
+#   terms_label: "Умови та Положення"
+#   invoice_label: "РАХУНОК"
+#   from_label: "Від"
+#   bill_to_label: "Рахунок для"
+#   description_label: "Опис"
+#   total_label: "Всього"
+#   item_label: "Послуга"
+#   quantity_label: "Кількість"
+#   rate_label: "Ціна"
+#   amount_label: "Сума"
+
+# ===== German Example =====
+# language: "de"
+# invoice:
+#   terms: "Bitte leisten Sie die Zahlung bis zum Fälligkeitsdatum."
+#   payment_note: "Die Zahlung ist innerhalb der angegebenen Frist fällig."
+#   notes_label: "Notizen"
+#   terms_label: "Geschäftsbedingungen"
+#   invoice_label: "RECHNUNG"
+#   from_label: "Von"
+#   bill_to_label: "Rechnung an"
+#   description_label: "Beschreibung"
+#   total_label: "Gesamt"
+#   item_label: "Position"
+#   quantity_label: "Menge"
+#   rate_label: "Preis"
+#   amount_label: "Betrag"

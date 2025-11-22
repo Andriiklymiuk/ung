@@ -2,14 +2,19 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/Andriiklymiuk/ung/internal/db"
 	"github.com/Andriiklymiuk/ung/internal/models"
 	"github.com/Andriiklymiuk/ung/pkg/invoice"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -39,6 +44,19 @@ var invoicePDFCmd = &cobra.Command{
 	RunE:  runInvoicePDF,
 }
 
+var invoiceEmailCmd = &cobra.Command{
+	Use:   "email [invoice-id]",
+	Short: "Export invoice to email client",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runInvoiceEmail,
+}
+
+var invoiceBatchEmailCmd = &cobra.Command{
+	Use:   "batch-email",
+	Short: "Export multiple invoices to email",
+	RunE:  runInvoiceBatchEmail,
+}
+
 var (
 	invoiceCompanyID   int
 	invoiceClientID    int
@@ -53,6 +71,8 @@ func init() {
 	invoiceCmd.AddCommand(invoiceNewCmd)
 	invoiceCmd.AddCommand(invoiceListCmd)
 	invoiceCmd.AddCommand(invoicePDFCmd)
+	invoiceCmd.AddCommand(invoiceEmailCmd)
+	invoiceCmd.AddCommand(invoiceBatchEmailCmd)
 
 	// New invoice flags
 	invoiceNewCmd.Flags().IntVar(&invoiceCompanyID, "company", 0, "Company ID (required)")
@@ -195,11 +215,14 @@ func runInvoicePDF(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invoice not found: %w", err)
 	}
 
-	// Get company
+	// Get company with all fields
 	err = db.DB.QueryRow(`
-		SELECT id, name, email, address, tax_id
+		SELECT id, name, email, phone, address, registration_address, tax_id,
+		       bank_name, bank_account, bank_swift, logo_path
 		FROM companies WHERE id = ?
-	`, inv.CompanyID).Scan(&company.ID, &company.Name, &company.Email, &company.Address, &company.TaxID)
+	`, inv.CompanyID).Scan(&company.ID, &company.Name, &company.Email, &company.Phone,
+		&company.Address, &company.RegistrationAddress, &company.TaxID,
+		&company.BankName, &company.BankAccount, &company.BankSWIFT, &company.LogoPath)
 	if err != nil {
 		return fmt.Errorf("company not found: %w", err)
 	}
@@ -215,8 +238,43 @@ func runInvoicePDF(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("client not found: %w", err)
 	}
 
+	// Get line items
+	var lineItems []models.InvoiceLineItem
+	rows, err := db.DB.Query(`
+		SELECT id, invoice_id, item_name, description, quantity, rate, amount, created_at
+		FROM invoice_line_items
+		WHERE invoice_id = ?
+		ORDER BY id
+	`, invoiceID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch line items: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item models.InvoiceLineItem
+		if err := rows.Scan(&item.ID, &item.InvoiceID, &item.ItemName, &item.Description,
+			&item.Quantity, &item.Rate, &item.Amount, &item.CreatedAt); err != nil {
+			return fmt.Errorf("failed to scan line item: %w", err)
+		}
+		lineItems = append(lineItems, item)
+	}
+
+	// If no line items, create a default one from invoice amount
+	if len(lineItems) == 0 {
+		lineItems = []models.InvoiceLineItem{
+			{
+				ItemName:    inv.Description,
+				Description: "",
+				Quantity:    1.0,
+				Rate:        inv.Amount,
+				Amount:      inv.Amount,
+			},
+		}
+	}
+
 	// Generate PDF
-	pdfPath, err := invoice.GeneratePDF(inv, company, client)
+	pdfPath, err := invoice.GeneratePDF(inv, company, client, lineItems)
 	if err != nil {
 		return fmt.Errorf("failed to generate PDF: %w", err)
 	}
@@ -228,5 +286,351 @@ func runInvoicePDF(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("✓ PDF generated successfully: %s\n", pdfPath)
+	return nil
+}
+
+func runInvoiceEmail(cmd *cobra.Command, args []string) error {
+	invoiceID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid invoice ID: %w", err)
+	}
+
+	// Fetch invoice details
+	var inv models.Invoice
+	var company models.Company
+
+	// Get invoice
+	err = db.DB.QueryRow(`
+		SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+		FROM invoices WHERE id = ?
+	`, invoiceID).Scan(
+		&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+		&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath,
+	)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	// Get company info
+	err = db.DB.QueryRow(`
+		SELECT id, name FROM companies WHERE id = ?
+	`, inv.CompanyID).Scan(&company.ID, &company.Name)
+	if err != nil {
+		return fmt.Errorf("company not found: %w", err)
+	}
+
+	// Ensure PDF is generated
+	var pdfPath string
+	if inv.PDFPath == "" {
+		fmt.Println("📄 Generating PDF first...")
+		// Call the PDF generation logic
+		if err := runInvoicePDF(cmd, args); err != nil {
+			return fmt.Errorf("failed to generate PDF: %w", err)
+		}
+		// Re-fetch the PDF path
+		err = db.DB.QueryRow("SELECT pdf_path FROM invoices WHERE id = ?", invoiceID).Scan(&pdfPath)
+		if err != nil {
+			return fmt.Errorf("failed to get PDF path: %w", err)
+		}
+	} else {
+		pdfPath = inv.PDFPath
+	}
+
+	// Extract month and year from issued date
+	month := inv.IssuedDate.Format("01")
+	year := inv.IssuedDate.Format("2006")
+
+	// Prepare email details
+	subject := fmt.Sprintf("%s.%s %s", month, year, company.Name)
+	body := fmt.Sprintf("Hi,\n\nHere is the invoice for %s %s.\n\nBest regards,\n%s",
+		inv.IssuedDate.Format("January"), year, company.Name)
+
+	// Prompt for email client selection
+	var emailClient string
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Select email client").
+				Options(
+					huh.NewOption("Apple Mail", "apple"),
+					huh.NewOption("Outlook", "outlook"),
+					huh.NewOption("Gmail (Browser)", "gmail"),
+				).
+				Value(&emailClient),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return fmt.Errorf("email export cancelled: %w", err)
+	}
+
+	// Export to selected email client
+	switch emailClient {
+	case "apple":
+		return exportToAppleMail(subject, body, pdfPath)
+	case "outlook":
+		return exportToOutlook(subject, body, pdfPath)
+	case "gmail":
+		return exportToGmail(subject, body, pdfPath)
+	default:
+		return fmt.Errorf("unknown email client: %s", emailClient)
+	}
+}
+
+// exportToAppleMail opens Apple Mail with prefilled email and attachment
+func exportToAppleMail(subject, body, attachmentPath string) error {
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("Apple Mail is only available on macOS")
+	}
+
+	// Create AppleScript to compose email with attachment
+	script := fmt.Sprintf(`
+tell application "Mail"
+	activate
+	set newMessage to make new outgoing message with properties {subject:"%s", content:"%s", visible:true}
+	tell newMessage
+		make new attachment with properties {file name:POSIX file "%s"} at after the last paragraph
+	end tell
+end tell
+`, escapeAppleScript(subject), escapeAppleScript(body), attachmentPath)
+
+	cmd := exec.Command("osascript", "-e", script)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to open Apple Mail: %w", err)
+	}
+
+	fmt.Println("✓ Email draft created in Apple Mail with attachment")
+	return nil
+}
+
+// exportToOutlook opens Outlook with prefilled email
+func exportToOutlook(subject, body, attachmentPath string) error {
+	// For Outlook, we'll use mailto: link and inform user to manually attach
+	// Outlook doesn't support attachments via mailto: protocol
+	mailtoURL := fmt.Sprintf("mailto:?subject=%s&body=%s",
+		url.QueryEscape(subject),
+		url.QueryEscape(body))
+
+	if err := openURL(mailtoURL); err != nil {
+		return fmt.Errorf("failed to open Outlook: %w", err)
+	}
+
+	fmt.Println("✓ Email draft created in Outlook")
+	fmt.Printf("📎 Please manually attach the PDF: %s\n", attachmentPath)
+	return nil
+}
+
+// exportToGmail opens Gmail in the browser with prefilled email
+func exportToGmail(subject, body, attachmentPath string) error {
+	// Gmail compose URL format
+	gmailURL := fmt.Sprintf("https://mail.google.com/mail/?view=cm&fs=1&su=%s&body=%s",
+		url.QueryEscape(subject),
+		url.QueryEscape(body))
+
+	if err := openURL(gmailURL); err != nil {
+		return fmt.Errorf("failed to open Gmail: %w", err)
+	}
+
+	fmt.Println("✓ Gmail compose opened in browser")
+	fmt.Printf("📎 Please manually attach the PDF: %s\n", attachmentPath)
+	return nil
+}
+
+// openURL opens a URL in the default browser or email client
+func openURL(urlStr string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", urlStr)
+	case "linux":
+		cmd = exec.Command("xdg-open", urlStr)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", urlStr)
+	default:
+		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+
+	return cmd.Run()
+}
+
+// escapeAppleScript escapes special characters for AppleScript strings
+func escapeAppleScript(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "\"", "\\\"")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	return s
+}
+
+func runInvoiceBatchEmail(cmd *cobra.Command, args []string) error {
+	// Prompt for export option
+	var exportOption string
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("What invoices would you like to export?").
+				Options(
+					huh.NewOption("Export for latest month", "latest"),
+					huh.NewOption("Select specific month/year", "specific"),
+					huh.NewOption("Export all pending invoices", "all_pending"),
+				).
+				Value(&exportOption),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return fmt.Errorf("export cancelled: %w", err)
+	}
+
+	var invoices []models.Invoice
+
+	switch exportOption {
+	case "latest":
+		// Get invoices from the latest month
+		query := `
+			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+			FROM invoices
+			WHERE strftime('%Y-%m', issued_date) = strftime('%Y-%m', 'now')
+			ORDER BY issued_date DESC
+		`
+		rows, err := db.DB.Query(query)
+		if err != nil {
+			return fmt.Errorf("failed to fetch invoices: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var inv models.Invoice
+			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
+				return fmt.Errorf("failed to scan invoice: %w", err)
+			}
+			invoices = append(invoices, inv)
+		}
+
+	case "specific":
+		// Prompt for month and year
+		var monthStr, yearStr string
+		monthForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Month (1-12)").
+					Placeholder("e.g., 10").
+					Value(&monthStr).
+					Validate(func(s string) error {
+						month, err := strconv.Atoi(s)
+						if err != nil || month < 1 || month > 12 {
+							return fmt.Errorf("please enter a valid month (1-12)")
+						}
+						return nil
+					}),
+				huh.NewInput().
+					Title("Year").
+					Placeholder("e.g., 2024").
+					Value(&yearStr).
+					Validate(func(s string) error {
+						year, err := strconv.Atoi(s)
+						if err != nil || year < 2000 {
+							return fmt.Errorf("please enter a valid year")
+						}
+						return nil
+					}),
+			),
+		)
+
+		if err := monthForm.Run(); err != nil {
+			return fmt.Errorf("export cancelled: %w", err)
+		}
+
+		// Pad month to 2 digits
+		month, _ := strconv.Atoi(monthStr)
+		yearMonth := fmt.Sprintf("%s-%02d", yearStr, month)
+
+		query := `
+			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+			FROM invoices
+			WHERE strftime('%Y-%m', issued_date) = ?
+			ORDER BY issued_date DESC
+		`
+		rows, err := db.DB.Query(query, yearMonth)
+		if err != nil {
+			return fmt.Errorf("failed to fetch invoices: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var inv models.Invoice
+			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
+				return fmt.Errorf("failed to scan invoice: %w", err)
+			}
+			invoices = append(invoices, inv)
+		}
+
+	case "all_pending":
+		// Get all pending invoices
+		query := `
+			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+			FROM invoices
+			WHERE status = ?
+			ORDER BY issued_date DESC
+		`
+		rows, err := db.DB.Query(query, models.StatusPending)
+		if err != nil {
+			return fmt.Errorf("failed to fetch invoices: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var inv models.Invoice
+			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
+				return fmt.Errorf("failed to scan invoice: %w", err)
+			}
+			invoices = append(invoices, inv)
+		}
+	}
+
+	if len(invoices) == 0 {
+		fmt.Println("No invoices found matching the criteria.")
+		return nil
+	}
+
+	fmt.Printf("\nFound %d invoice(s) to export:\n", len(invoices))
+	for _, inv := range invoices {
+		fmt.Printf("  - %s (%s) - %.2f %s\n", inv.InvoiceNum, inv.IssuedDate.Format("2006-01-02"), inv.Amount, inv.Currency)
+	}
+	fmt.Println()
+
+	// Confirm export
+	var shouldProceed bool
+	confirmForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Proceed with email export?").
+				Value(&shouldProceed),
+		),
+	)
+
+	if err := confirmForm.Run(); err != nil || !shouldProceed {
+		fmt.Println("Export cancelled.")
+		return nil
+	}
+
+	// Export each invoice
+	for i, inv := range invoices {
+		fmt.Printf("\n[%d/%d] Processing %s...\n", i+1, len(invoices), inv.InvoiceNum)
+
+		// Convert invoice ID to string for runInvoiceEmail
+		idStr := strconv.Itoa(int(inv.ID))
+		if err := runInvoiceEmail(cmd, []string{idStr}); err != nil {
+			fmt.Printf("  ❌ Failed to export %s: %v\n", inv.InvoiceNum, err)
+			continue
+		}
+	}
+
+	fmt.Println("\n✓ Batch export completed!")
 	return nil
 }

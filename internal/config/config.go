@@ -10,8 +10,27 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	DatabasePath string `yaml:"database_path"`
-	InvoicesDir  string `yaml:"invoices_dir"`
+	DatabasePath string         `yaml:"database_path"`
+	InvoicesDir  string         `yaml:"invoices_dir"`
+	Language     string         `yaml:"language"`      // e.g., "en", "uk", "de"
+	Invoice      InvoiceConfig  `yaml:"invoice"`
+}
+
+// InvoiceConfig represents invoice-specific configuration
+type InvoiceConfig struct {
+	Terms            string `yaml:"terms"`             // Terms & Conditions
+	PaymentNote      string `yaml:"payment_note"`      // Payment instruction
+	NotesLabel       string `yaml:"notes_label"`       // "Notes" label in chosen language
+	TermsLabel       string `yaml:"terms_label"`       // "Terms & Conditions" label
+	InvoiceLabel     string `yaml:"invoice_label"`     // "INVOICE" title
+	FromLabel        string `yaml:"from_label"`        // "From" label
+	BillToLabel      string `yaml:"bill_to_label"`     // "Bill To" label
+	DescriptionLabel string `yaml:"description_label"` // "Description" label
+	TotalLabel       string `yaml:"total_label"`       // "Total" label
+	ItemLabel        string `yaml:"item_label"`        // "Item" column header
+	QuantityLabel    string `yaml:"quantity_label"`    // "Quantity" column header
+	RateLabel        string `yaml:"rate_label"`        // "Rate" column header
+	AmountLabel      string `yaml:"amount_label"`      // "Amount" column header
 }
 
 var currentConfig *Config
@@ -85,6 +104,22 @@ func getDefaultConfig() *Config {
 	return &Config{
 		DatabasePath: filepath.Join(home, ".ung", "ung.db"),
 		InvoicesDir:  filepath.Join(home, ".ung", "invoices"),
+		Language:     "en",
+		Invoice: InvoiceConfig{
+			Terms:            "Please make the payment by the due date.",
+			PaymentNote:      "Payment is due within the specified term.",
+			NotesLabel:       "Notes",
+			TermsLabel:       "Terms & Conditions",
+			InvoiceLabel:     "INVOICE",
+			FromLabel:        "From",
+			BillToLabel:      "Bill To",
+			DescriptionLabel: "Description",
+			TotalLabel:       "Total",
+			ItemLabel:        "Item",
+			QuantityLabel:    "Quantity",
+			RateLabel:        "Rate",
+			AmountLabel:      "Amount",
+		},
 	}
 }
 

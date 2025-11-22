@@ -220,7 +220,7 @@ func ensureContractExists() error {
 		return fmt.Errorf("at least one contract is required. Run 'ung contract add' to create a contract")
 	}
 
-	fmt.Println("\n📋 Let's create your first contract!\n")
+	fmt.Println("\n📋 Let's create your first contract!")
 
 	// Redirect to contract add - but we need to ensure prerequisites first
 	if err := ensureCompanyExists(); err != nil {

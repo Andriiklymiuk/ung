@@ -84,7 +84,7 @@ func getClients() ([]models.Client, error) {
 
 func runContractAdd(cmd *cobra.Command, args []string) error {
 	// Ensure prerequisites exist
-	fmt.Println("🚀 Let's create a contract!\n")
+	fmt.Println("🚀 Let's create a contract!")
 
 	if err := ensureCompanyExists(); err != nil {
 		return err

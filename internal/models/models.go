@@ -8,13 +8,19 @@ import (
 
 // Company represents a business entity (the user's company)
 type Company struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"not null" json:"name"`
-	Email     string    `gorm:"not null" json:"email"`
-	Address   string    `json:"address"`
-	TaxID     string    `gorm:"column:tax_id" json:"tax_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                  uint      `gorm:"primaryKey" json:"id"`
+	Name                string    `gorm:"not null" json:"name"`
+	Email               string    `gorm:"not null" json:"email"`
+	Phone               string    `json:"phone"`
+	Address             string    `json:"address"`
+	RegistrationAddress string    `gorm:"column:registration_address" json:"registration_address"`
+	TaxID               string    `gorm:"column:tax_id" json:"tax_id"`
+	BankName            string    `gorm:"column:bank_name" json:"bank_name"`
+	BankAccount         string    `gorm:"column:bank_account" json:"bank_account"`
+	BankSWIFT           string    `gorm:"column:bank_swift" json:"bank_swift"`
+	LogoPath            string    `gorm:"column:logo_path" json:"logo_path"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // Client represents a customer/client
@@ -87,6 +93,19 @@ type InvoiceRecipient struct {
 	ID        uint `gorm:"primaryKey" json:"id"`
 	InvoiceID uint `gorm:"not null;index" json:"invoice_id"`
 	ClientID  uint `gorm:"not null;index" json:"client_id"`
+}
+
+// InvoiceLineItem represents an item/service on an invoice
+type InvoiceLineItem struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	InvoiceID   uint      `gorm:"not null;index" json:"invoice_id"`
+	Invoice     Invoice   `gorm:"foreignKey:InvoiceID" json:"-"`
+	ItemName    string    `gorm:"column:item_name;not null" json:"item_name"`
+	Description string    `json:"description"`
+	Quantity    float64   `gorm:"not null;default:1" json:"quantity"`
+	Rate        float64   `gorm:"not null" json:"rate"`
+	Amount      float64   `gorm:"not null" json:"amount"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // TrackingSession represents a time tracking session

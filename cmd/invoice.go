@@ -13,6 +13,7 @@ import (
 
 	"github.com/Andriiklymiuk/ung/internal/db"
 	"github.com/Andriiklymiuk/ung/internal/models"
+	"github.com/Andriiklymiuk/ung/pkg/idgen"
 	"github.com/Andriiklymiuk/ung/pkg/invoice"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -86,20 +87,19 @@ func init() {
 	invoiceNewCmd.MarkFlagRequired("price")
 }
 
-func generateInvoiceNumber() (string, error) {
-	year := time.Now().Year()
-	query := `SELECT COUNT(*) FROM invoices WHERE invoice_num LIKE ?`
-	var count int
-	err := db.DB.QueryRow(query, fmt.Sprintf("INV-%d-%%", year)).Scan(&count)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("INV-%d-%03d", year, count+1), nil
-}
-
 func runInvoiceNew(cmd *cobra.Command, args []string) error {
-	// Generate invoice number
-	invoiceNum, err := generateInvoiceNumber()
+	// Get client name for invoice number generation
+	var clientName string
+	err := db.DB.QueryRow("SELECT name FROM clients WHERE id = ?", invoiceClientID).Scan(&clientName)
+	if err != nil {
+		return fmt.Errorf("client not found: %w", err)
+	}
+
+	// Use current time for issued date
+	issuedDate := time.Now()
+
+	// Generate human-readable invoice number
+	invoiceNum, err := idgen.GenerateInvoiceNumber(db.GormDB, clientName, issuedDate)
 	if err != nil {
 		return fmt.Errorf("failed to generate invoice number: %w", err)
 	}
@@ -129,7 +129,7 @@ func runInvoiceNew(cmd *cobra.Command, args []string) error {
 		invoiceCurrency,
 		invoiceDescription,
 		models.StatusPending,
-		time.Now(),
+		issuedDate,
 		dueDate,
 	)
 	if err != nil {

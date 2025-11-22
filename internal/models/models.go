@@ -46,6 +46,7 @@ const (
 // Contract represents a work contract with a client
 type Contract struct {
 	ID           uint         `gorm:"primaryKey" json:"id"`
+	ContractNum  string       `gorm:"uniqueIndex;not null" json:"contract_num"` // e.g., "contract.acme.jan.2025"
 	ClientID     uint         `gorm:"not null;index" json:"client_id"`
 	Client       Client       `gorm:"foreignKey:ClientID" json:"-"`
 	Name         string       `gorm:"not null" json:"name"` // e.g., "Website Development Q1 2025"

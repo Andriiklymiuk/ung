@@ -14,6 +14,7 @@ import (
 	"github.com/Andriiklymiuk/ung/internal/models"
 	"github.com/Andriiklymiuk/ung/internal/repository"
 	"github.com/Andriiklymiuk/ung/pkg/contract"
+	"github.com/Andriiklymiuk/ung/pkg/idgen"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -248,10 +249,25 @@ func runContractAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid contract type: %s (use hourly, fixed_price, or retainer)", contractType)
 	}
 
+	// Get client name for contract number generation
+	var clientName string
+	if err := db.DB.QueryRow("SELECT name FROM clients WHERE id = ?", contractClientID).Scan(&clientName); err != nil {
+		return fmt.Errorf("client not found: %w", err)
+	}
+
+	// Use current time as start date
+	startDate := time.Now()
+
+	// Generate human-readable contract number
+	contractNum, err := idgen.GenerateContractNumber(db.GormDB, clientName, startDate)
+	if err != nil {
+		return fmt.Errorf("failed to generate contract number: %w", err)
+	}
+
 	// Insert contract
 	query := `
-		INSERT INTO contracts (client_id, name, contract_type, hourly_rate, fixed_price, currency, start_date, active)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+		INSERT INTO contracts (contract_num, client_id, name, contract_type, hourly_rate, fixed_price, currency, start_date, active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
 	`
 
 	var ratePtr *float64
@@ -264,13 +280,14 @@ func runContractAdd(cmd *cobra.Command, args []string) error {
 		pricePtr = &contractPrice
 	}
 
-	result, err := db.DB.Exec(query, contractClientID, contractName, ct, ratePtr, pricePtr, contractCurrency, time.Now())
+	result, err := db.DB.Exec(query, contractNum, contractClientID, contractName, ct, ratePtr, pricePtr, contractCurrency, startDate)
 	if err != nil {
 		return fmt.Errorf("failed to add contract: %w", err)
 	}
 
 	id, _ := result.LastInsertId()
 	fmt.Printf("✓ Contract added successfully (ID: %d)\n", id)
+	fmt.Printf("  Contract Number: %s\n", contractNum)
 	fmt.Printf("  Client ID: %d\n", contractClientID)
 	fmt.Printf("  Name: %s\n", contractName)
 	fmt.Printf("  Type: %s\n", ct)
@@ -286,7 +303,7 @@ func runContractAdd(cmd *cobra.Command, args []string) error {
 
 func runContractList(cmd *cobra.Command, args []string) error {
 	query := `
-		SELECT c.id, c.name, c.contract_type, c.hourly_rate, c.fixed_price, c.currency, c.active, cl.name
+		SELECT c.id, c.contract_num, c.name, c.contract_type, c.hourly_rate, c.fixed_price, c.currency, c.active, cl.name
 		FROM contracts c
 		JOIN clients cl ON c.client_id = cl.id
 		ORDER BY c.active DESC, c.id DESC
@@ -299,15 +316,15 @@ func runContractList(cmd *cobra.Command, args []string) error {
 	defer rows.Close()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tCLIENT\tTYPE\tRATE/PRICE\tACTIVE")
+	fmt.Fprintln(w, "ID\tCONTRACT#\tNAME\tCLIENT\tTYPE\tRATE/PRICE\tACTIVE")
 
 	for rows.Next() {
 		var id int
-		var name, contractType, currency, clientName string
+		var contractNum, name, contractType, currency, clientName string
 		var hourlyRate, fixedPrice *float64
 		var active bool
 
-		if err := rows.Scan(&id, &name, &contractType, &hourlyRate, &fixedPrice, &currency, &active, &clientName); err != nil {
+		if err := rows.Scan(&id, &contractNum, &name, &contractType, &hourlyRate, &fixedPrice, &currency, &active, &clientName); err != nil {
 			return fmt.Errorf("failed to scan row: %w", err)
 		}
 
@@ -323,8 +340,8 @@ func runContractList(cmd *cobra.Command, args []string) error {
 			activeStr = "✗"
 		}
 
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
-			id, name, clientName, contractType, ratePrice, activeStr)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			id, contractNum, name, clientName, contractType, ratePrice, activeStr)
 	}
 
 	w.Flush()

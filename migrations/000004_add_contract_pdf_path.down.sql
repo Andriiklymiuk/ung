@@ -1,0 +1,4 @@
+-- Remove pdf_path column from contracts table
+-- Note: SQLite doesn't support DROP COLUMN directly
+-- This would require recreating the table, which is risky for existing data
+-- For SQLite, consider this migration irreversible or handle manually

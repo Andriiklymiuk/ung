@@ -57,6 +57,7 @@ type Contract struct {
 	EndDate      *time.Time   `json:"end_date"`
 	Active       bool         `gorm:"default:true" json:"active"`
 	Notes        string       `json:"notes"`
+	PDFPath      string       `gorm:"column:pdf_path" json:"pdf_path"`
 	CreatedAt    time.Time    `json:"created_at"`
 	UpdatedAt    time.Time    `json:"updated_at"`
 }

@@ -2,13 +2,18 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"text/tabwriter"
 	"time"
 
 	"github.com/Andriiklymiuk/ung/internal/db"
 	"github.com/Andriiklymiuk/ung/internal/models"
+	"github.com/Andriiklymiuk/ung/internal/repository"
+	"github.com/Andriiklymiuk/ung/pkg/contract"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -39,6 +44,20 @@ var contractEditCmd = &cobra.Command{
 	RunE:  runContractEdit,
 }
 
+var contractPDFCmd = &cobra.Command{
+	Use:   "pdf [contract-id]",
+	Short: "Generate PDF for a contract",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runContractPDF,
+}
+
+var contractEmailCmd = &cobra.Command{
+	Use:   "email [contract-id]",
+	Short: "Export contract to email client",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runContractEmail,
+}
+
 var (
 	contractClientID int
 	contractName     string
@@ -54,6 +73,8 @@ func init() {
 	contractCmd.AddCommand(contractAddCmd)
 	contractCmd.AddCommand(contractListCmd)
 	contractCmd.AddCommand(contractEditCmd)
+	contractCmd.AddCommand(contractPDFCmd)
+	contractCmd.AddCommand(contractEmailCmd)
 
 	// Add flags (optional - if not provided, will use interactive mode)
 	contractAddCmd.Flags().IntVar(&contractClientID, "client", 0, "Client ID")
@@ -393,5 +414,168 @@ func runContractEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("✓ Contract %d updated successfully\n", contractID)
+	return nil
+}
+
+func runContractPDF(cmd *cobra.Command, args []string) error {
+	contractID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid contract ID: %w", err)
+	}
+
+	contractRepo := repository.NewContractRepository()
+	companyRepo := repository.NewCompanyRepository()
+
+	// Get contract with client preloaded
+	contractModel, err := contractRepo.GetByID(uint(contractID))
+	if err != nil {
+		return fmt.Errorf("contract not found: %w", err)
+	}
+
+	// Get company (assuming first company for now)
+	companies, err := companyRepo.List()
+	if err != nil || len(companies) == 0 {
+		return fmt.Errorf("no company found: %w", err)
+	}
+	company := companies[0]
+
+	// Generate PDF
+	pdfPath, err := contract.GeneratePDF(*contractModel, company, contractModel.Client)
+	if err != nil {
+		return fmt.Errorf("failed to generate PDF: %w", err)
+	}
+
+	// Update contract with PDF path
+	contractModel.PDFPath = pdfPath
+	if err := contractRepo.Update(contractModel); err != nil {
+		return fmt.Errorf("failed to update contract: %w", err)
+	}
+
+	fmt.Printf("✓ PDF generated successfully: %s\n", pdfPath)
+	return nil
+}
+
+func runContractEmail(cmd *cobra.Command, args []string) error {
+	contractID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid contract ID: %w", err)
+	}
+
+	contractRepo := repository.NewContractRepository()
+	companyRepo := repository.NewCompanyRepository()
+
+	// Get contract
+	contractModel, err := contractRepo.GetByID(uint(contractID))
+	if err != nil {
+		return fmt.Errorf("contract not found: %w", err)
+	}
+
+	// Get company
+	companies, err := companyRepo.List()
+	if err != nil || len(companies) == 0 {
+		return fmt.Errorf("no company found: %w", err)
+	}
+	company := companies[0]
+
+	// Ensure PDF is generated
+	var pdfPath string
+	if contractModel.PDFPath == "" {
+		fmt.Println("📄 Generating PDF first...")
+		pdfPath, err = contract.GeneratePDF(*contractModel, company, contractModel.Client)
+		if err != nil {
+			return fmt.Errorf("failed to generate PDF: %w", err)
+		}
+		contractModel.PDFPath = pdfPath
+		contractRepo.Update(contractModel)
+	} else {
+		pdfPath = contractModel.PDFPath
+	}
+
+	// Prepare email details
+	subject := fmt.Sprintf("Contract: %s - %s", company.Name, contractModel.Name)
+	body := fmt.Sprintf("Hi,\n\nPlease find attached the contract for %s.\n\nBest regards,\n%s",
+		contractModel.Name, company.Name)
+
+	// Prompt for email client selection
+	var emailClient string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Select email client").
+				Options(
+					huh.NewOption("Apple Mail", "apple"),
+					huh.NewOption("Outlook", "outlook"),
+					huh.NewOption("Gmail (Browser)", "gmail"),
+				).
+				Value(&emailClient),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return fmt.Errorf("email export cancelled: %w", err)
+	}
+
+	// Export to selected email client
+	switch emailClient {
+	case "apple":
+		return exportContractToAppleMail(subject, body, pdfPath)
+	case "outlook":
+		return exportContractToOutlook(subject, body, pdfPath)
+	case "gmail":
+		return exportContractToGmail(subject, body, pdfPath)
+	default:
+		return fmt.Errorf("unknown email client: %s", emailClient)
+	}
+}
+
+func exportContractToAppleMail(subject, body, attachmentPath string) error {
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("Apple Mail is only available on macOS")
+	}
+
+	script := fmt.Sprintf(`
+tell application "Mail"
+	activate
+	set newMessage to make new outgoing message with properties {subject:"%s", content:"%s", visible:true}
+	tell newMessage
+		make new attachment with properties {file name:POSIX file "%s"} at after the last paragraph
+	end tell
+end tell
+`, escapeAppleScript(subject), escapeAppleScript(body), attachmentPath)
+
+	cmd := exec.Command("osascript", "-e", script)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to open Apple Mail: %w", err)
+	}
+
+	fmt.Println("✓ Email draft created in Apple Mail with attachment")
+	return nil
+}
+
+func exportContractToOutlook(subject, body, attachmentPath string) error {
+	mailtoURL := fmt.Sprintf("mailto:?subject=%s&body=%s",
+		url.QueryEscape(subject),
+		url.QueryEscape(body))
+
+	if err := openURL(mailtoURL); err != nil {
+		return fmt.Errorf("failed to open Outlook: %w", err)
+	}
+
+	fmt.Println("✓ Email draft created in Outlook")
+	fmt.Printf("📎 Please manually attach the PDF: %s\n", attachmentPath)
+	return nil
+}
+
+func exportContractToGmail(subject, body, attachmentPath string) error {
+	gmailURL := fmt.Sprintf("https://mail.google.com/mail/?view=cm&fs=1&su=%s&body=%s",
+		url.QueryEscape(subject),
+		url.QueryEscape(body))
+
+	if err := openURL(gmailURL); err != nil {
+		return fmt.Errorf("failed to open Gmail: %w", err)
+	}
+
+	fmt.Println("✓ Gmail compose opened in browser")
+	fmt.Printf("📎 Please manually attach the PDF: %s\n", attachmentPath)
 	return nil
 }

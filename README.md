@@ -20,9 +20,17 @@ UNG's goal is to make invoicing, billing, and tracking simple, scriptable, and u
 - Store PDFs locally
 - Track statuses: pending, sent, paid, overdue
 
+### 📋 Contract Management
+- Track hourly rate, fixed price, and retainer contracts
+- Link contracts to clients
+- Automatically calculate billable amounts
+- Interactive prompts for easy data entry
+
 ### ⏱ Time Tracking
 - Start/stop timers
-- Assign sessions to a client/project
+- Manually log hours worked
+- Assign sessions to contracts with hourly rates
+- Automatic billable amount calculation
 - Convert tracked time → invoice line items
 
 ### 📂 Unified SQLite Database
@@ -60,6 +68,7 @@ ung [group] [command] [flags]
 **Groups:**
 - `company` — manage your own business details
 - `client` — manage clients
+- `contract` — manage contracts with clients
 - `invoice` — create & list invoices
 - `track` — time tracking utilities
 - `config` — global settings
@@ -118,6 +127,55 @@ ung client edit 3 --email "new@acme.com"
 
 ---
 
+## 📋 CONTRACT COMMANDS
+
+Contracts link clients to specific work agreements with hourly rates or fixed prices.
+
+### Add a contract (interactive mode - no flags needed!)
+
+```bash
+ung contract add
+```
+
+This will prompt you to:
+- Select a client
+- Enter contract name
+- Choose contract type (hourly, fixed_price, retainer)
+- Enter rate or price
+- Set currency
+
+### Add a contract (with flags)
+
+```bash
+ung contract add \
+  --client 1 \
+  --name "Website Development Q1 2025" \
+  --type hourly \
+  --rate 75 \
+  --currency USD
+```
+
+### List contracts
+
+```bash
+ung contract ls
+```
+
+Output shows client, type, and rates:
+```
+ID  NAME                    CLIENT     TYPE    RATE/PRICE    ACTIVE
+1   Website Development     Acme Corp  hourly  75.00 USD/hr  ✓
+2   Logo Design Project     TechCo     fixed   5000.00 USD   ✓
+```
+
+### Edit contract (mark inactive)
+
+```bash
+ung contract edit 1
+```
+
+---
+
 ## 🧾 INVOICE COMMANDS
 
 ### Create an invoice
@@ -156,6 +214,36 @@ ung invoice ls
 
 The track module lets you record billable or non-billable time.
 
+### Log hours worked (interactive mode - recommended!)
+
+```bash
+ung track log
+```
+
+This will prompt you to:
+- Select a contract (shows hourly rates for easy reference)
+- Enter hours worked
+- Add project/task name
+- Add notes
+
+**Automatically calculates billable amount** based on contract hourly rate!
+
+Example output:
+```
+✓ Time logged successfully (Session ID: 1)
+  Client: Acme Corp
+  Contract: Website Development
+  Hours: 2.50
+  Billable Amount: 187.50 USD
+  Project: Homepage redesign
+```
+
+### Log hours (with flags)
+
+```bash
+ung track log --contract 1 --hours 2.5 --project "Homepage redesign"
+```
+
 ### Start a timer
 
 ```bash
@@ -180,12 +268,6 @@ ung track now
 ung track ls
 ```
 
-### Convert tracked time → invoice item
-
-```bash
-ung track invoice --rate 40 --invoice 12
-```
-
 ---
 
 ## 📂 Directory Structure
@@ -208,9 +290,10 @@ You can back it up, sync it, or point a Swift app to it.
 
 - **companies** — your business entities
 - **clients** — client/customer information
+- **contracts** — work agreements with hourly rates or fixed prices
 - **invoices** — invoice records
 - **invoice_recipients** — links between invoices and clients
-- **tracking_sessions** — time tracking records
+- **tracking_sessions** — time tracking records linked to contracts
 
 ---
 
@@ -239,23 +322,30 @@ ung company add --name "Andrii" --email "andrii@example.com"
 ung client add --name "TechCorp" --email "billing@techcorp.com"
 ```
 
-### 3. Track time
+### 3. Create a contract
 
 ```bash
-ung track start --client 1
-ung track stop
+ung contract add --client 1 --name "Web Dev Q1" --type hourly --rate 75 --currency USD
 ```
 
-### 4. Create invoice
+### 4. Log your work (interactive)
 
 ```bash
-ung invoice new --company 1 --client 1 --price 120
+ung track log
+# Select contract, enter hours (e.g., 2.5), add notes
+# Billable amount calculated automatically!
 ```
 
-### 5. Generate PDF
+### 5. Create invoice
 
 ```bash
-ung invoice pdf 2
+ung invoice new --company 1 --client 1 --price 187.50 --currency USD
+```
+
+### 6. Generate PDF
+
+```bash
+ung invoice pdf 1
 ```
 
 ---

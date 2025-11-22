@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Andriiklymiuk/ung/internal/config"
 	_ "github.com/mattn/go-sqlite3"
@@ -61,25 +62,71 @@ func Close() error {
 
 // runMigrations runs database migrations
 func runMigrations(dbPath string) error {
-	// Use golang-migrate to run migrations from embedded files
-	// For now, we'll use a simple approach by reading migration files
 	migrationsDir := "migrations"
 
 	// Check if migrations directory exists
 	if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
-		// Fallback to inline schema for development
 		return runInlineSchema()
 	}
 
-	// Read and execute up migration
-	upFile := filepath.Join(migrationsDir, "000001_init_schema.up.sql")
-	upSQL, err := os.ReadFile(upFile)
+	// Create migrations table to track applied migrations
+	_, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version TEXT PRIMARY KEY,
+			applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create migrations table: %w", err)
+	}
+
+	// Read all migration files
+	files, err := os.ReadDir(migrationsDir)
 	if err != nil {
 		return runInlineSchema()
 	}
 
-	_, err = DB.Exec(string(upSQL))
-	return err
+	// Execute each .up.sql file in order
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		// Only process .up.sql files
+		fileName := file.Name()
+		if !strings.HasSuffix(fileName, ".up.sql") {
+			continue
+		}
+
+		version := fileName[:len(fileName)-7] // Remove .up.sql
+
+		// Check if already applied
+		var count int
+		err := DB.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = ?", version).Scan(&count)
+		if err == nil && count > 0 {
+			continue // Already applied
+		}
+
+		// Read and execute migration
+		migrationPath := filepath.Join(migrationsDir, file.Name())
+		migrationSQL, err := os.ReadFile(migrationPath)
+		if err != nil {
+			return fmt.Errorf("failed to read migration %s: %w", file.Name(), err)
+		}
+
+		_, err = DB.Exec(string(migrationSQL))
+		if err != nil {
+			return fmt.Errorf("failed to execute migration %s: %w", file.Name(), err)
+		}
+
+		// Record migration
+		_, err = DB.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version)
+		if err != nil {
+			return fmt.Errorf("failed to record migration %s: %w", file.Name(), err)
+		}
+	}
+
+	return nil
 }
 
 // runInlineSchema is a fallback for when migration files aren't available

@@ -28,6 +28,7 @@ func init() {
 	// Register subcommands
 	rootCmd.AddCommand(companyCmd)
 	rootCmd.AddCommand(clientCmd)
+	rootCmd.AddCommand(contractCmd)
 	rootCmd.AddCommand(invoiceCmd)
 	rootCmd.AddCommand(trackCmd)
 }

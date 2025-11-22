@@ -28,6 +28,33 @@ type Client struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// ContractType represents the type of contract
+type ContractType string
+
+const (
+	ContractTypeHourly     ContractType = "hourly"
+	ContractTypeFixedPrice ContractType = "fixed_price"
+	ContractTypeRetainer   ContractType = "retainer"
+)
+
+// Contract represents a work contract with a client
+type Contract struct {
+	ID           uint         `gorm:"primaryKey" json:"id"`
+	ClientID     uint         `gorm:"not null;index" json:"client_id"`
+	Client       Client       `gorm:"foreignKey:ClientID" json:"-"`
+	Name         string       `gorm:"not null" json:"name"` // e.g., "Website Development Q1 2025"
+	ContractType ContractType `gorm:"not null" json:"contract_type"`
+	HourlyRate   *float64     `json:"hourly_rate"` // For hourly contracts
+	FixedPrice   *float64     `json:"fixed_price"` // For fixed price contracts
+	Currency     string       `gorm:"default:USD" json:"currency"`
+	StartDate    time.Time    `json:"start_date"`
+	EndDate      *time.Time   `json:"end_date"`
+	Active       bool         `gorm:"default:true" json:"active"`
+	Notes        string       `json:"notes"`
+	CreatedAt    time.Time    `json:"created_at"`
+	UpdatedAt    time.Time    `json:"updated_at"`
+}
+
 // InvoiceStatus represents the status of an invoice
 type InvoiceStatus string
 
@@ -67,10 +94,13 @@ type TrackingSession struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
 	ClientID    *uint          `gorm:"index" json:"client_id"`
 	Client      *Client        `gorm:"foreignKey:ClientID" json:"-"`
+	ContractID  *uint          `gorm:"index" json:"contract_id"`
+	Contract    *Contract      `gorm:"foreignKey:ContractID" json:"-"`
 	ProjectName string         `json:"project_name"`
 	StartTime   time.Time      `gorm:"not null" json:"start_time"`
 	EndTime     *time.Time     `json:"end_time"`
-	Duration    *int           `json:"duration"` // in seconds
+	Duration    *int           `json:"duration"`       // in seconds
+	Hours       *float64       `json:"hours"`          // calculated hours for easier display
 	Billable    bool           `gorm:"default:true" json:"billable"`
 	Notes       string         `json:"notes"`
 	CreatedAt   time.Time      `json:"created_at"`

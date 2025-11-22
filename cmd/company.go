@@ -5,10 +5,9 @@ import (
 	"os"
 	"strconv"
 	"text/tabwriter"
-	"time"
 
-	"github.com/Andriiklymiuk/ung/internal/db"
 	"github.com/Andriiklymiuk/ung/internal/models"
+	"github.com/Andriiklymiuk/ung/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -67,38 +66,35 @@ func init() {
 }
 
 func runCompanyAdd(cmd *cobra.Command, args []string) error {
-	query := `
-		INSERT INTO companies (name, email, address, tax_id)
-		VALUES (?, ?, ?, ?)
-	`
+	repo := repository.NewCompanyRepository()
 
-	result, err := db.DB.Exec(query, companyName, companyEmail, companyAddress, companyTaxID)
-	if err != nil {
+	company := &models.Company{
+		Name:    companyName,
+		Email:   companyEmail,
+		Address: companyAddress,
+		TaxID:   companyTaxID,
+	}
+
+	if err := repo.Create(company); err != nil {
 		return fmt.Errorf("failed to add company: %w", err)
 	}
 
-	id, _ := result.LastInsertId()
-	fmt.Printf("✓ Company added successfully (ID: %d)\n", id)
+	fmt.Printf("✓ Company added successfully (ID: %d)\n", company.ID)
 	return nil
 }
 
 func runCompanyList(cmd *cobra.Command, args []string) error {
-	query := `SELECT id, name, email, address, tax_id, created_at FROM companies ORDER BY id`
+	repo := repository.NewCompanyRepository()
 
-	rows, err := db.DB.Query(query)
+	companies, err := repo.List()
 	if err != nil {
 		return fmt.Errorf("failed to query companies: %w", err)
 	}
-	defer rows.Close()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tNAME\tEMAIL\tADDRESS\tTAX ID\tCREATED")
 
-	for rows.Next() {
-		var c models.Company
-		if err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.Address, &c.TaxID, &c.CreatedAt); err != nil {
-			return fmt.Errorf("failed to scan row: %w", err)
-		}
+	for _, c := range companies {
 		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
 			c.ID, c.Name, c.Email, c.Address, c.TaxID, c.CreatedAt.Format("2006-01-02"))
 	}
@@ -113,46 +109,39 @@ func runCompanyEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid company ID: %w", err)
 	}
 
-	updates := make(map[string]interface{})
-	if cmd.Flags().Changed("name") {
-		updates["name"] = companyName
-	}
-	if cmd.Flags().Changed("email") {
-		updates["email"] = companyEmail
-	}
-	if cmd.Flags().Changed("address") {
-		updates["address"] = companyAddress
-	}
-	if cmd.Flags().Changed("tax-id") {
-		updates["tax_id"] = companyTaxID
+	repo := repository.NewCompanyRepository()
+
+	// Fetch existing company
+	company, err := repo.GetByID(uint(id))
+	if err != nil {
+		return fmt.Errorf("company with ID %d not found: %w", id, err)
 	}
 
-	if len(updates) == 0 {
+	// Update only changed fields
+	updated := false
+	if cmd.Flags().Changed("name") {
+		company.Name = companyName
+		updated = true
+	}
+	if cmd.Flags().Changed("email") {
+		company.Email = companyEmail
+		updated = true
+	}
+	if cmd.Flags().Changed("address") {
+		company.Address = companyAddress
+		updated = true
+	}
+	if cmd.Flags().Changed("tax-id") {
+		company.TaxID = companyTaxID
+		updated = true
+	}
+
+	if !updated {
 		return fmt.Errorf("no fields to update")
 	}
 
-	query := "UPDATE companies SET "
-	args_list := []interface{}{}
-	i := 0
-	for key, val := range updates {
-		if i > 0 {
-			query += ", "
-		}
-		query += key + " = ?"
-		args_list = append(args_list, val)
-		i++
-	}
-	query += ", updated_at = ? WHERE id = ?"
-	args_list = append(args_list, time.Now(), id)
-
-	result, err := db.DB.Exec(query, args_list...)
-	if err != nil {
+	if err := repo.Update(company); err != nil {
 		return fmt.Errorf("failed to update company: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("company with ID %d not found", id)
 	}
 
 	fmt.Printf("✓ Company %d updated successfully\n", id)

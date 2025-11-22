@@ -9,9 +9,13 @@ import (
 
 	"github.com/Andriiklymiuk/ung/internal/config"
 	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var DB *sql.DB
+var GormDB *gorm.DB
 
 // GetDBPath returns the path to the database file
 func GetDBPath() string {
@@ -47,6 +51,14 @@ func Initialize() error {
 
 	if err := runMigrations(dbPath); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	// Initialize GORM
+	GormDB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize GORM: %w", err)
 	}
 
 	return nil

@@ -3,14 +3,16 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/Andriiklymiuk/ung/internal/db"
+	"github.com/Andriiklymiuk/ung/internal/models"
+	"github.com/Andriiklymiuk/ung/internal/repository"
 	"github.com/charmbracelet/huh"
 )
 
 // ensureCompanyExists checks if a company exists, and prompts to create one if not
 func ensureCompanyExists() error {
-	var count int
-	err := db.DB.QueryRow("SELECT COUNT(*) FROM companies").Scan(&count)
+	repo := repository.NewCompanyRepository()
+
+	count, err := repo.Count()
 	if err != nil {
 		return fmt.Errorf("failed to check companies: %w", err)
 	}
@@ -84,22 +86,27 @@ func ensureCompanyExists() error {
 	}
 
 	// Insert company
-	query := `INSERT INTO companies (name, email, address, tax_id) VALUES (?, ?, ?, ?)`
-	result, err := db.DB.Exec(query, name, email, address, taxID)
-	if err != nil {
+	company := &models.Company{
+		Name:    name,
+		Email:   email,
+		Address: address,
+		TaxID:   taxID,
+	}
+
+	if err := repo.Create(company); err != nil {
 		return fmt.Errorf("failed to add company: %w", err)
 	}
 
-	id, _ := result.LastInsertId()
-	fmt.Printf("\n✓ Company added successfully (ID: %d)\n\n", id)
+	fmt.Printf("\n✓ Company added successfully (ID: %d)\n\n", company.ID)
 
 	return nil
 }
 
 // ensureClientExists checks if a client exists, and prompts to create one if not
 func ensureClientExists() error {
-	var count int
-	err := db.DB.QueryRow("SELECT COUNT(*) FROM clients").Scan(&count)
+	repo := repository.NewClientRepository()
+
+	count, err := repo.Count()
 	if err != nil {
 		return fmt.Errorf("failed to check clients: %w", err)
 	}
@@ -173,22 +180,27 @@ func ensureClientExists() error {
 	}
 
 	// Insert client
-	query := `INSERT INTO clients (name, email, address, tax_id) VALUES (?, ?, ?, ?)`
-	result, err := db.DB.Exec(query, name, email, address, taxID)
-	if err != nil {
+	client := &models.Client{
+		Name:    name,
+		Email:   email,
+		Address: address,
+		TaxID:   taxID,
+	}
+
+	if err := repo.Create(client); err != nil {
 		return fmt.Errorf("failed to add client: %w", err)
 	}
 
-	id, _ := result.LastInsertId()
-	fmt.Printf("\n✓ Client added successfully (ID: %d)\n\n", id)
+	fmt.Printf("\n✓ Client added successfully (ID: %d)\n\n", client.ID)
 
 	return nil
 }
 
 // ensureContractExists checks if a contract exists, and prompts to create one if not
 func ensureContractExists() error {
-	var count int
-	err := db.DB.QueryRow("SELECT COUNT(*) FROM contracts WHERE active = 1").Scan(&count)
+	repo := repository.NewContractRepository()
+
+	count, err := repo.CountActive()
 	if err != nil {
 		return fmt.Errorf("failed to check contracts: %w", err)
 	}

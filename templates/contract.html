@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Contract - {{.Name}}</title>
+    <style>
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            margin: 40px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 32px;
+            margin: 0;
+            color: #2c3e50;
+        }
+        .contract-details {
+            text-align: right;
+            margin-bottom: 30px;
+            font-size: 12px;
+        }
+        .parties {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+        }
+        .party {
+            width: 45%;
+        }
+        .party h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        .party p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        table th, table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+            font-size: 11px;
+        }
+        table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .notes, .terms {
+            margin-top: 30px;
+        }
+        .notes h3, .terms h3 {
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        .notes p, .terms p {
+            font-size: 11px;
+            line-height: 1.6;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-inactive {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>CONTRACT AGREEMENT</h1>
+    </div>
+
+    <div class="contract-details">
+        <p><strong>Contract:</strong> {{.Name}}</p>
+        <p><strong>Type:</strong> {{.ContractType}}</p>
+        <p><strong>Start Date:</strong> {{.StartDate}}</p>
+        {{if .EndDate}}<p><strong>End Date:</strong> {{.EndDate}}</p>{{end}}
+        <p>
+            <strong>Status:</strong>
+            {{if .Active}}
+                <span class="status-badge status-active">ACTIVE</span>
+            {{else}}
+                <span class="status-badge status-inactive">INACTIVE</span>
+            {{end}}
+        </p>
+    </div>
+
+    <div class="parties">
+        <div class="party">
+            <h3>{{.Labels.FromLabel}}</h3>
+            <p><strong>{{.Company.Name}}</strong></p>
+            <p>{{.Company.Email}}</p>
+            {{if .Company.Phone}}<p>{{.Company.Phone}}</p>{{end}}
+            {{if .Company.Address}}<p>{{.Company.Address}}</p>{{end}}
+            {{if .Company.TaxID}}<p>Tax ID: {{.Company.TaxID}}</p>{{end}}
+
+            {{if .Company.BankName}}
+            <p style="margin-top: 10px;"><strong>Bank Details:</strong></p>
+            <p>{{.Company.BankName}}</p>
+            {{if .Company.BankAccount}}<p>Account: {{.Company.BankAccount}}</p>{{end}}
+            {{if .Company.BankSWIFT}}<p>SWIFT: {{.Company.BankSWIFT}}</p>{{end}}
+            {{end}}
+        </div>
+
+        <div class="party">
+            <h3>{{.Labels.BillToLabel}}</h3>
+            <p><strong>{{.Client.Name}}</strong></p>
+            <p>{{.Client.Email}}</p>
+            {{if .Client.Address}}<p>{{.Client.Address}}</p>{{end}}
+            {{if .Client.TaxID}}<p>Tax ID: {{.Client.TaxID}}</p>{{end}}
+        </div>
+    </div>
+
+    <h3 style="color: #2c3e50; margin-bottom: 15px;">Contract Terms</h3>
+    <table>
+        <tr>
+            <th>Term</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>Contract Type</td>
+            <td>{{.ContractType}}</td>
+        </tr>
+        {{if .HourlyRate}}
+        <tr>
+            <td>Hourly Rate</td>
+            <td>{{.HourlyRate}} {{.Currency}}/hour</td>
+        </tr>
+        {{end}}
+        {{if .FixedPrice}}
+        <tr>
+            <td>Fixed Price</td>
+            <td>{{.FixedPrice}} {{.Currency}}</td>
+        </tr>
+        {{end}}
+        <tr>
+            <td>Start Date</td>
+            <td>{{.StartDate}}</td>
+        </tr>
+        {{if .EndDate}}
+        <tr>
+            <td>End Date</td>
+            <td>{{.EndDate}}</td>
+        </tr>
+        {{end}}
+        <tr>
+            <td>Status</td>
+            <td>{{if .Active}}Active{{else}}Inactive{{end}}</td>
+        </tr>
+    </table>
+
+    {{if .Notes}}
+    <div class="notes">
+        <h3>{{.Labels.NotesLabel}}</h3>
+        <p>{{.Notes}}</p>
+    </div>
+    {{end}}
+
+    <div class="terms">
+        <h3>{{.Labels.TermsLabel}}</h3>
+        <p>{{.Labels.Terms}}</p>
+    </div>
+</body>
+</html>

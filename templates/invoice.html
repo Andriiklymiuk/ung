@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice {{.InvoiceNum}}</title>
+    <style>
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            margin: 40px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 32px;
+            margin: 0;
+            color: #2c3e50;
+        }
+        .invoice-details {
+            text-align: right;
+            margin-bottom: 30px;
+            font-size: 12px;
+        }
+        .parties {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+        }
+        .party {
+            width: 45%;
+        }
+        .party h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        .party p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        table th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-size: 12px;
+        }
+        table td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            font-size: 11px;
+        }
+        table tr:last-child td {
+            border-bottom: none;
+        }
+        .total-row {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .notes, .terms {
+            margin-top: 30px;
+        }
+        .notes h3, .terms h3 {
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        .notes p, .terms p {
+            font-size: 11px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{.Labels.InvoiceLabel}}</h1>
+    </div>
+
+    <div class="invoice-details">
+        <p><strong>Invoice:</strong> {{.InvoiceNum}}</p>
+        <p><strong>Date:</strong> {{.IssuedDate}}</p>
+        <p><strong>Due Date:</strong> {{.DueDate}}</p>
+    </div>
+
+    <div class="parties">
+        <div class="party">
+            <h3>{{.Labels.FromLabel}}</h3>
+            <p><strong>{{.Company.Name}}</strong></p>
+            <p>{{.Company.Email}}</p>
+            {{if .Company.Phone}}<p>{{.Company.Phone}}</p>{{end}}
+            {{if .Company.Address}}<p>{{.Company.Address}}</p>{{end}}
+            {{if .Company.TaxID}}<p>Tax ID: {{.Company.TaxID}}</p>{{end}}
+
+            {{if .Company.BankName}}
+            <p style="margin-top: 10px;"><strong>Bank Details:</strong></p>
+            <p>{{.Company.BankName}}</p>
+            {{if .Company.BankAccount}}<p>Account: {{.Company.BankAccount}}</p>{{end}}
+            {{if .Company.BankSWIFT}}<p>SWIFT: {{.Company.BankSWIFT}}</p>{{end}}
+            {{end}}
+        </div>
+
+        <div class="party">
+            <h3>{{.Labels.BillToLabel}}</h3>
+            <p><strong>{{.Client.Name}}</strong></p>
+            <p>{{.Client.Email}}</p>
+            {{if .Client.Address}}<p>{{.Client.Address}}</p>{{end}}
+            {{if .Client.TaxID}}<p>Tax ID: {{.Client.TaxID}}</p>{{end}}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>{{.Labels.ItemLabel}}</th>
+                <th>{{.Labels.QuantityLabel}}</th>
+                <th>{{.Labels.RateLabel}}</th>
+                <th style="text-align: right;">{{.Labels.AmountLabel}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .LineItems}}
+            <tr>
+                <td>
+                    <strong>{{.ItemName}}</strong>
+                    {{if .Description}}<br><small>{{.Description}}</small>{{end}}
+                </td>
+                <td>{{.Quantity}}</td>
+                <td>{{.Rate}} {{$.Currency}}</td>
+                <td style="text-align: right;">{{.Amount}} {{$.Currency}}</td>
+            </tr>
+            {{end}}
+            <tr class="total-row">
+                <td colspan="3" style="text-align: right;"><strong>{{.Labels.TotalLabel}}:</strong></td>
+                <td style="text-align: right;"><strong>{{.Amount}} {{.Currency}}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    {{if .Description}}
+    <div class="notes">
+        <h3>{{.Labels.NotesLabel}}</h3>
+        <p>{{.Description}}</p>
+    </div>
+    {{end}}
+
+    <div class="terms">
+        <h3>{{.Labels.TermsLabel}}</h3>
+        <p>{{.Labels.Terms}}</p>
+    </div>
+</body>
+</html>

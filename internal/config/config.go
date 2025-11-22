@@ -14,6 +14,13 @@ type Config struct {
 	InvoicesDir  string         `yaml:"invoices_dir"`
 	Language     string         `yaml:"language"`      // e.g., "en", "uk", "de"
 	Invoice      InvoiceConfig  `yaml:"invoice"`
+	Templates    TemplateConfig `yaml:"templates"`
+}
+
+// TemplateConfig represents template paths for PDF generation
+type TemplateConfig struct {
+	InvoiceHTML  string `yaml:"invoice_html"`  // Path to invoice HTML template
+	ContractHTML string `yaml:"contract_html"` // Path to contract HTML template
 }
 
 // InvoiceConfig represents invoice-specific configuration

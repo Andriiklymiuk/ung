@@ -8,6 +8,12 @@ invoices_dir: "~/.ung/invoices"
 # Language code (en, uk, de, fr, es, etc.)
 language: "en"
 
+# Custom HTML templates for PDFs (optional)
+# If not specified, uses built-in gofpdf templates
+# templates:
+#   invoice_html: "~/custom-templates/invoice.html"
+#   contract_html: "~/custom-templates/contract.html"
+
 # Invoice configuration
 invoice:
   # Terms & Conditions text

@@ -128,3 +128,32 @@ type TrackingSession struct {
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
+
+// ExpenseCategory represents the category of an expense
+type ExpenseCategory string
+
+const (
+	ExpenseCategorySoftware      ExpenseCategory = "software"
+	ExpenseCategoryHardware      ExpenseCategory = "hardware"
+	ExpenseCategoryTravel        ExpenseCategory = "travel"
+	ExpenseCategoryMeals         ExpenseCategory = "meals"
+	ExpenseCategoryOfficeSupplies ExpenseCategory = "office_supplies"
+	ExpenseCategoryUtilities     ExpenseCategory = "utilities"
+	ExpenseCategoryMarketing     ExpenseCategory = "marketing"
+	ExpenseCategoryOther         ExpenseCategory = "other"
+)
+
+// Expense represents a business expense
+type Expense struct {
+	ID          uint            `gorm:"primaryKey" json:"id"`
+	Description string          `gorm:"not null" json:"description"`
+	Amount      float64         `gorm:"not null" json:"amount"`
+	Currency    string          `gorm:"default:USD" json:"currency"`
+	Category    ExpenseCategory `gorm:"not null" json:"category"`
+	Date        time.Time       `gorm:"not null" json:"date"`
+	Vendor      string          `json:"vendor"`
+	ReceiptPath string          `gorm:"column:receipt_path" json:"receipt_path"`
+	Notes       string          `json:"notes"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+}

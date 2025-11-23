@@ -1,0 +1,38 @@
+services:
+  ungApi:
+    path: ./api
+    port: 8080
+    environment:
+      - PORT=8080
+      - ENV=development
+      - API_DATABASE_PATH=$HOME/.ung/api.db
+      - USER_DATA_DIR=$HOME/.ung/users
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - ALLOWED_ORIGINS=http://localhost:3000,https://ung.app
+    beforeStart:
+      - echo "Setting up UNG API..."
+      - mkdir -p $HOME/.ung/users
+      - go mod download
+    start:
+      - go run cmd/server/main.go
+    afterStart:
+      - echo "UNG API is running on http://localhost:8080"
+
+  ungTelegramBot:
+    path: ./telegram
+    depends_on_services:
+      - name: ungApi
+        envAlias: UNG_API_URL
+        suffix: ""
+    environment:
+      - TELEGRAM_BOT_TOKEN=your-telegram-bot-token-from-botfather
+      - WEB_APP_URL=https://ung.app
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - DEBUG=false
+    beforeStart:
+      - echo "Setting up UNG Telegram Bot..."
+      - go mod download
+    start:
+      - go run cmd/bot/main.go
+    afterStart:
+      - echo "UNG Telegram Bot is running and connected to API"

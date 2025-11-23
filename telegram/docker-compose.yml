@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - UNG_API_URL=${UNG_API_URL:-http://api:8080}
+      - WEB_APP_URL=${WEB_APP_URL:-https://ung.app}
+      - DEBUG=${DEBUG:-false}
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  api:
+    image: ung-api:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/root/.ung
+    environment:
+      - PORT=8080
+      - ENV=production
+      - API_DATABASE_PATH=/root/.ung/api.db
+      - USER_DATA_DIR=/root/.ung/users
+      - JWT_SECRET=${JWT_SECRET}
+    restart: unless-stopped

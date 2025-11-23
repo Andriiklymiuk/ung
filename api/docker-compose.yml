@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/root/.ung
+    environment:
+      - PORT=8080
+      - ENV=production
+      - API_DATABASE_PATH=/root/.ung/api.db
+      - USER_DATA_DIR=/root/.ung/users
+      - JWT_SECRET=${JWT_SECRET:-change-this-super-secret-key-in-production}
+    restart: unless-stopped

@@ -20,9 +20,11 @@ import (
 )
 
 var invoiceCmd = &cobra.Command{
-	Use:   "invoice",
-	Short: "Manage invoices",
-	Long:  "Create, list, and manage invoices",
+	Use:   "invoice [client-name]",
+	Short: "Manage invoices or generate from time for a client",
+	Long:  "Create, list, and manage invoices. If client name provided, auto-generates invoice from tracked time.",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runInvoiceSimple,
 }
 
 var invoiceNewCmd = &cobra.Command{
@@ -632,5 +634,152 @@ func runInvoiceBatchEmail(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("\n✓ Batch export completed!")
+	return nil
+}
+
+// runInvoiceSimple handles the simple case: ung invoice <client-name>
+func runInvoiceSimple(cmd *cobra.Command, args []string) error {
+	// If no arguments and no subcommand, show help
+	if len(args) == 0 {
+		return cmd.Help()
+	}
+
+	// Get client name from argument
+	clientName := args[0]
+
+	// Find client by name
+	var clientID uint
+	err := db.DB.QueryRow(`
+		SELECT id FROM clients
+		WHERE LOWER(name) LIKE LOWER(?)
+		LIMIT 1
+	`, "%"+clientName+"%").Scan(&clientID)
+
+	if err != nil {
+		return fmt.Errorf("client '%s' not found. Create client first with: ung client create", clientName)
+	}
+
+	fmt.Printf("📊 Generating invoice from tracked time for %s...\n\n", clientName)
+
+	// Get unbilled time sessions for this client
+	groups, err := getUnbilledTimeSessionsForClient(clientID)
+	if err != nil {
+		return fmt.Errorf("failed to get unbilled sessions: %w", err)
+	}
+
+	if len(groups) == 0 {
+		return fmt.Errorf("no unbilled time found for %s. Track time first with: ung track log --client %s --hours <hours>", clientName, clientName)
+	}
+
+	// Auto-select the first (and likely only) group for this client
+	selectedGroup := groups[0]
+
+	// Show what will be invoiced
+	fmt.Printf("Sessions to invoice:\n")
+	for _, session := range selectedGroup.Sessions {
+		hours := 0.0
+		if session.Hours != nil {
+			hours = *session.Hours
+		}
+		fmt.Printf("  • %s - %.2f hours", session.StartTime.Format("2006-01-02"), hours)
+		if session.ProjectName != "" {
+			fmt.Printf(" - %s", session.ProjectName)
+		}
+		fmt.Println()
+	}
+	fmt.Printf("\nTotal: %.2f hours", selectedGroup.TotalHours)
+	if selectedGroup.HourlyRate != nil {
+		fmt.Printf(" @ %.2f %s/hr = %.2f %s", *selectedGroup.HourlyRate, selectedGroup.Currency, selectedGroup.TotalHours*(*selectedGroup.HourlyRate), selectedGroup.Currency)
+	}
+	fmt.Println("\n")
+
+	// Get company ID (should be 1 typically)
+	var companyID uint
+	err = db.DB.QueryRow("SELECT id FROM companies LIMIT 1").Scan(&companyID)
+	if err != nil {
+		return fmt.Errorf("no company found. Create one first with: ung company create")
+	}
+
+	// Calculate amount
+	amount := 0.0
+	currency := selectedGroup.Currency
+	if selectedGroup.HourlyRate != nil {
+		amount = selectedGroup.TotalHours * (*selectedGroup.HourlyRate)
+	}
+
+	if amount == 0 {
+		return fmt.Errorf("cannot calculate invoice amount (no hourly rate set). Please set a rate on the contract.")
+	}
+
+	// Generate invoice number
+	var fullClientName string
+	db.DB.QueryRow("SELECT name FROM clients WHERE id = ?", clientID).Scan(&fullClientName)
+	invoiceNum, err := idgen.GenerateInvoiceNumber(db.GormDB, fullClientName, time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to generate invoice number: %w", err)
+	}
+
+	// Create invoice
+	dueDate := time.Now().AddDate(0, 0, 15) // 15 days from now
+	issuedDate := time.Now()
+
+	result, err := db.DB.Exec(`
+		INSERT INTO invoices (invoice_num, company_id, amount, currency, description, status, issued_date, due_date)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, invoiceNum, companyID, amount, currency, "Time-based services", models.StatusPending, issuedDate, dueDate)
+
+	if err != nil {
+		return fmt.Errorf("failed to create invoice: %w", err)
+	}
+
+	invoiceID, _ := result.LastInsertId()
+
+	// Link to client
+	db.DB.Exec("INSERT INTO invoice_recipients (invoice_id, client_id) VALUES (?, ?)", invoiceID, clientID)
+
+	// Create line items and mark sessions as invoiced
+	for _, session := range selectedGroup.Sessions {
+		hours := 0.0
+		if session.Hours != nil {
+			hours = *session.Hours
+		}
+
+		rate := 0.0
+		if selectedGroup.HourlyRate != nil {
+			rate = *selectedGroup.HourlyRate
+		}
+
+		itemAmount := hours * rate
+		itemName := session.ProjectName
+		if itemName == "" {
+			itemName = "Development work"
+		}
+		itemName = fmt.Sprintf("%s - %s", session.StartTime.Format("Jan 2"), itemName)
+
+		db.DB.Exec(`
+			INSERT INTO invoice_line_items (invoice_id, item_name, description, quantity, rate, amount)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, invoiceID, itemName, session.Notes, hours, rate, itemAmount)
+
+		// Mark as invoiced
+		newNotes := session.Notes
+		if newNotes != "" {
+			newNotes += " "
+		}
+		newNotes += fmt.Sprintf("[Invoiced: %s]", invoiceNum)
+		db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?", newNotes, session.ID)
+	}
+
+	fmt.Printf("✓ Invoice created: %s\n", invoiceNum)
+	fmt.Printf("  Amount: %.2f %s\n", amount, currency)
+	fmt.Printf("  Due: %s\n\n", dueDate.Format("2006-01-02"))
+
+	// Auto-generate PDF
+	fmt.Println("Generating PDF...")
+	err = runInvoicePDF(cmd, []string{fmt.Sprintf("%d", invoiceID)})
+	if err != nil {
+		fmt.Printf("Warning: Could not generate PDF: %v\n", err)
+	}
+
 	return nil
 }

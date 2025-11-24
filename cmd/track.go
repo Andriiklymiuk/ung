@@ -53,6 +53,7 @@ var trackLogCmd = &cobra.Command{
 
 var (
 	trackClientID   int
+	trackClientName string
 	trackContractID int
 	trackProject    string
 	trackBillable   bool
@@ -76,6 +77,7 @@ func init() {
 
 	// Log flags
 	trackLogCmd.Flags().IntVar(&trackContractID, "contract", 0, "Contract ID")
+	trackLogCmd.Flags().StringVar(&trackClientName, "client", "", "Client name (e.g., humbrella)")
 	trackLogCmd.Flags().Float64Var(&trackHours, "hours", 0, "Hours worked")
 	trackLogCmd.Flags().StringVar(&trackProject, "project", "", "Project name")
 	trackLogCmd.Flags().StringVar(&trackNotes, "notes", "", "Session notes")
@@ -270,6 +272,32 @@ func runTrackLog(cmd *cobra.Command, args []string) error {
 	// Ensure prerequisites exist (company, client, contract)
 	if err := ensureContractExists(); err != nil {
 		return err
+	}
+
+	// If client name provided, look up client and find their active contract
+	if trackClientName != "" && trackContractID == 0 {
+		var clientID int
+		err := db.DB.QueryRow(`
+			SELECT id FROM clients
+			WHERE LOWER(name) LIKE LOWER(?)
+			LIMIT 1
+		`, "%"+trackClientName+"%").Scan(&clientID)
+
+		if err != nil {
+			return fmt.Errorf("client '%s' not found", trackClientName)
+		}
+
+		// Find active contract for this client
+		err = db.DB.QueryRow(`
+			SELECT id FROM contracts
+			WHERE client_id = ? AND active = 1
+			ORDER BY id DESC
+			LIMIT 1
+		`, clientID).Scan(&trackContractID)
+
+		if err != nil {
+			return fmt.Errorf("no active contract found for client '%s'", trackClientName)
+		}
 	}
 
 	// Interactive mode if parameters not provided

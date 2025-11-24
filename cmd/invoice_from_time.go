@@ -376,3 +376,21 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 
 	return groups, nil
 }
+
+// getUnbilledTimeSessionsForClient gets unbilled sessions for a specific client
+func getUnbilledTimeSessionsForClient(clientID uint) ([]timeSessionGroup, error) {
+	groups, err := getUnbilledTimeSessions()
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter to only this client
+	var filtered []timeSessionGroup
+	for _, g := range groups {
+		if g.ClientID == clientID {
+			filtered = append(filtered, g)
+		}
+	}
+
+	return filtered, nil
+}

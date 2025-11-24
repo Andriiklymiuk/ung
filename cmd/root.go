@@ -14,7 +14,7 @@ var rootCmd = &cobra.Command{
 clients, invoices, and time tracking.
 
 All data is stored locally in ~/.ung/ung.db`,
-	Version: "0.1.0",
+	Version: Version,
 }
 
 func Execute() {

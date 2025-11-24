@@ -744,8 +744,10 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 	fmt.Printf("\nTotal: %.2f hours", selectedGroup.TotalHours)
-	if selectedGroup.HourlyRate != nil {
+	if selectedGroup.ContractType == "hourly" && selectedGroup.HourlyRate != nil {
 		fmt.Printf(" @ %.2f %s/hr = %.2f %s", *selectedGroup.HourlyRate, selectedGroup.Currency, selectedGroup.TotalHours*(*selectedGroup.HourlyRate), selectedGroup.Currency)
+	} else if selectedGroup.ContractType == "fixed_price" && selectedGroup.FixedPrice != nil {
+		fmt.Printf(" [Fixed price: %.2f %s]", *selectedGroup.FixedPrice, selectedGroup.Currency)
 	}
 	fmt.Println("\n")
 
@@ -756,15 +758,17 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no company found. Create one first with: ung company create")
 	}
 
-	// Calculate amount
+	// Calculate amount based on contract type
 	amount := 0.0
 	currency := selectedGroup.Currency
-	if selectedGroup.HourlyRate != nil {
+	if selectedGroup.ContractType == "fixed_price" && selectedGroup.FixedPrice != nil {
+		amount = *selectedGroup.FixedPrice
+	} else if selectedGroup.ContractType == "hourly" && selectedGroup.HourlyRate != nil {
 		amount = selectedGroup.TotalHours * (*selectedGroup.HourlyRate)
 	}
 
 	if amount == 0 {
-		return fmt.Errorf("cannot calculate invoice amount (no hourly rate set). Please set a rate on the contract.")
+		return fmt.Errorf("cannot calculate invoice amount (no rate set). Please set a rate on the contract.")
 	}
 
 	// Generate invoice number
@@ -791,37 +795,60 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 	// Link to client
 	db.DB.Exec("INSERT INTO invoice_recipients (invoice_id, client_id) VALUES (?, ?)", invoiceID, clientID)
 
-	// Create line items and mark sessions as invoiced
-	for _, session := range selectedGroup.Sessions {
-		hours := 0.0
-		if session.Hours != nil {
-			hours = *session.Hours
-		}
-
-		rate := 0.0
-		if selectedGroup.HourlyRate != nil {
-			rate = *selectedGroup.HourlyRate
-		}
-
-		itemAmount := hours * rate
-		itemName := session.ProjectName
-		if itemName == "" {
-			itemName = "Development work"
-		}
-		itemName = fmt.Sprintf("%s - %s", session.StartTime.Format("Jan 2"), itemName)
+	// Create line items based on contract type
+	if selectedGroup.ContractType == "fixed_price" {
+		// For fixed price contracts, create a single line item
+		monthName := time.Now().Format("January 2006")
+		itemName := fmt.Sprintf("Software services in %s", monthName)
+		itemDescription := fmt.Sprintf("Fixed price contract work (%.2f hours tracked)", selectedGroup.TotalHours)
 
 		db.DB.Exec(`
 			INSERT INTO invoice_line_items (invoice_id, item_name, description, quantity, rate, amount)
 			VALUES (?, ?, ?, ?, ?, ?)
-		`, invoiceID, itemName, session.Notes, hours, rate, itemAmount)
+		`, invoiceID, itemName, itemDescription, 1, amount, amount)
 
-		// Mark as invoiced
-		newNotes := session.Notes
-		if newNotes != "" {
-			newNotes += " "
+		// Mark all sessions as invoiced
+		for _, session := range selectedGroup.Sessions {
+			newNotes := session.Notes
+			if newNotes != "" {
+				newNotes += " "
+			}
+			newNotes += fmt.Sprintf("[Invoiced: %s]", invoiceNum)
+			db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?", newNotes, session.ID)
 		}
-		newNotes += fmt.Sprintf("[Invoiced: %s]", invoiceNum)
-		db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?", newNotes, session.ID)
+	} else {
+		// For hourly contracts, create line items for each session
+		for _, session := range selectedGroup.Sessions {
+			hours := 0.0
+			if session.Hours != nil {
+				hours = *session.Hours
+			}
+
+			rate := 0.0
+			if selectedGroup.HourlyRate != nil {
+				rate = *selectedGroup.HourlyRate
+			}
+
+			itemAmount := hours * rate
+			itemName := session.ProjectName
+			if itemName == "" {
+				itemName = "Development work"
+			}
+			itemName = fmt.Sprintf("%s - %s", session.StartTime.Format("Jan 2"), itemName)
+
+			db.DB.Exec(`
+				INSERT INTO invoice_line_items (invoice_id, item_name, description, quantity, rate, amount)
+				VALUES (?, ?, ?, ?, ?, ?)
+			`, invoiceID, itemName, session.Notes, hours, rate, itemAmount)
+
+			// Mark as invoiced
+			newNotes := session.Notes
+			if newNotes != "" {
+				newNotes += " "
+			}
+			newNotes += fmt.Sprintf("[Invoiced: %s]", invoiceNum)
+			db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?", newNotes, session.ID)
+		}
 	}
 
 	fmt.Printf("✓ Invoice created: %s\n", invoiceNum)

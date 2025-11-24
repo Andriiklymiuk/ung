@@ -15,6 +15,7 @@ type Config struct {
 	Language     string         `yaml:"language"`      // e.g., "en", "uk", "de"
 	Invoice      InvoiceConfig  `yaml:"invoice"`
 	Templates    TemplateConfig `yaml:"templates"`
+	Email        EmailConfig    `yaml:"email"`
 }
 
 // TemplateConfig represents template paths for PDF generation
@@ -38,6 +39,17 @@ type InvoiceConfig struct {
 	QuantityLabel    string `yaml:"quantity_label"`    // "Quantity" column header
 	RateLabel        string `yaml:"rate_label"`        // "Rate" column header
 	AmountLabel      string `yaml:"amount_label"`      // "Amount" column header
+}
+
+// EmailConfig represents email/SMTP configuration
+type EmailConfig struct {
+	SMTPHost  string `yaml:"smtp_host"`  // SMTP server host
+	SMTPPort  int    `yaml:"smtp_port"`  // SMTP server port
+	Username  string `yaml:"username"`   // SMTP username
+	Password  string `yaml:"password"`   // SMTP password (or app password)
+	FromEmail string `yaml:"from_email"` // Sender email address
+	FromName  string `yaml:"from_name"`  // Sender name
+	UseTLS    bool   `yaml:"use_tls"`    // Use TLS encryption
 }
 
 var currentConfig *Config

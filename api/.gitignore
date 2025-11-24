@@ -1,5 +1,6 @@
 # Binaries
 ung-api
+api
 *.exe
 *.dll
 *.so

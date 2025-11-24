@@ -31,4 +31,10 @@ func init() {
 	rootCmd.AddCommand(contractCmd)
 	rootCmd.AddCommand(invoiceCmd)
 	rootCmd.AddCommand(trackCmd)
+
+	// Add update as alias for upgrade (reuse upgrade functionality)
+	updateCmd := *upgradeCmd
+	updateCmd.Use = "update"
+	updateCmd.Aliases = []string{}
+	rootCmd.AddCommand(&updateCmd)
 }

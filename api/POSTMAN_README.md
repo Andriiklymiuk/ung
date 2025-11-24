@@ -67,6 +67,8 @@ The collection uses the following environment variables:
 | `access_token` | JWT access token | Auto |
 | `refresh_token` | JWT refresh token | Auto |
 | `tenant_id` | Current tenant ID | Auto |
+| `client_id` | Last created client ID | Auto |
+| `tracking_session_id` | Active tracking session ID | Auto |
 
 ## Endpoints
 
@@ -76,16 +78,58 @@ The collection uses the following environment variables:
 - **POST** `/auth/refresh` - Refresh access token
 - **GET** `/auth/me` - Get user profile
 
+### Clients
+- **GET** `/clients` - List all clients
+- **GET** `/clients/:id` - Get client by ID
+- **POST** `/clients` - Create new client
+- **PUT** `/clients/:id` - Update client
+- **DELETE** `/clients/:id` - Delete client
+
+### Companies
+- **GET** `/companies` - List all companies
+- **GET** `/companies/:id` - Get company by ID
+- **POST** `/companies` - Create new company
+- **PUT** `/companies/:id` - Update company
+- **DELETE** `/companies/:id` - Delete company
+
+### Contracts
+- **GET** `/contracts` - List all contracts
+- **GET** `/contracts/:id` - Get contract by ID
+- **POST** `/contracts` - Create new contract (hourly/fixed/retainer)
+- **PUT** `/contracts/:id` - Update contract
+- **DELETE** `/contracts/:id` - Delete contract
+
 ### Invoices
-- **GET** `/invoices` - List invoices (with filters)
-- **GET** `/invoices/:id` - Get invoice by ID
-- **POST** `/invoices` - Create invoice
+- **GET** `/invoices` - List invoices
+- **GET** `/invoices/:id` - Get invoice by ID (with line items)
+- **POST** `/invoices` - Create new invoice
 - **PUT** `/invoices/:id` - Update invoice
 - **DELETE** `/invoices/:id` - Delete invoice
-- **POST** `/invoices/:id/email` - Email invoice
+- **PATCH** `/invoices/:id/status` - Update invoice status (pending/sent/paid/overdue)
+
+### Expenses
+- **GET** `/expenses` - List all expenses
+- **GET** `/expenses/:id` - Get expense by ID
+- **POST** `/expenses` - Create new expense
+- **PUT** `/expenses/:id` - Update expense
+- **DELETE** `/expenses/:id` - Delete expense
+
+### Time Tracking
+- **GET** `/tracking` - List all tracking sessions
+- **GET** `/tracking/active` - Get currently active session
+- **GET** `/tracking/:id` - Get tracking session by ID
+- **POST** `/tracking/start` - Start new tracking session
+- **POST** `/tracking/:id/stop` - Stop tracking session
+- **POST** `/tracking` - Create manual time entry
+- **PUT** `/tracking/:id` - Update tracking session
+- **DELETE** `/tracking/:id` - Delete tracking session
 
 ### Health
 - **GET** `/health` - Health check (no auth required)
+
+## Complete API Coverage
+
+The collection now includes **39 requests** across **8 resource categories**, providing complete CRUD operations for all UNG business entities.
 
 ## Features
 

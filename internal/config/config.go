@@ -130,15 +130,30 @@ func getDefaultConfig() *Config {
 	}
 }
 
-// expandPath expands ~ to home directory
+// expandPath expands ~ to home directory and converts relative paths to absolute
 func expandPath(path string) string {
-	if len(path) > 0 && path[0] == '~' {
+	if len(path) == 0 {
+		return path
+	}
+
+	// Expand ~ to home directory
+	if path[0] == '~' {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return path
 		}
-		return filepath.Join(home, path[1:])
+		path = filepath.Join(home, path[1:])
 	}
+
+	// Convert relative paths to absolute
+	if !filepath.IsAbs(path) {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return path
+		}
+		return absPath
+	}
+
 	return path
 }
 

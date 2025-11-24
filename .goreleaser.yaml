@@ -11,7 +11,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w
+      - -X github.com/Andriiklymiuk/ung/cmd.Version={{.Version}}
+      - -X github.com/Andriiklymiuk/ung/cmd.GitCommit={{.Commit}}
+      - -X github.com/Andriiklymiuk/ung/cmd.BuildDate={{.Date}}
     # SQLite requires CGO, so we need to build differently for each platform
 checksum:
   name_template: "checksums.txt"

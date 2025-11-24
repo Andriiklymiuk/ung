@@ -32,9 +32,11 @@ func TestGetDefaultConfig(t *testing.T) {
 
 func TestExpandPath(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		wantHome bool
+		name          string
+		input         string
+		wantHome      bool
+		wantAbsolute  bool
+		wantUnchanged bool
 	}{
 		{
 			name:     "home directory expansion",
@@ -42,14 +44,24 @@ func TestExpandPath(t *testing.T) {
 			wantHome: true,
 		},
 		{
-			name:     "absolute path no expansion",
-			input:    "/tmp/test",
-			wantHome: false,
+			name:          "absolute path no expansion",
+			input:         "/tmp/test",
+			wantUnchanged: true,
 		},
 		{
-			name:     "relative path no expansion",
-			input:    "test/path",
-			wantHome: false,
+			name:         "relative path to absolute",
+			input:        "test/path",
+			wantAbsolute: true,
+		},
+		{
+			name:         "dot relative path",
+			input:        "./test.db",
+			wantAbsolute: true,
+		},
+		{
+			name:          "empty string",
+			input:         "",
+			wantUnchanged: true,
 		},
 	}
 
@@ -67,9 +79,13 @@ func TestExpandPath(t *testing.T) {
 				if result != expected {
 					t.Errorf("expected %s, got %s", expected, result)
 				}
-			} else {
+			} else if tt.wantUnchanged {
 				if result != tt.input {
 					t.Errorf("expected %s, got %s", tt.input, result)
+				}
+			} else if tt.wantAbsolute {
+				if !filepath.IsAbs(result) {
+					t.Errorf("expected absolute path, got %s", result)
 				}
 			}
 		})

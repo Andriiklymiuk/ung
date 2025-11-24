@@ -647,72 +647,10 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 	// Get client name from argument
 	clientName := args[0]
 
-	// Find all matching clients
-	rows, err := db.DB.Query(`
-		SELECT id, name FROM clients
-		WHERE LOWER(name) LIKE LOWER(?)
-		ORDER BY name
-	`, "%"+clientName+"%")
-
+	// Find client (handles multiple matches with interactive selection)
+	clientID, fullClientName, err := FindClientByName(clientName)
 	if err != nil {
-		return fmt.Errorf("failed to search for clients: %w", err)
-	}
-	defer rows.Close()
-
-	type clientMatch struct {
-		id   uint
-		name string
-	}
-
-	var matches []clientMatch
-	for rows.Next() {
-		var m clientMatch
-		if err := rows.Scan(&m.id, &m.name); err != nil {
-			return fmt.Errorf("failed to scan client: %w", err)
-		}
-		matches = append(matches, m)
-	}
-
-	if len(matches) == 0 {
-		return fmt.Errorf("client '%s' not found. Create client first with: ung client create", clientName)
-	}
-
-	var clientID uint
-	var fullClientName string
-
-	// If multiple matches, let user choose
-	if len(matches) > 1 {
-		clientOptions := make([]huh.Option[uint], len(matches))
-		for i, m := range matches {
-			clientOptions[i] = huh.NewOption(m.name, m.id)
-		}
-
-		var selectedClientID uint
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[uint]().
-					Title("Multiple clients found").
-					Description(fmt.Sprintf("Which '%s' did you mean?", clientName)).
-					Options(clientOptions...).
-					Value(&selectedClientID),
-			),
-		)
-
-		if err := form.Run(); err != nil {
-			return fmt.Errorf("selection cancelled: %w", err)
-		}
-
-		clientID = selectedClientID
-		// Find the selected client name
-		for _, m := range matches {
-			if m.id == clientID {
-				fullClientName = m.name
-				break
-			}
-		}
-	} else {
-		clientID = matches[0].id
-		fullClientName = matches[0].name
+		return fmt.Errorf("%w. Create client first with: ung client create", err)
 	}
 
 	fmt.Printf("📊 Generating invoice from tracked time for %s...\n\n", fullClientName)

@@ -276,76 +276,18 @@ func runTrackLog(cmd *cobra.Command, args []string) error {
 
 	// If client name provided, look up client and find their active contract
 	if trackClientName != "" && trackContractID == 0 {
-		// Find all matching clients
-		rows, err := db.DB.Query(`
-			SELECT id, name FROM clients
-			WHERE LOWER(name) LIKE LOWER(?)
-			ORDER BY name
-		`, "%"+trackClientName+"%")
-
+		clientID, _, err := FindClientByName(trackClientName)
 		if err != nil {
-			return fmt.Errorf("failed to search for clients: %w", err)
-		}
-		defer rows.Close()
-
-		type clientMatch struct {
-			id   int
-			name string
-		}
-
-		var matches []clientMatch
-		for rows.Next() {
-			var m clientMatch
-			if err := rows.Scan(&m.id, &m.name); err != nil {
-				return fmt.Errorf("failed to scan client: %w", err)
-			}
-			matches = append(matches, m)
-		}
-
-		if len(matches) == 0 {
-			return fmt.Errorf("client '%s' not found", trackClientName)
-		}
-
-		var clientID int
-
-		// If multiple matches, let user choose
-		if len(matches) > 1 {
-			clientOptions := make([]huh.Option[int], len(matches))
-			for i, m := range matches {
-				clientOptions[i] = huh.NewOption(m.name, m.id)
-			}
-
-			var selectedClientID int
-			form := huh.NewForm(
-				huh.NewGroup(
-					huh.NewSelect[int]().
-						Title("Multiple clients found").
-						Description(fmt.Sprintf("Which '%s' did you mean?", trackClientName)).
-						Options(clientOptions...).
-						Value(&selectedClientID),
-				),
-			)
-
-			if err := form.Run(); err != nil {
-				return fmt.Errorf("selection cancelled: %w", err)
-			}
-
-			clientID = selectedClientID
-		} else {
-			clientID = matches[0].id
+			return err
 		}
 
 		// Find active contract for this client
-		err = db.DB.QueryRow(`
-			SELECT id FROM contracts
-			WHERE client_id = ? AND active = 1
-			ORDER BY id DESC
-			LIMIT 1
-		`, clientID).Scan(&trackContractID)
-
+		contractID, err := FindActiveContractForClient(clientID)
 		if err != nil {
-			return fmt.Errorf("no active contract found for selected client")
+			return err
 		}
+
+		trackContractID = contractID
 	}
 
 	// Interactive mode if parameters not provided

@@ -2,10 +2,8 @@ package invoice
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/Andriiklymiuk/ung/internal/config"
-	"github.com/Andriiklymiuk/ung/internal/db"
 	"github.com/Andriiklymiuk/ung/internal/models"
 	"github.com/jung-kurt/gofpdf"
 )
@@ -179,10 +177,9 @@ func GeneratePDF(invoice models.Invoice, company models.Company, client models.C
 	pdf.SetTextColor(80, 80, 80)
 	pdf.MultiCell(190, 4, cfg.Invoice.Terms, "", "L", false)
 
-	// Save PDF
-	invoicesDir := db.GetInvoicesDir()
+	// Save PDF to current directory
 	filename := fmt.Sprintf("%s.pdf", invoice.InvoiceNum)
-	pdfPath := filepath.Join(invoicesDir, filename)
+	pdfPath := filename // Save in current directory
 
 	err := pdf.OutputFileAndClose(pdfPath)
 	if err != nil {

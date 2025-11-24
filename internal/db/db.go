@@ -150,8 +150,10 @@ func runInlineSchema() error {
 		email TEXT NOT NULL,
 		address TEXT,
 		tax_id TEXT,
+		phone TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		deleted_at TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS clients (
@@ -162,6 +164,25 @@ func runInlineSchema() error {
 		tax_id TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS contracts (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		contract_num TEXT UNIQUE NOT NULL,
+		client_id INTEGER NOT NULL,
+		name TEXT NOT NULL,
+		contract_type TEXT NOT NULL,
+		hourly_rate REAL,
+		fixed_price REAL,
+		currency TEXT DEFAULT 'USD',
+		start_date TIMESTAMP NOT NULL,
+		end_date TIMESTAMP,
+		active BOOLEAN DEFAULT 1,
+		notes TEXT,
+		pdf_path TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (client_id) REFERENCES clients(id)
 	);
 
 	CREATE TABLE IF NOT EXISTS invoices (
@@ -175,9 +196,23 @@ func runInlineSchema() error {
 		issued_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		due_date TIMESTAMP,
 		pdf_path TEXT,
+		notes TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (company_id) REFERENCES companies(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS invoice_line_items (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		invoice_id INTEGER NOT NULL,
+		item_name TEXT NOT NULL,
+		description TEXT,
+		quantity REAL NOT NULL,
+		rate REAL NOT NULL,
+		amount REAL NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (invoice_id) REFERENCES invoices(id)
 	);
 
 	CREATE TABLE IF NOT EXISTS invoice_recipients (
@@ -191,21 +226,43 @@ func runInlineSchema() error {
 	CREATE TABLE IF NOT EXISTS tracking_sessions (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		client_id INTEGER,
+		contract_id INTEGER,
 		project_name TEXT,
 		start_time TIMESTAMP NOT NULL,
 		end_time TIMESTAMP,
 		duration INTEGER,
+		hours REAL,
 		billable BOOLEAN DEFAULT 1,
 		notes TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (client_id) REFERENCES clients(id)
+		deleted_at TIMESTAMP,
+		FOREIGN KEY (client_id) REFERENCES clients(id),
+		FOREIGN KEY (contract_id) REFERENCES contracts(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS expenses (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		description TEXT NOT NULL,
+		amount REAL NOT NULL,
+		currency TEXT DEFAULT 'USD',
+		category TEXT NOT NULL,
+		date TIMESTAMP NOT NULL,
+		vendor TEXT,
+		notes TEXT,
+		receipt_path TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_invoices_company ON invoices(company_id);
 	CREATE INDEX IF NOT EXISTS idx_invoice_recipients_invoice ON invoice_recipients(invoice_id);
 	CREATE INDEX IF NOT EXISTS idx_invoice_recipients_client ON invoice_recipients(client_id);
 	CREATE INDEX IF NOT EXISTS idx_tracking_sessions_client ON tracking_sessions(client_id);
+	CREATE INDEX IF NOT EXISTS idx_tracking_sessions_contract ON tracking_sessions(contract_id);
+	CREATE INDEX IF NOT EXISTS idx_contracts_client ON contracts(client_id);
+	CREATE INDEX IF NOT EXISTS idx_contracts_active ON contracts(active);
+	CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice ON invoice_line_items(invoice_id);
 	`
 
 	_, err := DB.Exec(schema)

@@ -34,6 +34,7 @@ func main() {
 	startHandler := handlers.NewStartHandler(bot, sessionMgr, cfg.WebAppURL)
 	helpHandler := handlers.NewHelpHandler(bot)
 	invoiceHandler := handlers.NewInvoiceHandler(bot, apiClient, sessionMgr)
+	clientHandler := handlers.NewClientHandler(bot, apiClient, sessionMgr)
 
 	// Start listening for updates
 	u := tgbotapi.NewUpdate(0)
@@ -46,14 +47,14 @@ func main() {
 	for update := range updates {
 		// Handle messages
 		if update.Message != nil {
-			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, sessionMgr); err != nil {
+			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, sessionMgr); err != nil {
 				log.Printf("Error handling message: %v", err)
 			}
 		}
 
 		// Handle callback queries
 		if update.CallbackQuery != nil {
-			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, sessionMgr); err != nil {
+			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, sessionMgr); err != nil {
 				log.Printf("Error handling callback: %v", err)
 			}
 		}
@@ -66,6 +67,7 @@ func handleMessage(
 	startHandler *handlers.StartHandler,
 	helpHandler *handlers.HelpHandler,
 	invoiceHandler *handlers.InvoiceHandler,
+	clientHandler *handlers.ClientHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	// Handle commands
@@ -79,6 +81,10 @@ func handleMessage(
 			return invoiceHandler.HandleCreate(message)
 		case "invoices":
 			return invoiceHandler.HandleList(message)
+		case "client":
+			return clientHandler.HandleCreate(message)
+		case "clients":
+			return clientHandler.HandleList(message)
 		default:
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Try /help")
 			bot.Send(msg)
@@ -97,8 +103,13 @@ func handleMessage(
 		case models.StateInvoiceDescription:
 			return invoiceHandler.HandleDescriptionInput(message)
 		case models.StateClientCreateName:
-			// Handle client creation
-			// TODO: Implement client creation handler
+			return clientHandler.HandleNameInput(message)
+		case models.StateClientCreateEmail:
+			return clientHandler.HandleEmailInput(message)
+		case models.StateClientCreateAddress:
+			return clientHandler.HandleAddressInput(message)
+		case models.StateClientCreateTaxID:
+			return clientHandler.HandleTaxIDInput(message)
 		}
 	}
 
@@ -112,6 +123,7 @@ func handleCallback(
 	callbackQuery *tgbotapi.CallbackQuery,
 	bot *tgbotapi.BotAPI,
 	invoiceHandler *handlers.InvoiceHandler,
+	clientHandler *handlers.ClientHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	data := callbackQuery.Data
@@ -146,6 +158,15 @@ func handleCallback(
 			From: callbackQuery.From,
 		}
 		return invoiceHandler.HandleCreate(msg)
+	}
+
+	if data == "invoice_new_client" {
+		// Start client creation flow
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		return clientHandler.HandleCreate(msg)
 	}
 
 	if data == "auth_login" {

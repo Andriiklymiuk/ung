@@ -38,6 +38,11 @@ func main() {
 	// Initialize controllers
 	authController := controllers.NewAuthController(authService)
 	invoiceController := controllers.NewInvoiceController()
+	clientController := controllers.NewClientController()
+	companyController := controllers.NewCompanyController()
+	contractController := controllers.NewContractController()
+	expenseController := controllers.NewExpenseController()
+	trackingController := controllers.NewTrackingController()
 
 	// Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(apiDB, cfg.JWTSecret)
@@ -47,6 +52,11 @@ func main() {
 	r := router.SetupRouter(
 		authController,
 		invoiceController,
+		clientController,
+		companyController,
+		contractController,
+		expenseController,
+		trackingController,
 		authMiddleware,
 		tenantMiddleware,
 	)

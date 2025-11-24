@@ -15,6 +15,11 @@ import (
 func SetupRouter(
 	authController *controllers.AuthController,
 	invoiceController *controllers.InvoiceController,
+	clientController *controllers.ClientController,
+	companyController *controllers.CompanyController,
+	contractController *controllers.ContractController,
+	expenseController *controllers.ExpenseController,
+	trackingController *controllers.TrackingController,
 	authMiddleware func(http.Handler) http.Handler,
 	tenantMiddleware func(http.Handler) http.Handler,
 ) *chi.Mux {
@@ -30,7 +35,7 @@ func SetupRouter(
 	// CORS
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
@@ -62,14 +67,63 @@ func SetupRouter(
 			r.Group(func(r chi.Router) {
 				r.Use(tenantMiddleware)
 
+				// Clients
+				r.Route("/clients", func(r chi.Router) {
+					r.Get("/", clientController.List)
+					r.Post("/", clientController.Create)
+					r.Get("/{id}", clientController.Get)
+					r.Put("/{id}", clientController.Update)
+					r.Delete("/{id}", clientController.Delete)
+				})
+
 				// Invoices
 				r.Route("/invoices", func(r chi.Router) {
 					r.Get("/", invoiceController.List)
+					r.Post("/", invoiceController.Create)
 					r.Get("/{id}", invoiceController.Get)
-					// Add POST, PUT, DELETE as needed
+					r.Put("/{id}", invoiceController.Update)
+					r.Delete("/{id}", invoiceController.Delete)
+					r.Patch("/{id}/status", invoiceController.UpdateStatus)
 				})
 
-				// Add other resources (clients, contracts, etc.)
+				// Companies
+				r.Route("/companies", func(r chi.Router) {
+					r.Get("/", companyController.List)
+					r.Post("/", companyController.Create)
+					r.Get("/{id}", companyController.Get)
+					r.Put("/{id}", companyController.Update)
+					r.Delete("/{id}", companyController.Delete)
+				})
+
+				// Contracts
+				r.Route("/contracts", func(r chi.Router) {
+					r.Get("/", contractController.List)
+					r.Post("/", contractController.Create)
+					r.Get("/{id}", contractController.Get)
+					r.Put("/{id}", contractController.Update)
+					r.Delete("/{id}", contractController.Delete)
+				})
+
+				// Expenses
+				r.Route("/expenses", func(r chi.Router) {
+					r.Get("/", expenseController.List)
+					r.Post("/", expenseController.Create)
+					r.Get("/{id}", expenseController.Get)
+					r.Put("/{id}", expenseController.Update)
+					r.Delete("/{id}", expenseController.Delete)
+				})
+
+				// Time Tracking
+				r.Route("/tracking", func(r chi.Router) {
+					r.Get("/", trackingController.List)
+					r.Post("/", trackingController.Create)
+					r.Get("/active", trackingController.Active)
+					r.Post("/start", trackingController.Start)
+					r.Get("/{id}", trackingController.Get)
+					r.Post("/{id}/stop", trackingController.Stop)
+					r.Put("/{id}", trackingController.Update)
+					r.Delete("/{id}", trackingController.Delete)
+				})
 			})
 		})
 	})

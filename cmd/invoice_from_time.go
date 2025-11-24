@@ -28,7 +28,9 @@ type timeSessionGroup struct {
 	ClientName   string
 	ContractID   *uint
 	ContractName string
+	ContractType string
 	HourlyRate   *float64
+	FixedPrice   *float64
 	Currency     string
 	TotalHours   float64
 	Sessions     []models.TrackingSession
@@ -56,8 +58,11 @@ func runInvoiceFromTime(cmd *cobra.Command, args []string) error {
 		if g.ContractName != "" {
 			label = fmt.Sprintf("%s (%s) - %.2f hours", g.ClientName, g.ContractName, g.TotalHours)
 		}
-		if g.HourlyRate != nil {
+		// Show pricing based on contract type
+		if g.ContractType == "hourly" && g.HourlyRate != nil {
 			label += fmt.Sprintf(" @ %.2f %s/hr = %.2f %s", *g.HourlyRate, g.Currency, g.TotalHours*(*g.HourlyRate), g.Currency)
+		} else if g.ContractType == "fixed_price" && g.FixedPrice != nil {
+			label += fmt.Sprintf(" [Fixed: %.2f %s]", *g.FixedPrice, g.Currency)
 		}
 		groupOptions[i] = huh.NewOption(label, i)
 	}
@@ -116,19 +121,23 @@ func runInvoiceFromTime(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no company found. Please create a company first with 'ung company add'")
 	}
 
-	// Calculate amount
+	// Calculate amount based on contract type
 	var amount float64
-	currency := "USD"
-	if selectedGroup.HourlyRate != nil {
+	currency := selectedGroup.Currency
+
+	if selectedGroup.ContractType == "fixed_price" && selectedGroup.FixedPrice != nil {
+		// Fixed price contract - use the fixed price amount
+		amount = *selectedGroup.FixedPrice
+	} else if selectedGroup.ContractType == "hourly" && selectedGroup.HourlyRate != nil {
+		// Hourly contract - calculate from hours
 		amount = selectedGroup.TotalHours * (*selectedGroup.HourlyRate)
-		currency = selectedGroup.Currency
 	} else {
-		// Prompt for amount if no hourly rate
+		// No rate found - prompt for amount
 		var amountStr string
 		amountForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
-					Title("No hourly rate found. Enter invoice amount:").
+					Title("No rate found. Enter invoice amount:").
 					Placeholder("e.g., 1500.00").
 					Value(&amountStr).
 					Validate(func(s string) error {
@@ -186,45 +195,69 @@ func runInvoiceFromTime(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to link invoice to client: %w", err)
 	}
 
-	// Create line items for each session
-	for _, session := range selectedGroup.Sessions {
-		hours := 0.0
-		if session.Hours != nil {
-			hours = *session.Hours
-		}
-
-		rate := 0.0
-		if selectedGroup.HourlyRate != nil {
-			rate = *selectedGroup.HourlyRate
-		} else {
-			rate = amount / selectedGroup.TotalHours // Distribute amount proportionally
-		}
-
-		itemAmount := hours * rate
-		itemName := fmt.Sprintf("%s - %s", session.StartTime.Format("Jan 2"), session.ProjectName)
-		itemDescription := session.Notes
+	// Create line items based on contract type
+	if selectedGroup.ContractType == "fixed_price" {
+		// For fixed price contracts, create a single line item
+		monthName := time.Now().Format("January 2006")
+		itemName := fmt.Sprintf("Software services in %s", monthName)
+		itemDescription := fmt.Sprintf("Fixed price contract work (%.2f hours tracked)", selectedGroup.TotalHours)
 
 		_, err = db.DB.Exec(`
 			INSERT INTO invoice_line_items (invoice_id, item_name, description, quantity, rate, amount)
 			VALUES (?, ?, ?, ?, ?, ?)
-		`, invoiceID, itemName, itemDescription, hours, rate, itemAmount)
+		`, invoiceID, itemName, itemDescription, 1, amount, amount)
 		if err != nil {
 			return fmt.Errorf("failed to create line item: %w", err)
 		}
 
-		// Mark session as billed (we'll add a billed field or invoice_id later)
-		// For now, we could delete or mark as non-billable
-		// Let's update notes to indicate it's billed
-		newNotes := session.Notes
-		if newNotes != "" {
-			newNotes += " "
+		// Mark all sessions as invoiced
+		for _, session := range selectedGroup.Sessions {
+			newNotes := session.Notes
+			if newNotes != "" {
+				newNotes += " "
+			}
+			newNotes += fmt.Sprintf("[Invoiced: %s]", invoiceNum)
+			db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?", newNotes, session.ID)
 		}
-		newNotes += fmt.Sprintf("[Invoiced: %s]", invoiceNum)
+	} else {
+		// For hourly contracts, create line items for each session
+		for _, session := range selectedGroup.Sessions {
+			hours := 0.0
+			if session.Hours != nil {
+				hours = *session.Hours
+			}
 
-		_, err = db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?", newNotes, session.ID)
-		if err != nil {
-			// Non-fatal, just log
-			fmt.Printf("Warning: Could not mark session %d as invoiced\n", session.ID)
+			rate := 0.0
+			if selectedGroup.HourlyRate != nil {
+				rate = *selectedGroup.HourlyRate
+			} else {
+				rate = amount / selectedGroup.TotalHours // Distribute amount proportionally
+			}
+
+			itemAmount := hours * rate
+			itemName := fmt.Sprintf("%s - %s", session.StartTime.Format("Jan 2"), session.ProjectName)
+			itemDescription := session.Notes
+
+			_, err = db.DB.Exec(`
+				INSERT INTO invoice_line_items (invoice_id, item_name, description, quantity, rate, amount)
+				VALUES (?, ?, ?, ?, ?, ?)
+			`, invoiceID, itemName, itemDescription, hours, rate, itemAmount)
+			if err != nil {
+				return fmt.Errorf("failed to create line item: %w", err)
+			}
+
+			// Mark session as invoiced
+			newNotes := session.Notes
+			if newNotes != "" {
+				newNotes += " "
+			}
+			newNotes += fmt.Sprintf("[Invoiced: %s]", invoiceNum)
+
+			_, err = db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?", newNotes, session.ID)
+			if err != nil {
+				// Non-fatal, just log
+				fmt.Printf("Warning: Could not mark session %d as invoiced\n", session.ID)
+			}
 		}
 	}
 
@@ -261,7 +294,9 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 			ts.end_time, ts.duration, ts.hours, ts.notes,
 			c.name as client_name,
 			COALESCE(ct.name, '') as contract_name,
+			COALESCE(ct.contract_type, 'hourly') as contract_type,
 			ct.hourly_rate,
+			ct.fixed_price,
 			COALESCE(ct.currency, 'USD') as currency
 		FROM tracking_sessions ts
 		LEFT JOIN clients c ON ts.client_id = c.id
@@ -283,10 +318,10 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 
 	for rows.Next() {
 		var session models.TrackingSession
-		var clientName, contractName, currency string
+		var clientName, contractName, contractType, currency string
 		var clientID uint
 		var contractID, duration sql.NullInt64
-		var hourlyRate sql.NullFloat64
+		var hourlyRate, fixedPrice sql.NullFloat64
 		var hours sql.NullFloat64
 		var endTime sql.NullTime
 		var notes sql.NullString
@@ -303,7 +338,9 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 			&notes,
 			&clientName,
 			&contractName,
+			&contractType,
 			&hourlyRate,
+			&fixedPrice,
 			&currency,
 		)
 		if err != nil {
@@ -341,6 +378,12 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 				rate = &r
 			}
 
+			var fixed *float64
+			if fixedPrice.Valid {
+				f := fixedPrice.Float64
+				fixed = &f
+			}
+
 			var cid *uint
 			if contractID.Valid {
 				c := uint(contractID.Int64)
@@ -352,7 +395,9 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 				ClientName:   clientName,
 				ContractID:   cid,
 				ContractName: contractName,
+				ContractType: contractType,
 				HourlyRate:   rate,
+				FixedPrice:   fixed,
 				Currency:     currency,
 				TotalHours:   0,
 				Sessions:     []models.TrackingSession{},

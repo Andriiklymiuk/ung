@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -43,6 +44,9 @@ func init() {
 func runUpgrade(cmd *cobra.Command, args []string) {
 	fmt.Println("🔍 Checking for updates...")
 
+	// Detect installation method
+	installMethod := detectInstallMethod()
+
 	// Get latest release info from GitHub
 	release, err := getLatestRelease()
 	if err != nil {
@@ -58,6 +62,10 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 	fmt.Printf("\nCurrent version: %s\n", currentVersion)
 	fmt.Printf("Latest version:  %s\n", latestVersion)
 
+	if installMethod != "" {
+		fmt.Printf("Installation:    %s\n", installMethod)
+	}
+
 	// Compare versions
 	if currentVersion == latestVersion {
 		fmt.Println("\n✅ You are already running the latest version!")
@@ -72,6 +80,24 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 	fmt.Printf("\n🎉 New version available: %s\n", release.Name)
 	fmt.Printf("📝 Release page: %s\n", release.HTMLURL)
 
+	// Provide upgrade instructions based on installation method
+	switch installMethod {
+	case "homebrew":
+		fmt.Println("\n📦 You installed ung via Homebrew.")
+		fmt.Println("To upgrade, run:")
+		fmt.Println("   brew update")
+		fmt.Println("   brew upgrade ung")
+		return
+	case "go install":
+		fmt.Println("\n📦 You installed ung via 'go install'.")
+		fmt.Println("To upgrade, run:")
+		fmt.Println("   go install github.com/Andriiklymiuk/ung@latest")
+		return
+	}
+
+	// For direct binary installation, proceed with download
+	fmt.Println("\n📦 Direct binary installation detected.")
+
 	// Find the appropriate asset for current OS/Arch
 	assetURL := findAssetForPlatform(release, runtime.GOOS, runtime.GOARCH)
 	if assetURL == "" {
@@ -80,7 +106,7 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 		fmt.Println("\n💡 You can build from source:")
 		fmt.Println("   git clone https://github.com/Andriiklymiuk/ung")
 		fmt.Println("   cd ung")
-		fmt.Println("   go build -o ung main.go")
+		fmt.Println("   make build")
 		return
 	}
 
@@ -104,6 +130,36 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 
 	fmt.Println("\n✅ Successfully upgraded to version", latestVersion)
 	fmt.Println("🔄 Please restart ung to use the new version")
+}
+
+func detectInstallMethod() string {
+	exePath, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+
+	exePath, err = filepath.EvalSymlinks(exePath)
+	if err != nil {
+		return ""
+	}
+
+	// Check for Homebrew installation
+	if strings.Contains(exePath, "/homebrew/") || strings.Contains(exePath, "/Homebrew/") ||
+	   strings.Contains(exePath, "/Cellar/") || strings.Contains(exePath, "/opt/homebrew/") {
+		return "homebrew"
+	}
+
+	// Check for go install (usually in $GOPATH/bin or $HOME/go/bin)
+	goPath := os.Getenv("GOPATH")
+	if goPath == "" {
+		home, _ := os.UserHomeDir()
+		goPath = filepath.Join(home, "go")
+	}
+	if strings.HasPrefix(exePath, filepath.Join(goPath, "bin")) {
+		return "go install"
+	}
+
+	return "binary"
 }
 
 func getLatestRelease() (*GitHubRelease, error) {

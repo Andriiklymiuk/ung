@@ -2,20 +2,26 @@
 
 # Build variables
 BINARY_NAME=ung
-VERSION?=$(shell cat VERSION 2>/dev/null || echo "0.1.0")
+VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "0.1.0")
+GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
+BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 BUILD_DIR=dist
 GO_FILES=$(shell find . -name '*.go' -type f -not -path "./vendor/*")
+LDFLAGS=-ldflags "-s -w \
+	-X 'github.com/Andriiklymiuk/ung/cmd.Version=$(VERSION)' \
+	-X 'github.com/Andriiklymiuk/ung/cmd.GitCommit=$(GIT_COMMIT)' \
+	-X 'github.com/Andriiklymiuk/ung/cmd.BuildDate=$(BUILD_DATE)'"
 
 # Build the binary
 build:
 	@echo "Building $(BINARY_NAME) v$(VERSION)..."
-	@go build -ldflags="-s -w -X main.version=$(VERSION)" -o $(BINARY_NAME) .
+	@go build $(LDFLAGS) -o $(BINARY_NAME) .
 	@echo "✓ Build complete: ./$(BINARY_NAME)"
 
 # Install the binary to GOPATH/bin
 install: build
 	@echo "Installing $(BINARY_NAME) to GOPATH/bin..."
-	@go install -ldflags="-s -w -X main.version=$(VERSION)"
+	@go install $(LDFLAGS)
 	@echo "✓ Installation complete"
 
 # Run tests
@@ -65,11 +71,11 @@ dev:
 build-all:
 	@echo "Building for all platforms..."
 	@mkdir -p $(BUILD_DIR)
-	@GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 .
-	@GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 .
-	@GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 .
-	@GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 .
-	@GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe .
+	@GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 .
+	@GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 .
+	@GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 .
+	@GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 .
+	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe .
 	@echo "✓ Cross-compilation complete"
 
 # Help

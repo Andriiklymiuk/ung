@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Andriiklymiuk/ung/internal/cloud"
 	"github.com/Andriiklymiuk/ung/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -52,12 +53,14 @@ var configPathCmd = &cobra.Command{
 }
 
 var (
-	configInitLocal bool
+	configInitLocal  bool
+	configInitICloud bool
 )
 
 func init() {
 	configInitCmd.Flags().BoolVarP(&configInitLocal, "local", "l", true, "Create local workspace config (.ung.yaml)")
 	configInitCmd.Flags().BoolVarP(&configInitLocal, "global", "g", false, "Create global config (~/.ung/config.yaml)")
+	configInitCmd.Flags().BoolVar(&configInitICloud, "icloud", false, "Use iCloud Drive for storage (macOS only)")
 
 	configCmd.AddCommand(configInitCmd)
 	configCmd.AddCommand(configShowCmd)
@@ -70,7 +73,39 @@ func runConfigInit(cmd *cobra.Command, args []string) {
 	var dbPath string
 	var invoicesDir string
 
-	if configInitLocal {
+	// Check for iCloud flag
+	if configInitICloud {
+		if !cloud.ICloudAvailable() {
+			fmt.Println("❌ iCloud Drive is not available")
+			fmt.Println("   Make sure you're on macOS and iCloud Drive is enabled")
+			return
+		}
+
+		iCloudDB, iCloudInvoices, err := cloud.GetOptimalPath(true)
+		if err != nil {
+			fmt.Printf("❌ Failed to get iCloud paths: %v\n", err)
+			return
+		}
+
+		dbPath = iCloudDB
+		invoicesDir = iCloudInvoices
+
+		if configInitLocal {
+			configPath = ".ung.yaml"
+			fmt.Println("☁️  Creating local workspace configuration with iCloud storage...")
+		} else {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				fmt.Printf("❌ Failed to get home directory: %v\n", err)
+				return
+			}
+			configPath = filepath.Join(home, ".ung", "config.yaml")
+			fmt.Println("☁️  Creating global configuration with iCloud storage...")
+		}
+
+		fmt.Println("\n✨ iCloud Drive sync enabled!")
+		fmt.Println("   Your data will sync across all your Apple devices")
+	} else if configInitLocal {
 		// Local workspace config
 		configPath = ".ung.yaml"
 		dbPath = "./ung.db"
@@ -137,11 +172,25 @@ func runConfigInit(cmd *cobra.Command, args []string) {
 	fmt.Printf("   Invoices:  %s\n", invoicesDir)
 	fmt.Printf("   Language:  en\n")
 
+	// Show iCloud status
+	if cloud.IsSyncedToiCloud(dbPath) {
+		fmt.Println("\n☁️  iCloud Sync: Enabled")
+		fmt.Println("   Status:     " + cloud.GetSyncStatus(dbPath))
+		fmt.Println("   Device:     Data syncs across all Apple devices")
+		fmt.Println("   iOS App:    Can access this database")
+	}
+
 	if configInitLocal {
 		fmt.Println("\n💡 Tips:")
-		fmt.Println("   - Add ung.db and invoices/ to .gitignore")
+		if !configInitICloud {
+			fmt.Println("   - Add ung.db and invoices/ to .gitignore")
+		}
 		fmt.Println("   - This project will now use its own database")
 		fmt.Println("   - Run 'ung doctor' to verify the setup")
+		if configInitICloud {
+			fmt.Println("   - Data automatically syncs via iCloud Drive")
+			fmt.Println("   - Use 'ung cloud status' to check sync status")
+		}
 	}
 }
 

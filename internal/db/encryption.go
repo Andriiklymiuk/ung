@@ -119,12 +119,42 @@ func DecryptDatabase(inputPath, outputPath string, password string) error {
 }
 
 // IsEncrypted checks if a file appears to be encrypted
-// This is a heuristic check - it verifies the file size is at least saltSize
+// This is a heuristic check - it verifies the file size and tries to read the salt
 func IsEncrypted(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {
 		return false
 	}
 	// Encrypted files should be at least saltSize + nonceSize bytes
-	return info.Size() >= int64(saltSize+nonceSize)
+	if info.Size() < int64(saltSize+nonceSize) {
+		return false
+	}
+
+	// Try to read the salt to verify file format
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	if len(data) < saltSize {
+		return false
+	}
+
+	// Check if first saltSize bytes look like random data
+	// by checking they're not all zeros and not all printable ASCII
+	salt := data[:saltSize]
+	allZeros := true
+	allPrintable := true
+
+	for _, b := range salt {
+		if b != 0 {
+			allZeros = false
+		}
+		if b < 32 || b > 126 {
+			allPrintable = false
+		}
+	}
+
+	// If all zeros or all printable ASCII, probably not encrypted
+	return !allZeros && !allPrintable
 }

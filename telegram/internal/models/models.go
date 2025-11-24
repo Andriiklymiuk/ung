@@ -46,4 +46,6 @@ const (
 	StateInvoiceDueDate      SessionState = "invoice_due_date"
 	StateClientCreateName    SessionState = "client_create_name"
 	StateClientCreateEmail   SessionState = "client_create_email"
+	StateClientCreateAddress SessionState = "client_create_address"
+	StateClientCreateTaxID   SessionState = "client_create_tax_id"
 )

@@ -37,9 +37,19 @@ type Invoice struct {
 
 // Client represents a client from the API
 type Client struct {
-	ID    uint   `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID      uint   `json:"id"`
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Address string `json:"address"`
+	TaxID   string `json:"tax_id"`
+}
+
+// ClientCreateRequest represents a client creation request
+type ClientCreateRequest struct {
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Address string `json:"address,omitempty"`
+	TaxID   string `json:"tax_id,omitempty"`
 }
 
 // APIResponse represents standard API response
@@ -211,4 +221,47 @@ func (c *APIClient) Login(email, password string) (string, error) {
 	}
 
 	return apiResp.Data.AccessToken, nil
+}
+
+// CreateClient creates a new client
+func (c *APIClient) CreateClient(token string, req ClientCreateRequest) (*Client, error) {
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequest("POST", c.baseURL+"/api/v1/clients", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var createdClient Client
+	if err := json.Unmarshal(apiResp.Data, &createdClient); err != nil {
+		return nil, err
+	}
+
+	return &createdClient, nil
 }

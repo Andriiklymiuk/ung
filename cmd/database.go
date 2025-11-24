@@ -177,7 +177,6 @@ func runDBCurrent(cmd *cobra.Command, args []string) {
 	}
 
 	// Show config source
-	cfg, _ := config.Load()
 	configSource := "default"
 	if _, err := os.Stat(".ung.yaml"); err == nil {
 		configSource = ".ung.yaml (local workspace)"

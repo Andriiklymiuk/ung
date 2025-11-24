@@ -10,12 +10,13 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	DatabasePath string         `yaml:"database_path"`
-	InvoicesDir  string         `yaml:"invoices_dir"`
-	Language     string         `yaml:"language"`      // e.g., "en", "uk", "de"
-	Invoice      InvoiceConfig  `yaml:"invoice"`
-	Templates    TemplateConfig `yaml:"templates"`
-	Email        EmailConfig    `yaml:"email"`
+	DatabasePath string           `yaml:"database_path"`
+	InvoicesDir  string           `yaml:"invoices_dir"`
+	Language     string           `yaml:"language"`      // e.g., "en", "uk", "de"
+	Invoice      InvoiceConfig    `yaml:"invoice"`
+	Templates    TemplateConfig   `yaml:"templates"`
+	Email        EmailConfig      `yaml:"email"`
+	Security     SecurityConfig   `yaml:"security"`
 }
 
 // TemplateConfig represents template paths for PDF generation
@@ -50,6 +51,11 @@ type EmailConfig struct {
 	FromEmail string `yaml:"from_email"` // Sender email address
 	FromName  string `yaml:"from_name"`  // Sender name
 	UseTLS    bool   `yaml:"use_tls"`    // Use TLS encryption
+}
+
+// SecurityConfig represents database security configuration
+type SecurityConfig struct {
+	EncryptDatabase bool `yaml:"encrypt_database"` // Whether to encrypt database at rest
 }
 
 var currentConfig *Config

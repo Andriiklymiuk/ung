@@ -16,6 +16,9 @@ import (
 
 var DB *sql.DB
 var GormDB *gorm.DB
+var isEncrypted bool
+var encryptedPath string
+var decryptedPath string
 
 // GetDBPath returns the path to the database file
 func GetDBPath() string {
@@ -43,6 +46,34 @@ func Initialize() error {
 		return fmt.Errorf("failed to create invoices directory: %w", err)
 	}
 
+	// Check if encryption is enabled
+	cfg, _ := config.Load()
+	encryptedDBPath := dbPath + ".encrypted"
+
+	// Handle encrypted database
+	if cfg.Security.EncryptDatabase || fileExists(encryptedDBPath) {
+		isEncrypted = true
+		encryptedPath = encryptedDBPath
+		decryptedPath = dbPath + ".decrypted"
+
+		// If encrypted file exists, decrypt it
+		if fileExists(encryptedDBPath) {
+			password, err := GetDatabasePassword()
+			if err != nil {
+				return fmt.Errorf("failed to get password: %w", err)
+			}
+
+			if err := DecryptDatabase(encryptedDBPath, decryptedPath, password); err != nil {
+				return fmt.Errorf("failed to decrypt database: %w", err)
+			}
+
+			dbPath = decryptedPath
+		} else {
+			// First time encryption - use regular path, will encrypt on Close
+			decryptedPath = dbPath
+		}
+	}
+
 	var err error
 	DB, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -64,12 +95,40 @@ func Initialize() error {
 	return nil
 }
 
-// Close closes the database connection
+// Close closes the database connection and re-encrypts if needed
 func Close() error {
 	if DB != nil {
-		return DB.Close()
+		if err := DB.Close(); err != nil {
+			return err
+		}
 	}
+
+	// Re-encrypt database if encryption is enabled
+	if isEncrypted && decryptedPath != "" && encryptedPath != "" {
+		password, err := GetDatabasePassword()
+		if err != nil {
+			return fmt.Errorf("failed to get password for encryption: %w", err)
+		}
+
+		// Encrypt the database
+		if err := EncryptDatabase(decryptedPath, encryptedPath, password); err != nil {
+			return fmt.Errorf("failed to encrypt database: %w", err)
+		}
+
+		// Clean up decrypted file
+		os.Remove(decryptedPath)
+
+		// Clear password cache for security
+		ClearPasswordCache()
+	}
+
 	return nil
+}
+
+// fileExists checks if a file exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // runMigrations runs database migrations

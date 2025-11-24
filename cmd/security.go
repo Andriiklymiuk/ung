@@ -1,0 +1,337 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/Andriiklymiuk/ung/internal/config"
+	"github.com/Andriiklymiuk/ung/internal/db"
+	"github.com/spf13/cobra"
+)
+
+var securityCmd = &cobra.Command{
+	Use:     "security",
+	Aliases: []string{"sec", "encrypt"},
+	Short:   "Manage database security and encryption",
+	Long: `Manage database security settings including encryption.
+
+Examples:
+  ung security status              # Show encryption status
+  ung security enable              # Enable database encryption
+  ung security disable             # Disable database encryption
+  ung security change-password     # Change encryption password`,
+}
+
+var securityStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show database encryption status",
+	Long:  `Display whether the database is encrypted and security settings.`,
+	Run:   runSecurityStatus,
+}
+
+var securityEnableCmd = &cobra.Command{
+	Use:   "enable",
+	Short: "Enable database encryption",
+	Long: `Enable encryption for the database. This will encrypt the database file at rest
+using AES-256-GCM encryption with PBKDF2 key derivation.
+
+The database will be encrypted with a password that you provide. You'll need to
+enter this password each time you use ung, or set it via the UNG_DB_PASSWORD
+environment variable.
+
+Example:
+  ung security enable
+  export UNG_DB_PASSWORD="your-password"`,
+	Run: runSecurityEnable,
+}
+
+var securityDisableCmd = &cobra.Command{
+	Use:   "disable",
+	Short: "Disable database encryption",
+	Long: `Disable encryption for the database. This will decrypt the database and
+store it in plain text.
+
+⚠️  WARNING: This will make your financial data readable by anyone with
+access to the file. Only do this if you understand the security implications.`,
+	Run: runSecurityDisable,
+}
+
+var securityChangePasswordCmd = &cobra.Command{
+	Use:   "change-password",
+	Short: "Change database encryption password",
+	Long: `Change the password used to encrypt the database.
+
+You'll need to provide both the current password and the new password.`,
+	Run: runSecurityChangePassword,
+}
+
+func init() {
+	securityCmd.AddCommand(securityStatusCmd)
+	securityCmd.AddCommand(securityEnableCmd)
+	securityCmd.AddCommand(securityDisableCmd)
+	securityCmd.AddCommand(securityChangePasswordCmd)
+	rootCmd.AddCommand(securityCmd)
+}
+
+func runSecurityStatus(cmd *cobra.Command, args []string) {
+	cfg, _ := config.Load()
+	dbPath := db.GetDBPath()
+	encryptedPath := dbPath + ".encrypted"
+
+	fmt.Println("🔒 Database Security Status\n")
+
+	// Check if encrypted file exists
+	encryptedExists := fileExists(encryptedPath)
+	plainExists := fileExists(dbPath)
+
+	if encryptedExists {
+		fmt.Println("Status:    ✅ Encrypted")
+		fmt.Printf("File:      %s\n", encryptedPath)
+		fmt.Println("Algorithm: AES-256-GCM with PBKDF2")
+		fmt.Println("\n💡 Password can be provided via:")
+		fmt.Println("   - Interactive prompt (default)")
+		fmt.Println("   - Environment variable: UNG_DB_PASSWORD")
+	} else if plainExists {
+		fmt.Println("Status:    ⚠️  Not Encrypted (Plain Text)")
+		fmt.Printf("File:      %s\n", dbPath)
+		fmt.Println("\n⚠️  Your financial data is stored in plain text.")
+		fmt.Println("   Run 'ung security enable' to encrypt it.")
+	} else {
+		fmt.Println("Status:    Database not created yet")
+	}
+
+	if cfg.Security.EncryptDatabase {
+		fmt.Println("\nConfig:    Encryption enabled in configuration")
+	} else if encryptedExists {
+		fmt.Println("\nConfig:    Encryption auto-detected (encrypted file exists)")
+	}
+}
+
+func runSecurityEnable(cmd *cobra.Command, args []string) {
+	cfg, _ := config.Load()
+	dbPath := db.GetDBPath()
+	encryptedPath := dbPath + ".encrypted"
+
+	fmt.Println("🔒 Enable Database Encryption\n")
+
+	// Check if already encrypted
+	if fileExists(encryptedPath) {
+		fmt.Println("✅ Database is already encrypted")
+		return
+	}
+
+	// Check if database exists
+	if !fileExists(dbPath) {
+		// No database yet, just enable in config
+		cfg.Security.EncryptDatabase = true
+		if err := config.Save(cfg, false); err != nil {
+			fmt.Printf("❌ Failed to save config: %v\n", err)
+			return
+		}
+		fmt.Println("✅ Encryption enabled")
+		fmt.Println("   Database will be encrypted when created")
+		return
+	}
+
+	// Get password for encryption
+	fmt.Print("Enter encryption password: ")
+	password, err := readPassword()
+	if err != nil {
+		fmt.Printf("\n❌ Failed to read password: %v\n", err)
+		return
+	}
+
+	fmt.Print("Confirm password: ")
+	confirmPassword, err := readPassword()
+	if err != nil {
+		fmt.Printf("\n❌ Failed to read password: %v\n", err)
+		return
+	}
+
+	if password != confirmPassword {
+		fmt.Println("\n❌ Passwords don't match")
+		return
+	}
+
+	// Encrypt the database
+	fmt.Println("\n🔄 Encrypting database...")
+	if err := db.EncryptDatabase(dbPath, encryptedPath, password); err != nil {
+		fmt.Printf("❌ Failed to encrypt database: %v\n", err)
+		return
+	}
+
+	// Update config
+	cfg.Security.EncryptDatabase = true
+	if err := config.Save(cfg, false); err != nil {
+		fmt.Printf("❌ Failed to save config: %v\n", err)
+		// Remove encrypted file since config update failed
+		os.Remove(encryptedPath)
+		return
+	}
+
+	// Remove plain text database
+	if err := os.Remove(dbPath); err != nil {
+		fmt.Printf("⚠️  Failed to remove plain text database: %v\n", err)
+		fmt.Println("   Please remove it manually for security")
+	}
+
+	fmt.Println("✅ Database encrypted successfully")
+	fmt.Printf("   Encrypted: %s\n", encryptedPath)
+	fmt.Println("\n💡 To use the database, you'll need to provide the password via:")
+	fmt.Println("   - Interactive prompt (you'll be asked each time)")
+	fmt.Println("   - Environment variable: export UNG_DB_PASSWORD=\"your-password\"")
+}
+
+func runSecurityDisable(cmd *cobra.Command, args []string) {
+	cfg, _ := config.Load()
+	dbPath := db.GetDBPath()
+	encryptedPath := dbPath + ".encrypted"
+
+	fmt.Println("🔓 Disable Database Encryption\n")
+
+	// Check if encrypted
+	if !fileExists(encryptedPath) {
+		fmt.Println("✅ Database is not encrypted")
+		return
+	}
+
+	// Confirm action
+	fmt.Println("⚠️  WARNING: This will decrypt your database and store it in plain text.")
+	fmt.Print("Are you sure? (yes/no): ")
+	var response string
+	fmt.Scanln(&response)
+
+	if response != "yes" {
+		fmt.Println("Cancelled")
+		return
+	}
+
+	// Get password for decryption
+	fmt.Print("\nEnter current password: ")
+	password, err := readPassword()
+	if err != nil {
+		fmt.Printf("\n❌ Failed to read password: %v\n", err)
+		return
+	}
+
+	// Decrypt the database
+	fmt.Println("\n🔄 Decrypting database...")
+	if err := db.DecryptDatabase(encryptedPath, dbPath, password); err != nil {
+		fmt.Printf("❌ Failed to decrypt database: %v\n", err)
+		return
+	}
+
+	// Update config
+	cfg.Security.EncryptDatabase = false
+	if err := config.Save(cfg, false); err != nil {
+		fmt.Printf("❌ Failed to save config: %v\n", err)
+		return
+	}
+
+	// Remove encrypted database
+	if err := os.Remove(encryptedPath); err != nil {
+		fmt.Printf("⚠️  Failed to remove encrypted database: %v\n", err)
+	}
+
+	fmt.Println("✅ Database decrypted successfully")
+	fmt.Printf("   Plain text: %s\n", dbPath)
+	fmt.Println("\n⚠️  Your database is now stored in plain text")
+}
+
+func runSecurityChangePassword(cmd *cobra.Command, args []string) {
+	dbPath := db.GetDBPath()
+	encryptedPath := dbPath + ".encrypted"
+
+	fmt.Println("🔑 Change Encryption Password\n")
+
+	// Check if encrypted
+	if !fileExists(encryptedPath) {
+		fmt.Println("❌ Database is not encrypted")
+		fmt.Println("   Run 'ung security enable' first")
+		return
+	}
+
+	// Get current password
+	fmt.Print("Enter current password: ")
+	currentPassword, err := readPassword()
+	if err != nil {
+		fmt.Printf("\n❌ Failed to read password: %v\n", err)
+		return
+	}
+
+	// Decrypt with current password
+	fmt.Println("\n🔄 Verifying current password...")
+	tempPath := dbPath + ".temp"
+	if err := db.DecryptDatabase(encryptedPath, tempPath, currentPassword); err != nil {
+		fmt.Printf("❌ Failed to decrypt: %v\n", err)
+		fmt.Println("   (Wrong password?)")
+		return
+	}
+
+	// Get new password
+	fmt.Print("Enter new password: ")
+	newPassword, err := readPassword()
+	if err != nil {
+		fmt.Printf("\n❌ Failed to read password: %v\n", err)
+		os.Remove(tempPath)
+		return
+	}
+
+	fmt.Print("Confirm new password: ")
+	confirmPassword, err := readPassword()
+	if err != nil {
+		fmt.Printf("\n❌ Failed to read password: %v\n", err)
+		os.Remove(tempPath)
+		return
+	}
+
+	if newPassword != confirmPassword {
+		fmt.Println("\n❌ Passwords don't match")
+		os.Remove(tempPath)
+		return
+	}
+
+	// Encrypt with new password
+	fmt.Println("\n🔄 Re-encrypting with new password...")
+	newEncryptedPath := encryptedPath + ".new"
+	if err := db.EncryptDatabase(tempPath, newEncryptedPath, newPassword); err != nil {
+		fmt.Printf("❌ Failed to encrypt: %v\n", err)
+		os.Remove(tempPath)
+		return
+	}
+
+	// Replace old encrypted file
+	if err := os.Remove(encryptedPath); err != nil {
+		fmt.Printf("❌ Failed to remove old encrypted file: %v\n", err)
+		os.Remove(tempPath)
+		os.Remove(newEncryptedPath)
+		return
+	}
+
+	if err := os.Rename(newEncryptedPath, encryptedPath); err != nil {
+		fmt.Printf("❌ Failed to replace encrypted file: %v\n", err)
+		os.Remove(tempPath)
+		return
+	}
+
+	// Clean up
+	os.Remove(tempPath)
+
+	fmt.Println("✅ Password changed successfully")
+	fmt.Println("   Use the new password for future access")
+}
+
+func readPassword() (string, error) {
+	password, err := db.GetDatabasePassword()
+	if err != nil {
+		return "", err
+	}
+	// Clear cache so it prompts again next time
+	db.ClearPasswordCache()
+	return password, nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}

@@ -79,6 +79,27 @@ Examples:
 	RunE: runInvoiceSendAll,
 }
 
+var invoiceMarkCmd = &cobra.Command{
+	Use:   "mark <id>",
+	Short: "Mark an invoice with a new status",
+	Long: `Update the status of an invoice.
+
+Available statuses:
+  - pending: Invoice not yet sent
+  - sent: Invoice has been sent to client
+  - paid: Payment received
+  - overdue: Past due date
+
+Examples:
+  ung invoice mark 5 --status paid      Mark invoice #5 as paid
+  ung invoice mark 3 --status sent      Mark invoice #3 as sent
+  ung invoice mark 7 --status overdue   Mark invoice #7 as overdue`,
+	Args: cobra.ExactArgs(1),
+	RunE: runInvoiceMark,
+}
+
+var invoiceMarkStatus string
+
 
 var (
 	// Flags for invoice new command
@@ -105,6 +126,11 @@ func init() {
 	invoiceCmd.AddCommand(invoiceListCmd)
 	invoiceCmd.AddCommand(invoiceGenerateAllCmd)
 	invoiceCmd.AddCommand(invoiceSendAllCmd)
+	invoiceCmd.AddCommand(invoiceMarkCmd)
+
+	// Mark command flags
+	invoiceMarkCmd.Flags().StringVar(&invoiceMarkStatus, "status", "", "New status (pending, sent, paid, overdue)")
+	invoiceMarkCmd.MarkFlagRequired("status")
 
 	// Main invoice command flags
 	invoiceCmd.Flags().StringVarP(&invoiceFlagClient, "client", "c", "", "Client name (generates invoice from tracked time)")
@@ -1120,5 +1146,44 @@ func runInvoiceSendAll(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\n✓ Processed %d/%d invoice(s)!\n", successCount, len(invoices))
+	return nil
+}
+
+// runInvoiceMark updates the status of an invoice
+func runInvoiceMark(cmd *cobra.Command, args []string) error {
+	// Parse invoice ID from args
+	invoiceID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid invoice ID: %s", args[0])
+	}
+
+	// Validate status
+	validStatuses := map[string]models.InvoiceStatus{
+		"pending": models.StatusPending,
+		"sent":    models.StatusSent,
+		"paid":    models.StatusPaid,
+		"overdue": models.StatusOverdue,
+	}
+
+	newStatus, ok := validStatuses[invoiceMarkStatus]
+	if !ok {
+		return fmt.Errorf("invalid status: %s (valid: pending, sent, paid, overdue)", invoiceMarkStatus)
+	}
+
+	// Check if invoice exists
+	var currentStatus string
+	var invoiceNum string
+	err = db.DB.QueryRow("SELECT invoice_num, status FROM invoices WHERE id = ?", invoiceID).Scan(&invoiceNum, &currentStatus)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	// Update status
+	_, err = db.DB.Exec("UPDATE invoices SET status = ? WHERE id = ?", newStatus, invoiceID)
+	if err != nil {
+		return fmt.Errorf("failed to update invoice: %w", err)
+	}
+
+	fmt.Printf("✓ Invoice %s status updated: %s → %s\n", invoiceNum, currentStatus, newStatus)
 	return nil
 }

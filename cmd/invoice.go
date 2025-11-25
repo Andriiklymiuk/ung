@@ -45,6 +45,40 @@ var invoiceListCmd = &cobra.Command{
 	RunE:    runInvoiceList,
 }
 
+var invoiceGenerateAllCmd = &cobra.Command{
+	Use:   "generate-all",
+	Short: "Generate invoices for all clients with unbilled time",
+	Long: `Generate invoices for all clients with unbilled time tracking entries.
+
+This command will:
+1. Find all clients with unbilled time
+2. Create invoices for each client based on their contract terms
+3. Optionally generate PDFs and/or send emails
+
+Examples:
+  ung invoice generate-all                    Generate invoices only
+  ung invoice generate-all --pdf              Generate invoices + PDFs
+  ung invoice generate-all --email            Generate invoices + PDFs + emails
+  ung invoice generate-all --email --email-app apple   Use Apple Mail`,
+	RunE: runInvoiceGenerateAll,
+}
+
+var invoiceSendAllCmd = &cobra.Command{
+	Use:   "send-all",
+	Short: "Send emails for all pending invoices",
+	Long: `Send emails for all pending invoices that have PDFs generated.
+
+This command will:
+1. Find all pending invoices
+2. Generate PDFs if not already generated
+3. Open email client for each invoice
+
+Examples:
+  ung invoice send-all                        Send all pending invoices
+  ung invoice send-all --email-app outlook    Use Outlook`,
+	RunE: runInvoiceSendAll,
+}
+
 
 var (
 	// Flags for invoice new command
@@ -66,9 +100,11 @@ var (
 )
 
 func init() {
-	// Add subcommands (only new and ls remain)
+	// Add subcommands
 	invoiceCmd.AddCommand(invoiceNewCmd)
 	invoiceCmd.AddCommand(invoiceListCmd)
+	invoiceCmd.AddCommand(invoiceGenerateAllCmd)
+	invoiceCmd.AddCommand(invoiceSendAllCmd)
 
 	// Main invoice command flags
 	invoiceCmd.Flags().StringVarP(&invoiceFlagClient, "client", "c", "", "Client name (generates invoice from tracked time)")
@@ -77,6 +113,14 @@ func init() {
 	invoiceCmd.Flags().BoolVar(&invoiceFlagEmail, "email", false, "Send email (auto-generates PDF)")
 	invoiceCmd.Flags().StringVar(&invoiceFlagEmailApp, "email-app", "", "Email client (apple, outlook, gmail)")
 	invoiceCmd.Flags().BoolVar(&invoiceFlagBatch, "batch", false, "Batch operation for multiple invoices")
+
+	// Generate-all command flags
+	invoiceGenerateAllCmd.Flags().BoolVar(&invoiceFlagPDF, "pdf", false, "Generate PDF for each invoice")
+	invoiceGenerateAllCmd.Flags().BoolVar(&invoiceFlagEmail, "email", false, "Send email for each invoice (auto-generates PDF)")
+	invoiceGenerateAllCmd.Flags().StringVar(&invoiceFlagEmailApp, "email-app", "", "Email client (apple, outlook, gmail)")
+
+	// Send-all command flags
+	invoiceSendAllCmd.Flags().StringVar(&invoiceFlagEmailApp, "email-app", "", "Email client (apple, outlook, gmail)")
 
 	// New invoice flags
 	invoiceNewCmd.Flags().IntVar(&invoiceCompanyID, "company", 0, "Company ID")
@@ -879,5 +923,202 @@ func runBatchInvoice(cmd *cobra.Command) error {
 	}
 
 	fmt.Println("\n✓ Batch processing completed!")
+	return nil
+}
+
+// runInvoiceGenerateAll generates invoices for all clients with unbilled time
+func runInvoiceGenerateAll(cmd *cobra.Command, args []string) error {
+	// Get all unbilled time sessions grouped by client
+	groups, err := getUnbilledTimeSessions()
+	if err != nil {
+		return fmt.Errorf("failed to get unbilled sessions: %w", err)
+	}
+
+	if len(groups) == 0 {
+		fmt.Println("No unbilled time found for any clients.")
+		return nil
+	}
+
+	// Show summary
+	fmt.Println("📊 Clients with unbilled time:\n")
+	totalAmount := 0.0
+	for i, group := range groups {
+		amount := 0.0
+		if group.ContractType == "fixed_price" && group.FixedPrice != nil {
+			amount = *group.FixedPrice
+		} else if group.HourlyRate != nil {
+			amount = group.TotalHours * (*group.HourlyRate)
+		}
+		totalAmount += amount
+		fmt.Printf("  %d. %s - %.2f hours", i+1, group.ClientName, group.TotalHours)
+		if amount > 0 {
+			fmt.Printf(" = %.2f %s", amount, group.Currency)
+		}
+		fmt.Println()
+	}
+	fmt.Printf("\nTotal: %.2f (across all currencies)\n", totalAmount)
+	fmt.Printf("Will create %d invoice(s)\n\n", len(groups))
+
+	// Confirm
+	var shouldProceed bool
+	confirmForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Generate invoices for all clients?").
+				Value(&shouldProceed),
+		),
+	)
+
+	if err := confirmForm.Run(); err != nil || !shouldProceed {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	// Generate invoice for each client
+	generatedInvoices := []struct {
+		ID         int64
+		InvoiceNum string
+		ClientName string
+	}{}
+
+	for i, group := range groups {
+		fmt.Printf("\n[%d/%d] Generating invoice for %s...\n", i+1, len(groups), group.ClientName)
+
+		// Use the existing generateInvoiceFromTime function
+		invoiceID, err := generateInvoiceFromTime(group.ClientName)
+		if err != nil {
+			fmt.Printf("  ❌ Failed: %v\n", err)
+			continue
+		}
+
+		// Get invoice number
+		var invoiceNum string
+		db.DB.QueryRow("SELECT invoice_num FROM invoices WHERE id = ?", invoiceID).Scan(&invoiceNum)
+
+		generatedInvoices = append(generatedInvoices, struct {
+			ID         int64
+			InvoiceNum string
+			ClientName string
+		}{invoiceID, invoiceNum, group.ClientName})
+
+		fmt.Printf("  ✓ Created %s\n", invoiceNum)
+
+		// Generate PDF if --pdf or --email
+		if invoiceFlagPDF || invoiceFlagEmail {
+			if err := generateInvoicePDFByID(int(invoiceID)); err != nil {
+				fmt.Printf("  ❌ Failed to generate PDF: %v\n", err)
+				continue
+			}
+			fmt.Printf("  ✓ PDF generated\n")
+		}
+
+		// Email if --email
+		if invoiceFlagEmail {
+			if err := emailInvoiceByID(int(invoiceID), invoiceFlagEmailApp); err != nil {
+				fmt.Printf("  ❌ Failed to email: %v\n", err)
+				continue
+			}
+			fmt.Printf("  ✓ Email prepared\n")
+		}
+	}
+
+	fmt.Printf("\n✓ Generated %d invoice(s)!\n", len(generatedInvoices))
+	if len(generatedInvoices) > 0 {
+		fmt.Println("\nSummary:")
+		for _, inv := range generatedInvoices {
+			fmt.Printf("  • %s for %s\n", inv.InvoiceNum, inv.ClientName)
+		}
+	}
+
+	return nil
+}
+
+// runInvoiceSendAll sends emails for all pending invoices
+func runInvoiceSendAll(cmd *cobra.Command, args []string) error {
+	// Get all pending invoices
+	query := `
+		SELECT i.id, i.invoice_num, i.amount, i.currency, i.status, i.pdf_path,
+		       c.name as client_name
+		FROM invoices i
+		LEFT JOIN invoice_recipients ir ON i.id = ir.invoice_id
+		LEFT JOIN clients c ON ir.client_id = c.id
+		WHERE i.status = ?
+		ORDER BY i.issued_date DESC
+	`
+
+	rows, err := db.DB.Query(query, models.StatusPending)
+	if err != nil {
+		return fmt.Errorf("failed to fetch invoices: %w", err)
+	}
+	defer rows.Close()
+
+	type pendingInvoice struct {
+		ID         int64
+		InvoiceNum string
+		Amount     float64
+		Currency   string
+		Status     string
+		PDFPath    *string
+		ClientName string
+	}
+
+	var invoices []pendingInvoice
+	for rows.Next() {
+		var inv pendingInvoice
+		if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.Amount, &inv.Currency,
+			&inv.Status, &inv.PDFPath, &inv.ClientName); err != nil {
+			return fmt.Errorf("failed to scan invoice: %w", err)
+		}
+		invoices = append(invoices, inv)
+	}
+
+	if len(invoices) == 0 {
+		fmt.Println("No pending invoices found.")
+		return nil
+	}
+
+	fmt.Printf("📧 Found %d pending invoice(s):\n\n", len(invoices))
+	for i, inv := range invoices {
+		fmt.Printf("  %d. %s - %s - %.2f %s\n", i+1, inv.InvoiceNum, inv.ClientName, inv.Amount, inv.Currency)
+	}
+	fmt.Println()
+
+	// Confirm
+	var shouldProceed bool
+	confirmForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Send emails for all pending invoices?").
+				Value(&shouldProceed),
+		),
+	)
+
+	if err := confirmForm.Run(); err != nil || !shouldProceed {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	// Process each invoice
+	successCount := 0
+	for i, inv := range invoices {
+		fmt.Printf("\n[%d/%d] Processing %s (%s)...\n", i+1, len(invoices), inv.InvoiceNum, inv.ClientName)
+
+		// Generate PDF if not exists
+		if err := generateInvoicePDFByID(int(inv.ID)); err != nil {
+			fmt.Printf("  ❌ Failed to generate PDF: %v\n", err)
+			continue
+		}
+		fmt.Printf("  ✓ PDF ready\n")
+
+		// Send email
+		if err := emailInvoiceByID(int(inv.ID), invoiceFlagEmailApp); err != nil {
+			fmt.Printf("  ❌ Failed to email: %v\n", err)
+			continue
+		}
+		fmt.Printf("  ✓ Email prepared\n")
+		successCount++
+	}
+
+	fmt.Printf("\n✓ Processed %d/%d invoice(s)!\n", successCount, len(invoices))
 	return nil
 }

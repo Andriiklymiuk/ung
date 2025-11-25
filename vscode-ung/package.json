@@ -2,7 +2,7 @@
   "name": "ung",
   "displayName": "UNG - Billing & Time Tracking",
   "description": "Comprehensive billing, invoicing, and time tracking extension for the UNG CLI tool",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "publisher": "andriiklymiuk",
   "icon": "resources/icon.png",
   "repository": {
@@ -349,6 +349,18 @@
         "title": "Refresh All Views",
         "category": "UNG",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.generateAllInvoices",
+        "title": "Generate All Invoices",
+        "category": "UNG",
+        "icon": "$(files)"
+      },
+      {
+        "command": "ung.sendAllInvoices",
+        "title": "Send All Pending Invoices",
+        "category": "UNG",
+        "icon": "$(send)"
       }
     ],
     "viewsContainers": {
@@ -434,12 +446,22 @@
         {
           "command": "ung.createInvoice",
           "when": "view == ungInvoices",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "ung.generateAllInvoices",
+          "when": "view == ungInvoices",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ung.sendAllInvoices",
+          "when": "view == ungInvoices",
+          "group": "navigation@3"
         },
         {
           "command": "ung.refreshInvoices",
           "when": "view == ungInvoices",
-          "group": "navigation"
+          "group": "navigation@4"
         },
         {
           "command": "ung.createContract",

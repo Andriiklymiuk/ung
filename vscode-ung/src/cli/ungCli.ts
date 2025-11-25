@@ -359,6 +359,35 @@ export class UngCli {
         });
     }
 
+    /**
+     * Generate invoices for all clients with unbilled time
+     * Note: This runs interactively in CLI, so for VS Code we use manual approach
+     */
+    async generateAllInvoices(options?: { pdf?: boolean; email?: boolean; emailApp?: string }): Promise<CliResult> {
+        const args = ['invoice', 'generate-all'];
+        if (options?.pdf) args.push('--pdf');
+        if (options?.email) args.push('--email');
+        if (options?.emailApp) args.push('--email-app', options.emailApp);
+        return this.exec(args);
+    }
+
+    /**
+     * Send emails for all pending invoices
+     * Note: This runs interactively in CLI
+     */
+    async sendAllInvoices(emailApp?: string): Promise<CliResult> {
+        const args = ['invoice', 'send-all'];
+        if (emailApp) args.push('--email-app', emailApp);
+        return this.exec(args);
+    }
+
+    /**
+     * Get unbilled time summary (for VS Code bulk generation preview)
+     */
+    async getUnbilledTimeSummary(): Promise<CliResult> {
+        return this.exec(['track', 'ls', '--unbilled']);
+    }
+
     // ========== Expense Commands ==========
 
     /**

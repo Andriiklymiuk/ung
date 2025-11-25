@@ -41,9 +41,9 @@ jobs:
 
       - name: Publish to VSCode Marketplace
         working-directory: vscode-ung
-        run: vsce publish -p ${{ secrets.GH_PAT }}
+        run: vsce publish -p ${{ secrets.VSCE_PAT }}
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Upload VSIX as artifact
         uses: actions/upload-artifact@v4

@@ -153,8 +153,9 @@ func runInvoiceNew(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Use current time for issued date
-	issuedDate := time.Now()
+	// Use end of current month for issued date
+	now := time.Now()
+	issuedDate := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, now.Location())
 
 	// Generate human-readable invoice number
 	invoiceNum, err := idgen.GenerateInvoiceNumber(db.GormDB, clientName, issuedDate)
@@ -771,9 +772,10 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate invoice number: %w", err)
 	}
 
-	// Create invoice
-	dueDate := time.Now().AddDate(0, 0, 15) // 15 days from now
-	issuedDate := time.Now()
+	// Create invoice - use end of current month for issued date
+	now := time.Now()
+	issuedDate := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, now.Location())
+	dueDate := issuedDate.AddDate(0, 1, 0) // 1 month from issued date
 
 	result, err := db.DB.Exec(`
 		INSERT INTO invoices (invoice_num, company_id, amount, currency, description, status, issued_date, due_date)

@@ -23,7 +23,7 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 	pdf.SetFont("Helvetica", "B", 24)
 
 	// Title
-	pdf.CellFormat(190, 10, cfg.Invoice.InvoiceLabel+" / CONTRACT", "", 1, "C", false, 0, "")
+	pdf.CellFormat(190, 10, "CONTRACT", "", 1, "C", false, 0, "")
 	pdf.Ln(10)
 
 	// Contract metadata (right-aligned)
@@ -64,7 +64,7 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 		pdf.CellFormat(90, 5, company.Phone, "", 1, "L", false, 0, "")
 	}
 	if company.Address != "" {
-		pdf.CellFormat(90, 5, company.Address, "", 1, "L", false, 0, "")
+		pdf.MultiCell(90, 5, company.Address, "", "L", false)
 	}
 	if company.RegistrationAddress != "" && company.RegistrationAddress != company.Address {
 		pdf.CellFormat(90, 5, fmt.Sprintf("Reg: %s", company.RegistrationAddress), "", 1, "L", false, 0, "")
@@ -106,7 +106,7 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 		pdf.SetX(105)
 	}
 	if client.Address != "" {
-		pdf.CellFormat(85, 5, client.Address, "", 1, "L", false, 0, "")
+		pdf.MultiCell(85, 5, client.Address, "", "L", false)
 		pdf.SetX(105)
 	}
 	if client.TaxID != "" {

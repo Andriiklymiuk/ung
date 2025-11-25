@@ -63,8 +63,40 @@ func GeneratePDF(invoice models.Invoice, company models.Company, client models.C
 		pdf.MultiCell(contentWidth/2-10, 4, company.Address, "", "L", false)
 	}
 
-	// Invoice metadata on the right side
-	metaStartY := 55.0
+	// Bill To section (after company info, on left)
+	billToY := pdf.GetY() + 8
+	pdf.SetXY(leftMargin, billToY)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(80, 80, 80)
+	pdf.Cell(40, 5, cfg.Invoice.BillToLabel)
+
+	pdf.SetFont("Arial", "B", 11)
+	pdf.SetTextColor(40, 40, 40)
+	pdf.SetXY(leftMargin, billToY+7)
+	pdf.Cell(contentWidth/2, 5, client.Name)
+
+	pdf.SetFont("Arial", "", 9)
+	pdf.SetTextColor(60, 60, 60)
+	currentY := billToY + 13
+
+	// Client registration/VAT info
+	if client.TaxID != "" {
+		pdf.SetXY(leftMargin, currentY)
+		pdf.Cell(contentWidth/2, 4, fmt.Sprintf("Registration number: %s, VAT ID:", client.TaxID[:min(len(client.TaxID), 11)]))
+		currentY += 4
+		pdf.SetXY(leftMargin, currentY)
+		pdf.Cell(contentWidth/2, 4, client.TaxID)
+		currentY += 4
+	}
+
+	// Client address
+	if client.Address != "" {
+		pdf.SetXY(leftMargin, currentY)
+		pdf.MultiCell(contentWidth/2, 4, client.Address, "", "L", false)
+	}
+
+	// Invoice metadata on the right side (positioned next to Bill To)
+	metaStartY := billToY
 	metaLabelX := pageWidth - rightMargin - 80
 	metaValueX := pageWidth - rightMargin - 40
 
@@ -94,40 +126,8 @@ func GeneratePDF(invoice models.Invoice, company models.Company, client models.C
 	pdf.SetXY(metaValueX, metaStartY+12)
 	pdf.Cell(40, 5, invoice.DueDate.Format("02 Jan 2006"))
 
-	// Bill To section
-	billToY := 75.0
-	pdf.SetXY(leftMargin, billToY)
-	pdf.SetFont("Arial", "B", 10)
-	pdf.SetTextColor(80, 80, 80)
-	pdf.Cell(40, 5, cfg.Invoice.BillToLabel)
-
-	pdf.SetFont("Arial", "B", 11)
-	pdf.SetTextColor(40, 40, 40)
-	pdf.SetXY(leftMargin, billToY+7)
-	pdf.Cell(contentWidth/2, 5, client.Name)
-
-	pdf.SetFont("Arial", "", 9)
-	pdf.SetTextColor(60, 60, 60)
-	currentY := billToY + 13
-
-	// Client registration/VAT info
-	if client.TaxID != "" {
-		pdf.SetXY(leftMargin, currentY)
-		pdf.Cell(contentWidth/2, 4, fmt.Sprintf("Registration number: %s, VAT ID:", client.TaxID[:min(len(client.TaxID), 11)]))
-		currentY += 4
-		pdf.SetXY(leftMargin, currentY)
-		pdf.Cell(contentWidth/2, 4, client.TaxID)
-		currentY += 4
-	}
-
-	// Client address
-	if client.Address != "" {
-		pdf.SetXY(leftMargin, currentY)
-		pdf.MultiCell(contentWidth/2-10, 4, client.Address, "", "L", false)
-	}
-
 	// Line Items Table
-	tableY := 115.0
+	tableY := pdf.GetY() + 15
 	pdf.SetXY(leftMargin, tableY)
 
 	// Ensure line items have proper names

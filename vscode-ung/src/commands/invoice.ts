@@ -143,7 +143,7 @@ export class InvoiceCommands {
     }
 
     /**
-     * View invoice details
+     * View invoice details - shows action menu like contracts
      */
     async viewInvoice(invoiceId?: number): Promise<void> {
         if (!invoiceId) {
@@ -151,7 +151,28 @@ export class InvoiceCommands {
             return;
         }
 
-        vscode.window.showInformationMessage(`Invoice ID: ${invoiceId}. Detailed view coming soon!`);
+        // Show action menu like contracts
+        const actions = [
+            { label: '$(file-pdf) Export to PDF', action: 'pdf' },
+            { label: '$(mail) Email Invoice', action: 'email' },
+            { label: '$(close) Close', action: 'close' }
+        ];
+
+        const selected = await vscode.window.showQuickPick(actions, {
+            placeHolder: `Invoice ${invoiceId}`,
+            title: 'Invoice Actions'
+        });
+
+        if (selected) {
+            switch (selected.action) {
+                case 'pdf':
+                    await this.exportInvoice(invoiceId);
+                    break;
+                case 'email':
+                    await this.emailInvoice(invoiceId);
+                    break;
+            }
+        }
     }
 
     /**

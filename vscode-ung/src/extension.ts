@@ -12,7 +12,6 @@ import { ClientProvider } from './views/clientProvider';
 import { ExpenseProvider } from './views/expenseProvider';
 import { TrackingProvider } from './views/trackingProvider';
 import { DashboardProvider } from './views/dashboardProvider';
-import { InvoicePanel } from './webview/invoicePanel';
 import { ExportPanel } from './webview/exportPanel';
 import { StatusBarManager } from './utils/statusBar';
 
@@ -204,11 +203,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ung.createInvoice', () => invoiceCommands.createInvoice()),
         vscode.commands.registerCommand('ung.generateFromTime', () => invoiceCommands.generateFromTime()),
         vscode.commands.registerCommand('ung.viewInvoice', (item) => {
-            if (item?.itemId) {
-                InvoicePanel.createOrShow(cli, item.itemId);
-            } else {
-                invoiceCommands.viewInvoice(item?.itemId);
-            }
+            invoiceCommands.viewInvoice(item?.itemId);
         }),
         vscode.commands.registerCommand('ung.editInvoice', (item) => invoiceCommands.editInvoice(item?.itemId)),
         vscode.commands.registerCommand('ung.deleteInvoice', (item) => invoiceCommands.deleteInvoice(item?.itemId)),

@@ -379,6 +379,12 @@
         "title": "Export Data for Accounting",
         "category": "UNG",
         "icon": "$(export)"
+      },
+      {
+        "command": "ung.syncData",
+        "title": "Backup & Sync Data",
+        "category": "UNG",
+        "icon": "$(cloud)"
       }
     ],
     "viewsContainers": {

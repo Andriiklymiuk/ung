@@ -544,4 +544,32 @@ export class UngCli {
         if (options?.year) args.push('--year', options.year.toString());
         return this.exec(args);
     }
+
+    // ========== Sync Commands ==========
+
+    /**
+     * Create a backup of all data
+     */
+    async createBackup(outputPath?: string): Promise<CliResult> {
+        const args = ['sync', 'backup'];
+        if (outputPath) args.push('--output', outputPath);
+        return this.exec(args);
+    }
+
+    /**
+     * List available backups
+     */
+    async listBackups(): Promise<CliResult> {
+        return this.exec(['sync', 'ls']);
+    }
+
+    /**
+     * Restore from backup (interactive, best run in terminal)
+     */
+    async restoreBackup(file?: string, force?: boolean): Promise<CliResult> {
+        const args = ['sync', 'restore'];
+        if (file) args.push(file);
+        if (force) args.push('--force');
+        return this.exec(args);
+    }
 }

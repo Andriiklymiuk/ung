@@ -398,6 +398,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '$(watch) Pomodoro Timer', command: 'ung.startPomodoro' },
                 { label: '$(sync) Recurring Invoices', command: 'ung.manageRecurring' },
                 { label: '$(export) Export Data', command: 'ung.exportData' },
+                { label: '$(cloud) Backup & Sync', command: 'ung.syncData' },
                 { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
             ];
 
@@ -572,6 +573,58 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage(`Export failed: ${result.error}`);
                 }
             });
+        })
+    );
+
+    // Backup & Sync command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.syncData', async () => {
+            const actions = [
+                { label: '$(cloud-upload) Create Backup', value: 'backup', description: 'Save all data to backup file' },
+                { label: '$(cloud-download) Restore from Backup', value: 'restore', description: 'Restore data from backup' },
+                { label: '$(list-flat) List Backups', value: 'list', description: 'Show available backups' }
+            ];
+
+            const action = await vscode.window.showQuickPick(actions, {
+                placeHolder: 'Select sync action',
+                title: 'Backup & Sync'
+            });
+
+            if (!action) return;
+
+            switch (action.value) {
+                case 'backup': {
+                    await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: 'Creating backup...'
+                    }, async () => {
+                        const result = await cli.createBackup();
+                        if (result.success) {
+                            vscode.window.showInformationMessage('Backup created successfully! Check ~/.ung/backups');
+                            outputChannel.clear();
+                            outputChannel.appendLine(result.stdout || 'Backup complete');
+                            outputChannel.show();
+                        } else {
+                            vscode.window.showErrorMessage(`Backup failed: ${result.error}`);
+                        }
+                    });
+                    break;
+                }
+                case 'restore': {
+                    const terminal = vscode.window.createTerminal('UNG Restore');
+                    terminal.show();
+                    terminal.sendText('ung sync restore');
+                    break;
+                }
+                case 'list': {
+                    const result = await cli.listBackups();
+                    outputChannel.clear();
+                    outputChannel.appendLine('=== Available Backups ===\n');
+                    outputChannel.appendLine(result.stdout || 'No backups found');
+                    outputChannel.show();
+                    break;
+                }
+            }
         })
     );
 

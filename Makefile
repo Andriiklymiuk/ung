@@ -1,4 +1,4 @@
-.PHONY: build install test clean run help
+.PHONY: build install test clean run help release
 
 # Build variables
 BINARY_NAME=ung
@@ -78,6 +78,25 @@ build-all:
 	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe .
 	@echo "✓ Cross-compilation complete"
 
+# Release - bump version, create tag, and push to trigger release
+# Usage: make release [v=1.2.3]  (if v is not specified, patch version is bumped)
+release:
+	@git diff --quiet || (echo "Error: Working directory has uncommitted changes" && exit 1)
+	$(eval LAST_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"))
+	$(eval LAST_VERSION := $(shell echo $(LAST_TAG) | sed 's/^v//'))
+	$(eval MAJOR := $(shell echo $(LAST_VERSION) | cut -d. -f1))
+	$(eval MINOR := $(shell echo $(LAST_VERSION) | cut -d. -f2))
+	$(eval PATCH := $(shell echo $(LAST_VERSION) | cut -d. -f3))
+	$(eval NEW_PATCH := $(shell echo $$(($(PATCH) + 1))))
+	$(eval NEW_VERSION := $(or $(v),$(MAJOR).$(MINOR).$(NEW_PATCH)))
+	@echo "Releasing v$(NEW_VERSION)... (previous: $(LAST_TAG))"
+	@sed -i.bak 's/Version   = "[^"]*"/Version   = "$(NEW_VERSION)"/' cmd/version.go && rm -f cmd/version.go.bak
+	@git add cmd/version.go
+	@git commit -m "chore: bump version to $(NEW_VERSION)"
+	@git tag -a v$(NEW_VERSION) -m "Release v$(NEW_VERSION)"
+	@git push origin main v$(NEW_VERSION)
+	@echo "✓ Version bumped, committed, tagged v$(NEW_VERSION), and pushed. Release workflow triggered."
+
 # Help
 help:
 	@echo "UNG Makefile targets:"
@@ -91,4 +110,5 @@ help:
 	@echo "  lint       - Run linter"
 	@echo "  dev        - Build with race detector"
 	@echo "  build-all  - Cross-compile for all platforms"
+	@echo "  release    - Create and push a release tag (auto-bumps patch, or: make release v=1.2.3)"
 	@echo "  help       - Show this help message"

@@ -2,20 +2,58 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - env:
+  - id: linux-amd64
+    env:
       - CGO_ENABLED=1
+      - CC=gcc
     goos:
       - linux
-      - darwin
     goarch:
       - amd64
+    ldflags:
+      - -s -w
+      - -X github.com/Andriiklymiuk/ung/cmd.Version={{.Version}}
+      - -X github.com/Andriiklymiuk/ung/cmd.GitCommit={{.Commit}}
+      - -X github.com/Andriiklymiuk/ung/cmd.BuildDate={{.Date}}
+  - id: linux-arm64
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
       - arm64
     ldflags:
       - -s -w
       - -X github.com/Andriiklymiuk/ung/cmd.Version={{.Version}}
       - -X github.com/Andriiklymiuk/ung/cmd.GitCommit={{.Commit}}
       - -X github.com/Andriiklymiuk/ung/cmd.BuildDate={{.Date}}
-    # SQLite requires CGO, so we need to build differently for each platform
+  - id: darwin-amd64
+    env:
+      - CGO_ENABLED=1
+      - CC=o64-clang
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+      - -X github.com/Andriiklymiuk/ung/cmd.Version={{.Version}}
+      - -X github.com/Andriiklymiuk/ung/cmd.GitCommit={{.Commit}}
+      - -X github.com/Andriiklymiuk/ung/cmd.BuildDate={{.Date}}
+  - id: darwin-arm64
+    env:
+      - CGO_ENABLED=1
+      - CC=oa64-clang
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/Andriiklymiuk/ung/cmd.Version={{.Version}}
+      - -X github.com/Andriiklymiuk/ung/cmd.GitCommit={{.Commit}}
+      - -X github.com/Andriiklymiuk/ung/cmd.BuildDate={{.Date}}
 checksum:
   name_template: "checksums.txt"
 snapshot:

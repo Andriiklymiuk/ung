@@ -2,7 +2,7 @@
   "name": "ung",
   "displayName": "UNG - Billing & Time Tracking",
   "description": "Comprehensive billing, invoicing, and time tracking extension for the UNG CLI tool",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "publisher": "andriiklymiuk",
   "icon": "resources/icon.png",
   "repository": {
@@ -124,6 +124,23 @@
       {
         "command": "ung.emailInvoice",
         "title": "Email Invoice",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.markInvoicePaid",
+        "title": "Mark Invoice as Paid",
+        "category": "UNG",
+        "icon": "$(check)"
+      },
+      {
+        "command": "ung.markInvoiceSent",
+        "title": "Mark Invoice as Sent",
+        "category": "UNG",
+        "icon": "$(send)"
+      },
+      {
+        "command": "ung.changeInvoiceStatus",
+        "title": "Change Invoice Status",
         "category": "UNG"
       },
       {
@@ -368,6 +385,21 @@
           "group": "1_actions"
         },
         {
+          "command": "ung.markInvoicePaid",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "1_actions"
+        },
+        {
+          "command": "ung.markInvoiceSent",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "1_actions"
+        },
+        {
+          "command": "ung.changeInvoiceStatus",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "2_modify"
+        },
+        {
           "command": "ung.editInvoice",
           "when": "view == ungInvoices && viewItem == invoice",
           "group": "2_modify"
@@ -452,9 +484,27 @@
         "when": "editorTextFocus || !editorFocus"
       },
       {
+        "command": "ung.stopTracking",
+        "key": "ctrl+alt+s",
+        "mac": "cmd+alt+s",
+        "when": "editorTextFocus || !editorFocus"
+      },
+      {
         "command": "ung.createInvoice",
         "key": "ctrl+alt+i",
         "mac": "cmd+alt+i",
+        "when": "!editorFocus"
+      },
+      {
+        "command": "ung.generateFromTime",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "!editorFocus"
+      },
+      {
+        "command": "ung.refreshDashboard",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
         "when": "!editorFocus"
       }
     ]

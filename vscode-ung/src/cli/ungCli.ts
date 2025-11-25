@@ -263,6 +263,27 @@ export class UngCli {
     }
 
     /**
+     * Mark invoice as paid
+     */
+    async markInvoicePaid(id: number): Promise<CliResult> {
+        return this.exec(['invoice', 'mark', id.toString(), '--status', 'paid']);
+    }
+
+    /**
+     * Mark invoice as sent
+     */
+    async markInvoiceSent(id: number): Promise<CliResult> {
+        return this.exec(['invoice', 'mark', id.toString(), '--status', 'sent']);
+    }
+
+    /**
+     * Update invoice status
+     */
+    async updateInvoiceStatus(id: number, status: 'pending' | 'sent' | 'paid' | 'overdue'): Promise<CliResult> {
+        return this.exec(['invoice', 'mark', id.toString(), '--status', status]);
+    }
+
+    /**
      * Generate invoice from time tracking
      */
     async generateInvoiceFromTime(clientName: string, options?: { pdf?: boolean; email?: boolean; emailApp?: string }): Promise<CliResult> {

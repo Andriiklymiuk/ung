@@ -63,6 +63,7 @@ var invoiceBatchEmailCmd = &cobra.Command{
 var (
 	invoiceCompanyID   int
 	invoiceClientID    int
+	invoiceClientName  string
 	invoiceAmount      float64
 	invoiceCurrency    string
 	invoiceDescription string
@@ -78,23 +79,78 @@ func init() {
 	invoiceCmd.AddCommand(invoiceBatchEmailCmd)
 
 	// New invoice flags
-	invoiceNewCmd.Flags().IntVar(&invoiceCompanyID, "company", 0, "Company ID (required)")
-	invoiceNewCmd.Flags().IntVar(&invoiceClientID, "client", 0, "Client ID (required)")
+	invoiceNewCmd.Flags().IntVar(&invoiceCompanyID, "company", 0, "Company ID")
+	invoiceNewCmd.Flags().IntVar(&invoiceClientID, "client", 0, "Client ID")
+	invoiceNewCmd.Flags().StringVar(&invoiceClientName, "client-name", "", "Client name (partial match, min 3 chars)")
 	invoiceNewCmd.Flags().Float64Var(&invoiceAmount, "price", 0, "Invoice amount (required)")
 	invoiceNewCmd.Flags().StringVar(&invoiceCurrency, "currency", "USD", "Currency code")
 	invoiceNewCmd.Flags().StringVar(&invoiceDescription, "description", "", "Invoice description")
 	invoiceNewCmd.Flags().StringVar(&invoiceDueDate, "due", "", "Due date (YYYY-MM-DD)")
-	invoiceNewCmd.MarkFlagRequired("company")
-	invoiceNewCmd.MarkFlagRequired("client")
 	invoiceNewCmd.MarkFlagRequired("price")
 }
 
 func runInvoiceNew(cmd *cobra.Command, args []string) error {
-	// Get client name for invoice number generation
 	var clientName string
-	err := db.DB.QueryRow("SELECT name FROM clients WHERE id = ?", invoiceClientID).Scan(&clientName)
-	if err != nil {
-		return fmt.Errorf("client not found: %w", err)
+	var resolvedClientID int
+
+	// Resolve client: by name (preferred) or by ID
+	if invoiceClientName != "" {
+		// Use client name search
+		clientID, fullName, err := FindClientByName(invoiceClientName)
+		if err != nil {
+			return fmt.Errorf("client lookup failed: %w", err)
+		}
+		resolvedClientID = int(clientID)
+		clientName = fullName
+	} else if invoiceClientID > 0 {
+		// Use client ID directly
+		resolvedClientID = invoiceClientID
+		err := db.DB.QueryRow("SELECT name FROM clients WHERE id = ?", invoiceClientID).Scan(&clientName)
+		if err != nil {
+			return fmt.Errorf("client not found: %w", err)
+		}
+	} else {
+		// Interactive mode - show all clients and let user select
+		clients, err := getClients()
+		if err != nil {
+			return fmt.Errorf("failed to get clients: %w", err)
+		}
+		if len(clients) == 0 {
+			return fmt.Errorf("no clients found. Create one first with: ung client add")
+		}
+
+		clientOptions := make([]huh.Option[int], len(clients))
+		for i, c := range clients {
+			clientOptions[i] = huh.NewOption(fmt.Sprintf("%s (%s)", c.Name, c.Email), int(c.ID))
+		}
+
+		var selectedClientID int
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[int]().
+					Title("Select Client").
+					Options(clientOptions...).
+					Value(&selectedClientID),
+			),
+		)
+
+		if err := form.Run(); err != nil {
+			return fmt.Errorf("selection cancelled: %w", err)
+		}
+
+		resolvedClientID = selectedClientID
+		err = db.DB.QueryRow("SELECT name FROM clients WHERE id = ?", selectedClientID).Scan(&clientName)
+		if err != nil {
+			return fmt.Errorf("client not found: %w", err)
+		}
+	}
+
+	// Get company ID - use provided or default to first company
+	if invoiceCompanyID == 0 {
+		err := db.DB.QueryRow("SELECT id FROM companies LIMIT 1").Scan(&invoiceCompanyID)
+		if err != nil {
+			return fmt.Errorf("no company found. Create one first with: ung company add")
+		}
 	}
 
 	// Use current time for issued date
@@ -143,7 +199,7 @@ func runInvoiceNew(cmd *cobra.Command, args []string) error {
 	// Link invoice to client
 	_, err = db.DB.Exec(
 		"INSERT INTO invoice_recipients (invoice_id, client_id) VALUES (?, ?)",
-		invoiceID, invoiceClientID,
+		invoiceID, resolvedClientID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to link invoice to client: %w", err)

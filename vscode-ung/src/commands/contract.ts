@@ -36,7 +36,83 @@ export class ContractCommands {
             return;
         }
 
-        vscode.window.showInformationMessage(`Contract ID: ${contractId}. Full details coming soon!`);
+        // Get contract list and find the specific contract
+        const result = await this.cli.listContracts();
+        if (!result.success) {
+            vscode.window.showErrorMessage('Failed to fetch contracts');
+            return;
+        }
+
+        const contract = this.parseContractFromOutput(result.stdout || '', contractId);
+        if (!contract) {
+            vscode.window.showErrorMessage(`Contract ${contractId} not found`);
+            return;
+        }
+
+        // Show contract details in a quick pick with actions
+        const actions = [
+            { label: '$(file-pdf) Generate PDF', action: 'pdf' },
+            { label: '$(mail) Email Contract', action: 'email' },
+            { label: '$(close) Close', action: 'close' }
+        ];
+
+        const detail = `${contract.name} | ${contract.client} | ${contract.type} | ${contract.ratePrice} | ${contract.active ? 'Active' : 'Inactive'}`;
+
+        const selected = await vscode.window.showQuickPick(actions, {
+            placeHolder: `Contract: ${contract.contractNum}`,
+            title: detail
+        });
+
+        if (selected) {
+            switch (selected.action) {
+                case 'pdf':
+                    await this.generateContractPDF(contractId);
+                    break;
+                case 'email':
+                    await this.emailContract(contractId);
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Parse a specific contract from CLI output
+     */
+    private parseContractFromOutput(output: string, contractId: number): {
+        id: number;
+        contractNum: string;
+        name: string;
+        client: string;
+        type: string;
+        ratePrice: string;
+        active: boolean;
+    } | null {
+        const lines = output.trim().split('\n');
+        if (lines.length < 2) return null;
+
+        // Skip header line
+        const dataLines = lines.slice(1);
+
+        for (const line of dataLines) {
+            // Parse: ID  CONTRACT#  NAME  CLIENT  TYPE  RATE/PRICE  ACTIVE
+            const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(p => p);
+            if (parts.length >= 6) {
+                const id = parseInt(parts[0], 10);
+                if (id === contractId) {
+                    return {
+                        id,
+                        contractNum: parts[1],
+                        name: parts[2],
+                        client: parts[3],
+                        type: parts[4],
+                        ratePrice: parts[5],
+                        active: parts[6] === '✓'
+                    };
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -22,19 +22,29 @@ export class InvoiceCommands {
             return;
         }
 
-        // For simplicity, ask for client ID
-        const clientIdStr = await vscode.window.showInputBox({
-            prompt: 'Client ID',
-            placeHolder: 'Enter client ID (use "ung client ls" to see list)',
-            validateInput: (value) => {
-                if (!value) return 'Client ID is required';
-                if (isNaN(Number(value))) return 'Must be a number';
-                return null;
-            }
+        // Parse clients from CLI output
+        const clients = this.parseClientsFromOutput(clientResult.stdout || '');
+        if (clients.length === 0) {
+            vscode.window.showErrorMessage('No clients found. Create one first with "ung client add"');
+            return;
+        }
+
+        // Show client dropdown
+        const clientItems = clients.map(c => ({
+            label: c.name,
+            description: c.email,
+            detail: c.address || undefined,
+            id: c.id
+        }));
+
+        const selectedClient = await vscode.window.showQuickPick(clientItems, {
+            placeHolder: 'Select a client',
+            matchOnDescription: true,
+            matchOnDetail: true
         });
 
-        if (!clientIdStr) return;
-        const clientId = Number(clientIdStr);
+        if (!selectedClient) return;
+        const clientId = selectedClient.id;
 
         const amountStr = await vscode.window.showInputBox({
             prompt: 'Invoice Amount',
@@ -269,5 +279,35 @@ export class InvoiceCommands {
     private parsePDFPath(output: string): string | undefined {
         const match = output.match(/PDF saved to:\s*(.+\.pdf)/i);
         return match ? match[1].trim() : undefined;
+    }
+
+    /**
+     * Parse clients from CLI output (tabular format)
+     */
+    private parseClientsFromOutput(output: string): Array<{ id: number; name: string; email: string; address?: string }> {
+        const lines = output.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        // Skip header line
+        const dataLines = lines.slice(1);
+        const clients: Array<{ id: number; name: string; email: string; address?: string }> = [];
+
+        for (const line of dataLines) {
+            // Parse tab-separated values: ID  NAME  EMAIL  ADDRESS  TAX ID  CREATED
+            const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(p => p);
+            if (parts.length >= 3) {
+                const id = parseInt(parts[0], 10);
+                if (!isNaN(id)) {
+                    clients.push({
+                        id,
+                        name: parts[1],
+                        email: parts[2],
+                        address: parts[3] || undefined
+                    });
+                }
+            }
+        }
+
+        return clients;
     }
 }

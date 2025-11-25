@@ -38,10 +38,13 @@ var companyEditCmd = &cobra.Command{
 }
 
 var (
-	companyName    string
-	companyEmail   string
-	companyAddress string
-	companyTaxID   string
+	companyName        string
+	companyEmail       string
+	companyAddress     string
+	companyTaxID       string
+	companyBankName    string
+	companyBankAccount string
+	companyBankSWIFT   string
 )
 
 func init() {
@@ -55,6 +58,9 @@ func init() {
 	companyAddCmd.Flags().StringVar(&companyEmail, "email", "", "Company email (required)")
 	companyAddCmd.Flags().StringVar(&companyAddress, "address", "", "Company address")
 	companyAddCmd.Flags().StringVar(&companyTaxID, "tax-id", "", "Tax ID")
+	companyAddCmd.Flags().StringVar(&companyBankName, "bank-name", "", "Bank name")
+	companyAddCmd.Flags().StringVar(&companyBankAccount, "bank-account", "", "Bank account number (e.g., IBAN)")
+	companyAddCmd.Flags().StringVar(&companyBankSWIFT, "bank-swift", "", "Bank SWIFT/BIC code")
 	companyAddCmd.MarkFlagRequired("name")
 	companyAddCmd.MarkFlagRequired("email")
 
@@ -63,16 +69,22 @@ func init() {
 	companyEditCmd.Flags().StringVar(&companyEmail, "email", "", "Company email")
 	companyEditCmd.Flags().StringVar(&companyAddress, "address", "", "Company address")
 	companyEditCmd.Flags().StringVar(&companyTaxID, "tax-id", "", "Tax ID")
+	companyEditCmd.Flags().StringVar(&companyBankName, "bank-name", "", "Bank name")
+	companyEditCmd.Flags().StringVar(&companyBankAccount, "bank-account", "", "Bank account number (e.g., IBAN)")
+	companyEditCmd.Flags().StringVar(&companyBankSWIFT, "bank-swift", "", "Bank SWIFT/BIC code")
 }
 
 func runCompanyAdd(cmd *cobra.Command, args []string) error {
 	repo := repository.NewCompanyRepository()
 
 	company := &models.Company{
-		Name:    companyName,
-		Email:   companyEmail,
-		Address: companyAddress,
-		TaxID:   companyTaxID,
+		Name:        companyName,
+		Email:       companyEmail,
+		Address:     companyAddress,
+		TaxID:       companyTaxID,
+		BankName:    companyBankName,
+		BankAccount: companyBankAccount,
+		BankSWIFT:   companyBankSWIFT,
 	}
 
 	if err := repo.Create(company); err != nil {
@@ -92,11 +104,11 @@ func runCompanyList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tEMAIL\tADDRESS\tTAX ID\tCREATED")
+	fmt.Fprintln(w, "ID\tNAME\tEMAIL\tADDRESS\tTAX ID\tBANK ACCOUNT\tCREATED")
 
 	for _, c := range companies {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
-			c.ID, c.Name, c.Email, c.Address, c.TaxID, c.CreatedAt.Format("2006-01-02"))
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			c.ID, c.Name, c.Email, c.Address, c.TaxID, c.BankAccount, c.CreatedAt.Format("2006-01-02"))
 	}
 
 	w.Flush()
@@ -133,6 +145,18 @@ func runCompanyEdit(cmd *cobra.Command, args []string) error {
 	}
 	if cmd.Flags().Changed("tax-id") {
 		company.TaxID = companyTaxID
+		updated = true
+	}
+	if cmd.Flags().Changed("bank-name") {
+		company.BankName = companyBankName
+		updated = true
+	}
+	if cmd.Flags().Changed("bank-account") {
+		company.BankAccount = companyBankAccount
+		updated = true
+	}
+	if cmd.Flags().Changed("bank-swift") {
+		company.BankSWIFT = companyBankSWIFT
 		updated = true
 	}
 

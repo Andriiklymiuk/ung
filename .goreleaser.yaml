@@ -1,6 +1,9 @@
+version: 2
+
 before:
   hooks:
     - go mod tidy
+
 builds:
   - id: linux-amd64
     env:
@@ -54,10 +57,10 @@ builds:
       - -X github.com/Andriiklymiuk/ung/cmd.Version={{.Version}}
       - -X github.com/Andriiklymiuk/ung/cmd.GitCommit={{.Commit}}
       - -X github.com/Andriiklymiuk/ung/cmd.BuildDate={{.Date}}
+
 checksum:
   name_template: "checksums.txt"
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
@@ -65,6 +68,7 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
+
 brews:
   - name: ung
     homepage: https://github.com/Andriiklymiuk/ung

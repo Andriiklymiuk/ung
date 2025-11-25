@@ -4,7 +4,7 @@
   "description": "Comprehensive billing, invoicing, and time tracking extension for the UNG CLI tool",
   "version": "1.0.7",
   "publisher": "andriiklymiuk",
-  "icon": "media/icon.png",
+  "icon": "resources/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/Andriiklymiuk/ung"
@@ -13,9 +13,7 @@
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other",
-    "Finance",
-    "Productivity"
+    "Other"
   ],
   "keywords": [
     "billing",
@@ -236,7 +234,7 @@
         {
           "id": "ung",
           "title": "UNG Billing",
-          "icon": "media/icon.png"
+          "icon": "resources/activityBarIcon.png"
         }
       ]
     },

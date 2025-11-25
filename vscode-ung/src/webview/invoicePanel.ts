@@ -93,7 +93,22 @@ export class InvoicePanel {
      * Email invoice
      */
     private async emailInvoice() {
-        const result = await this.cli.emailInvoice(this.invoiceId);
+        // Ask user to select email client
+        const emailClients = [
+            { label: 'Apple Mail', value: 'apple' },
+            { label: 'Outlook', value: 'outlook' },
+            { label: 'Gmail (Browser)', value: 'gmail' }
+        ];
+
+        const selected = await vscode.window.showQuickPick(emailClients, {
+            placeHolder: 'Select email client'
+        });
+
+        if (!selected) {
+            return;
+        }
+
+        const result = await this.cli.emailInvoice(this.invoiceId, selected.value);
         if (result.success) {
             vscode.window.showInformationMessage('Invoice email prepared!');
         } else {

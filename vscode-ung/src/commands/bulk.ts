@@ -62,6 +62,21 @@ export class BulkCommands extends BaseCommand {
             return;
         }
 
+        // Ask user to select email client
+        const emailClients = [
+            { label: 'Apple Mail', value: 'apple' },
+            { label: 'Outlook', value: 'outlook' },
+            { label: 'Gmail (Browser)', value: 'gmail' }
+        ];
+
+        const selectedClient = await vscode.window.showQuickPick(emailClients, {
+            placeHolder: 'Select email client'
+        });
+
+        if (!selectedClient) {
+            return;
+        }
+
         const confirmed = await this.confirm(
             `Email ${invoices.length} invoice(s)?`,
             {
@@ -78,7 +93,7 @@ export class BulkCommands extends BaseCommand {
         await this.executeBulkOperation(
             invoices,
             async (invoice) => {
-                return await this.cli.emailInvoice(invoice.id);
+                return await this.cli.emailInvoice(invoice.id, selectedClient.value);
             },
             'Emailing invoices',
             'Email'

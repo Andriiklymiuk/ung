@@ -107,6 +107,10 @@ type InvoiceLineItem struct {
 	Quantity    float64   `gorm:"not null;default:1" json:"quantity"`
 	Rate        float64   `gorm:"not null" json:"rate"`
 	Amount      float64   `gorm:"not null" json:"amount"`
+	Discount    float64   `gorm:"default:0" json:"discount"`       // Discount amount for this line item
+	DiscountPct float64   `gorm:"default:0" json:"discount_pct"`   // Discount percentage (0-100)
+	TaxRate     float64   `gorm:"default:0" json:"tax_rate"`       // Tax rate for this item (0-1)
+	TaxAmount   float64   `gorm:"default:0" json:"tax_amount"`     // Calculated tax amount
 	CreatedAt   time.Time `json:"created_at"`
 }
 

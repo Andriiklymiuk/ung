@@ -9,7 +9,7 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     container:
-      image: goreleaser/goreleaser-cross:v1.23
+      image: goreleaser/goreleaser-cross:v1.24
     steps:
       - name: Checkout
         uses: actions/checkout@v4

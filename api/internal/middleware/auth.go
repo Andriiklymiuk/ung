@@ -18,6 +18,9 @@ const (
 	TenantDBKey    contextKey = "tenantDB"
 )
 
+// TestTenantDBKey is exported for use in tests to set the tenant DB context
+var TestTenantDBKey = TenantDBKey
+
 // AuthMiddleware validates JWT tokens and adds user to context
 func AuthMiddleware(apiDB *gorm.DB, jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

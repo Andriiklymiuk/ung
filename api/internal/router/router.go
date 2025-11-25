@@ -20,6 +20,7 @@ func SetupRouter(
 	contractController *controllers.ContractController,
 	expenseController *controllers.ExpenseController,
 	trackingController *controllers.TrackingController,
+	dashboardController *controllers.DashboardController,
 	authMiddleware func(http.Handler) http.Handler,
 	tenantMiddleware func(http.Handler) http.Handler,
 ) *chi.Mux {
@@ -123,6 +124,12 @@ func SetupRouter(
 					r.Post("/{id}/stop", trackingController.Stop)
 					r.Put("/{id}", trackingController.Update)
 					r.Delete("/{id}", trackingController.Delete)
+				})
+
+				// Dashboard
+				r.Route("/dashboard", func(r chi.Router) {
+					r.Get("/revenue", dashboardController.GetRevenue)
+					r.Get("/summary", dashboardController.GetSummary)
 				})
 			})
 		})

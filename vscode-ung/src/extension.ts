@@ -11,6 +11,7 @@ import { ContractProvider } from './views/contractProvider';
 import { ClientProvider } from './views/clientProvider';
 import { ExpenseProvider } from './views/expenseProvider';
 import { TrackingProvider } from './views/trackingProvider';
+import { DashboardProvider } from './views/dashboardProvider';
 import { InvoicePanel } from './webview/invoicePanel';
 import { ExportPanel } from './webview/exportPanel';
 import { StatusBarManager } from './utils/statusBar';
@@ -60,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const clientProvider = new ClientProvider(cli);
     const expenseProvider = new ExpenseProvider(cli);
     const trackingProvider = new TrackingProvider(cli);
+    const dashboardProvider = new DashboardProvider(cli);
 
     // Register tree views
     const invoicesTree = vscode.window.createTreeView('ungInvoices', {
@@ -77,8 +79,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const trackingTree = vscode.window.createTreeView('ungTracking', {
         treeDataProvider: trackingProvider
     });
+    const dashboardTree = vscode.window.createTreeView('ungDashboard', {
+        treeDataProvider: dashboardProvider
+    });
 
-    context.subscriptions.push(invoicesTree, contractsTree, clientsTree, expensesTree, trackingTree);
+    context.subscriptions.push(invoicesTree, contractsTree, clientsTree, expensesTree, trackingTree, dashboardTree);
 
     // Initialize command handlers
     const companyCommands = new CompanyCommands(cli);
@@ -149,6 +154,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ung.logTimeManually', () => trackingCommands.logTimeManually()),
         vscode.commands.registerCommand('ung.viewActiveSession', () => trackingCommands.viewActiveSession()),
         vscode.commands.registerCommand('ung.refreshTracking', () => trackingProvider.refresh())
+    );
+
+    // Dashboard commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.refreshDashboard', () => dashboardProvider.refresh())
     );
 
     // Export wizard command

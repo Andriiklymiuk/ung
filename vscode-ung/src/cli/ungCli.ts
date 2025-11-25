@@ -469,4 +469,44 @@ export class UngCli {
 
         return this.exec(args);
     }
+
+    // ========== Recurring Invoice Commands ==========
+
+    /**
+     * List recurring invoices
+     */
+    async listRecurringInvoices(): Promise<CliResult> {
+        return this.exec(['recurring', 'ls']);
+    }
+
+    /**
+     * Generate due recurring invoices
+     */
+    async generateRecurringInvoices(options?: { all?: boolean; dryRun?: boolean }): Promise<CliResult> {
+        const args = ['recurring', 'generate'];
+        if (options?.all) args.push('--all');
+        if (options?.dryRun) args.push('--dry-run');
+        return this.exec(args);
+    }
+
+    /**
+     * Pause a recurring invoice
+     */
+    async pauseRecurringInvoice(id: number): Promise<CliResult> {
+        return this.exec(['recurring', 'pause', id.toString()]);
+    }
+
+    /**
+     * Resume a recurring invoice
+     */
+    async resumeRecurringInvoice(id: number): Promise<CliResult> {
+        return this.exec(['recurring', 'resume', id.toString()]);
+    }
+
+    /**
+     * Delete a recurring invoice
+     */
+    async deleteRecurringInvoice(id: number): Promise<CliResult> {
+        return this.exec(['recurring', 'delete', id.toString()]);
+    }
 }

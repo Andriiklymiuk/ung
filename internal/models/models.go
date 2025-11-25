@@ -161,3 +161,40 @@ type Expense struct {
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 }
+
+// RecurringFrequency represents how often a recurring invoice is generated
+type RecurringFrequency string
+
+const (
+	FrequencyWeekly    RecurringFrequency = "weekly"
+	FrequencyBiweekly  RecurringFrequency = "biweekly"
+	FrequencyMonthly   RecurringFrequency = "monthly"
+	FrequencyQuarterly RecurringFrequency = "quarterly"
+	FrequencyYearly    RecurringFrequency = "yearly"
+)
+
+// RecurringInvoice represents a template for automatically generating invoices
+type RecurringInvoice struct {
+	ID                 uint               `gorm:"primaryKey" json:"id"`
+	ClientID           uint               `gorm:"not null;index" json:"client_id"`
+	Client             Client             `gorm:"foreignKey:ClientID" json:"-"`
+	ContractID         *uint              `gorm:"index" json:"contract_id"`
+	Contract           *Contract          `gorm:"foreignKey:ContractID" json:"-"`
+	Amount             float64            `gorm:"not null" json:"amount"`
+	Currency           string             `gorm:"default:USD" json:"currency"`
+	Description        string             `json:"description"`
+	Frequency          RecurringFrequency `gorm:"not null" json:"frequency"`
+	DayOfMonth         int                `gorm:"default:1" json:"day_of_month"`       // 1-28 for monthly
+	DayOfWeek          int                `gorm:"default:1" json:"day_of_week"`        // 1-7 for weekly (1=Monday)
+	NextGenerationDate time.Time          `json:"next_generation_date"`
+	LastGeneratedDate  *time.Time         `json:"last_generated_date"`
+	LastInvoiceID      *uint              `json:"last_invoice_id"`
+	Active             bool               `gorm:"default:true" json:"active"`
+	AutoSend           bool               `gorm:"default:false" json:"auto_send"`      // Auto-send email when generated
+	AutoPDF            bool               `gorm:"default:true" json:"auto_pdf"`        // Auto-generate PDF
+	EmailApp           string             `gorm:"column:email_app" json:"email_app"`   // apple, outlook, gmail
+	GeneratedCount     int                `gorm:"default:0" json:"generated_count"`    // How many invoices generated
+	Notes              string             `json:"notes"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}

@@ -273,6 +273,21 @@ brews:
       token: "{{ .Env.GH_PAT }}"
 ```
 
+#### Optional: VSCode Extension Publishing
+
+If you want to publish the VSCode extension to the marketplace:
+
+```bash
+# Generate Azure DevOps Personal Access Token
+# Go to: https://dev.azure.com
+# User Settings → Personal Access Tokens → New Token
+# Scopes: Marketplace → Manage
+
+VSCE_PAT=your-azure-devops-token
+```
+
+**Important:** `VSCE_PAT` is an **Azure DevOps token**, NOT a GitHub token!
+
 ### GitHub Actions Workflows
 
 Current setup (`.github/workflows/release.yml`):
@@ -433,13 +448,13 @@ jobs:
         working-directory: vscode-ung
         run: |
           npm install -g @vscode/vsce
-          vsce publish -p ${{ secrets.GH_PAT }}
+          vsce publish -p ${{ secrets.VSCE_PAT }}
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 ```
 
 **Add GitHub Secret:**
-- Name: `GH_PAT`
+- Name: `VSCE_PAT`
 - Value: Your Azure DevOps PAT token
 
 **To publish:**
@@ -709,6 +724,16 @@ ung --version
 | `AWS_S3_BUCKET` | api/.env | No | - | S3 bucket name |
 | `AWS_ACCESS_KEY_ID` | api/.env | No | - | AWS credentials |
 | `AWS_SECRET_ACCESS_KEY` | api/.env | No | - | AWS credentials |
+
+### GitHub Secrets (for CI/CD)
+
+| Secret | Purpose | Where to Get | Required For |
+|--------|---------|--------------|--------------|
+| `GITHUB_TOKEN` | GitHub releases | Auto-provided by GitHub Actions | CLI releases |
+| `GH_PAT` | Homebrew tap publishing | GitHub → Settings → Tokens (classic)<br/>Scopes: `repo` | Homebrew formula |
+| `VSCE_PAT` | VSCode Marketplace publishing | Azure DevOps → PAT<br/>Scopes: `Marketplace: Manage` | VSCode extension |
+
+**Important:** `GH_PAT` and `VSCE_PAT` are **different tokens** from **different services**!
 
 ---
 

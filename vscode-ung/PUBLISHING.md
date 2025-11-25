@@ -84,7 +84,7 @@ git push origin vscode-v1.0.1
 ```
 
 **Required GitHub Secret:**
-- Name: `GH_PAT`
+- Name: `VSCE_PAT`
 - Value: Your Azure DevOps PAT
 
 Add it: GitHub repo → Settings → Secrets → Actions → New repository secret

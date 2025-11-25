@@ -1,0 +1,416 @@
+{
+  "name": "ung",
+  "displayName": "UNG - Billing & Time Tracking",
+  "description": "Comprehensive billing, invoicing, and time tracking extension for the UNG CLI tool",
+  "version": "1.0.0",
+  "publisher": "ung",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Finance",
+    "Productivity"
+  ],
+  "keywords": [
+    "billing",
+    "invoicing",
+    "time tracking",
+    "freelance",
+    "accounting"
+  ],
+  "activationEvents": [
+    "onView:ungInvoices",
+    "onView:ungContracts",
+    "onView:ungClients",
+    "onView:ungExpenses",
+    "onView:ungTracking"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ung.createCompany",
+        "title": "Create Company",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.editCompany",
+        "title": "Edit Company",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.createClient",
+        "title": "Create Client",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.editClient",
+        "title": "Edit Client",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.deleteClient",
+        "title": "Delete Client",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.listClients",
+        "title": "List Clients",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.createContract",
+        "title": "Create Contract",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.editContract",
+        "title": "Edit Contract",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.deleteContract",
+        "title": "Delete Contract",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.viewContract",
+        "title": "View Contract",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.generateContractPDF",
+        "title": "Generate Contract PDF",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.createInvoice",
+        "title": "Create Invoice",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.generateFromTime",
+        "title": "Generate Invoice from Time",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.viewInvoice",
+        "title": "View Invoice",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.editInvoice",
+        "title": "Edit Invoice",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.deleteInvoice",
+        "title": "Delete Invoice",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.exportInvoice",
+        "title": "Export Invoice to PDF",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.emailInvoice",
+        "title": "Email Invoice",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.logExpense",
+        "title": "Log Expense",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.editExpense",
+        "title": "Edit Expense",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.deleteExpense",
+        "title": "Delete Expense",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.viewExpenseReport",
+        "title": "View Expense Report",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.startTracking",
+        "title": "Start Time Tracking",
+        "category": "UNG",
+        "icon": "$(play)"
+      },
+      {
+        "command": "ung.stopTracking",
+        "title": "Stop Time Tracking",
+        "category": "UNG",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "ung.logTimeManually",
+        "title": "Log Time Manually",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.viewActiveSession",
+        "title": "View Active Tracking Session",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.refreshInvoices",
+        "title": "Refresh Invoices",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.refreshContracts",
+        "title": "Refresh Contracts",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.refreshClients",
+        "title": "Refresh Clients",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.refreshExpenses",
+        "title": "Refresh Expenses",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.refreshTracking",
+        "title": "Refresh Tracking",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ung",
+          "title": "UNG Billing",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ung": [
+        {
+          "id": "ungInvoices",
+          "name": "Invoices"
+        },
+        {
+          "id": "ungContracts",
+          "name": "Contracts"
+        },
+        {
+          "id": "ungClients",
+          "name": "Clients"
+        },
+        {
+          "id": "ungExpenses",
+          "name": "Expenses"
+        },
+        {
+          "id": "ungTracking",
+          "name": "Time Tracking"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "ung.createInvoice",
+          "when": "view == ungInvoices",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.refreshInvoices",
+          "when": "view == ungInvoices",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.createContract",
+          "when": "view == ungContracts",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.refreshContracts",
+          "when": "view == ungContracts",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.createClient",
+          "when": "view == ungClients",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.refreshClients",
+          "when": "view == ungClients",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.logExpense",
+          "when": "view == ungExpenses",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.refreshExpenses",
+          "when": "view == ungExpenses",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.logTimeManually",
+          "when": "view == ungTracking",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.startTracking",
+          "when": "view == ungTracking",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.refreshTracking",
+          "when": "view == ungTracking",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ung.viewInvoice",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "inline"
+        },
+        {
+          "command": "ung.exportInvoice",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "1_actions"
+        },
+        {
+          "command": "ung.emailInvoice",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "1_actions"
+        },
+        {
+          "command": "ung.editInvoice",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "2_modify"
+        },
+        {
+          "command": "ung.deleteInvoice",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "3_delete"
+        },
+        {
+          "command": "ung.viewContract",
+          "when": "view == ungContracts && viewItem == contract",
+          "group": "inline"
+        },
+        {
+          "command": "ung.generateContractPDF",
+          "when": "view == ungContracts && viewItem == contract",
+          "group": "1_actions"
+        },
+        {
+          "command": "ung.editContract",
+          "when": "view == ungContracts && viewItem == contract",
+          "group": "2_modify"
+        },
+        {
+          "command": "ung.deleteContract",
+          "when": "view == ungContracts && viewItem == contract",
+          "group": "3_delete"
+        },
+        {
+          "command": "ung.editClient",
+          "when": "view == ungClients && viewItem == client",
+          "group": "1_modify"
+        },
+        {
+          "command": "ung.deleteClient",
+          "when": "view == ungClients && viewItem == client",
+          "group": "2_delete"
+        },
+        {
+          "command": "ung.editExpense",
+          "when": "view == ungExpenses && viewItem == expense",
+          "group": "1_modify"
+        },
+        {
+          "command": "ung.deleteExpense",
+          "when": "view == ungExpenses && viewItem == expense",
+          "group": "2_delete"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "UNG",
+      "properties": {
+        "ung.cliPath": {
+          "type": "string",
+          "default": "ung",
+          "description": "Path to the UNG CLI executable"
+        },
+        "ung.defaultCurrency": {
+          "type": "string",
+          "default": "USD",
+          "description": "Default currency for new invoices and contracts"
+        },
+        "ung.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh views after operations"
+        },
+        "ung.dateFormat": {
+          "type": "string",
+          "default": "YYYY-MM-DD",
+          "enum": [
+            "YYYY-MM-DD",
+            "MM/DD/YYYY",
+            "DD/MM/YYYY"
+          ],
+          "description": "Date format for display"
+        },
+        "ung.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show active time tracking in status bar"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^20.0.0",
+    "@types/mocha": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.0.0",
+    "mocha": "^10.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {}
+}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Andriiklymiuk/ung/internal/models"
 	"github.com/Andriiklymiuk/ung/internal/repository"
+	"github.com/Andriiklymiuk/ung/pkg/format"
 	"github.com/spf13/cobra"
 )
 
@@ -72,8 +73,9 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 					}
 				}
 
-				monthly = hours * (*contract.HourlyRate)
-				details = fmt.Sprintf("%.1fh @ $%.0f/hr", hours, *contract.HourlyRate)
+				roundedHours := format.RoundHoursUp(hours)
+				monthly = roundedHours * (*contract.HourlyRate)
+				details = fmt.Sprintf("%.0fh @ $%.0f/hr", roundedHours, *contract.HourlyRate)
 				hourlyRevenue += monthly
 				projectedHours += hours
 			}
@@ -117,7 +119,7 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Hourly Contracts:  $%.2f\n", hourlyRevenue)
 	fmt.Printf("  Retainer Contracts: $%.2f\n", retainerRevenue)
 	fmt.Printf("  Fixed/Project:     $%.2f\n", totalMonthly-hourlyRevenue-retainerRevenue)
-	fmt.Printf("  Projected Hours:   %.1f hours\n", projectedHours)
+	fmt.Printf("  Projected Hours:   %.0f hours\n", format.RoundHoursUp(projectedHours))
 
 	if projectedHours > 0 {
 		avgRate := hourlyRevenue / projectedHours

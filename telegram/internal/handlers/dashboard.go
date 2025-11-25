@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -59,7 +60,7 @@ func (h *DashboardHandler) Handle(message *tgbotapi.Message) error {
 		projection.TotalMonthlyRevenue-projection.HourlyContractsRevenue-projection.RetainerRevenue))
 	text.WriteString("\n")
 
-	text.WriteString(fmt.Sprintf("⏱️ *Projected Hours:* %.1f hours\n", projection.ProjectedHours))
+	text.WriteString(fmt.Sprintf("⏱️ *Projected Hours:* %.0f hours\n", math.Ceil(projection.ProjectedHours)))
 	if projection.AverageHourlyRate > 0 {
 		text.WriteString(fmt.Sprintf("💵 *Average Rate:* $%.0f/hr\n", projection.AverageHourlyRate))
 	}

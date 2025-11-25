@@ -203,6 +203,16 @@
         "title": "Refresh Dashboard",
         "category": "UNG",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.openInvoicePDF",
+        "title": "Open Invoice PDF",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.quickStart",
+        "title": "Quick Start Time Tracking",
+        "category": "UNG"
       }
     ],
     "viewsContainers": {
@@ -385,9 +395,33 @@
           "type": "boolean",
           "default": true,
           "description": "Show active time tracking in status bar"
+        },
+        "ung.roundHours": {
+          "type": "boolean",
+          "default": true,
+          "description": "Round hours up to nearest integer (9.5 → 10)"
+        },
+        "ung.roundRevenue": {
+          "type": "boolean",
+          "default": true,
+          "description": "Round revenue projections up to nearest dollar"
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "ung.quickStart",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t",
+        "when": "editorTextFocus || !editorFocus"
+      },
+      {
+        "command": "ung.createInvoice",
+        "key": "ctrl+alt+i",
+        "mac": "cmd+alt+i",
+        "when": "!editorFocus"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

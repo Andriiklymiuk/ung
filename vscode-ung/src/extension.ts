@@ -32,13 +32,49 @@ export async function activate(context: vscode.ExtensionContext) {
     // Check if CLI is installed
     const isInstalled = await cli.isInstalled();
     if (!isInstalled) {
-        const action = await vscode.window.showWarningMessage(
-            'UNG CLI is not installed or not in PATH. Please install it first.',
-            'Open Installation Guide'
+        // Register install command
+        context.subscriptions.push(
+            vscode.commands.registerCommand('ung.installCli', async () => {
+                const action = await vscode.window.showQuickPick(
+                    [
+                        { label: '$(terminal) Install via Homebrew', description: 'Recommended for macOS/Linux', value: 'homebrew' },
+                        { label: '$(cloud-download) Download from GitHub', description: 'Download binary directly', value: 'github' },
+                        { label: '$(book) View Instructions', description: 'Open installation guide', value: 'docs' }
+                    ],
+                    { placeHolder: 'Choose installation method' }
+                );
+
+                if (action?.value === 'homebrew') {
+                    const terminal = vscode.window.createTerminal('UNG Installation');
+                    terminal.show();
+                    terminal.sendText('brew tap Andriiklymiuk/tools && brew install ung');
+                    vscode.window.showInformationMessage('Installing UNG CLI... Reload VSCode after installation completes.');
+                } else if (action?.value === 'github') {
+                    vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/releases/latest'));
+                } else if (action?.value === 'docs') {
+                    vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#installation'));
+                }
+            })
         );
 
-        if (action === 'Open Installation Guide') {
-            vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#installation'));
+        // Show welcome view with install button
+        vscode.window.registerTreeDataProvider('ungDashboard', {
+            getTreeItem: () => {
+                const item = new vscode.TreeItem('Install UNG CLI to get started');
+                item.description = 'Click the button above';
+                return item;
+            },
+            getChildren: () => []
+        });
+
+        // Show error with install option
+        const action = await vscode.window.showErrorMessage(
+            'UNG CLI is not installed. Install it to use billing and time tracking features.',
+            'Install Now'
+        );
+
+        if (action === 'Install Now') {
+            vscode.commands.executeCommand('ung.installCli');
         }
         return;
     }

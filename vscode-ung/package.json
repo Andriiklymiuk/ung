@@ -217,6 +217,12 @@
         "command": "ung.quickStart",
         "title": "Quick Start Time Tracking",
         "category": "UNG"
+      },
+      {
+        "command": "ung.installCli",
+        "title": "Install UNG CLI",
+        "category": "UNG",
+        "icon": "$(cloud-download)"
       }
     ],
     "viewsContainers": {
@@ -232,7 +238,13 @@
       "ung": [
         {
           "id": "ungDashboard",
-          "name": "Dashboard"
+          "name": "Dashboard",
+          "when": "ung.cliInstalled"
+        },
+        {
+          "id": "ungWelcome",
+          "name": "Welcome",
+          "when": "!ung.cliInstalled"
         },
         {
           "id": "ungInvoices",

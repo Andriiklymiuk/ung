@@ -259,7 +259,7 @@ If you want to auto-publish to Homebrew tap:
 # Settings → Developer settings → Personal access tokens → Tokens (classic)
 # Scopes: repo (full), write:packages
 
-HOMEBREW_TAP_GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+GH_PAT=ghp_xxxxxxxxxxxxxxxxxxxx
 ```
 
 Update `.goreleaser.yaml` brew section:
@@ -270,7 +270,7 @@ brews:
     repository:
       owner: Andriiklymiuk
       name: homebrew-tools
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: "{{ .Env.GH_PAT }}"
 ```
 
 ### GitHub Actions Workflows
@@ -433,13 +433,13 @@ jobs:
         working-directory: vscode-ung
         run: |
           npm install -g @vscode/vsce
-          vsce publish -p ${{ secrets.VSCE_PAT }}
+          vsce publish -p ${{ secrets.GH_PAT }}
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          GH_PAT: ${{ secrets.GH_PAT }}
 ```
 
 **Add GitHub Secret:**
-- Name: `VSCE_PAT`
+- Name: `GH_PAT`
 - Value: Your Azure DevOps PAT token
 
 **To publish:**

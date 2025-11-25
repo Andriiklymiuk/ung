@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
 import { UngCli } from '../cli/ungCli';
 
 /**
@@ -169,16 +171,30 @@ export class ContractCommands {
         });
 
         if (pdfPath) {
+            // Auto-open the PDF
+            await vscode.env.openExternal(vscode.Uri.file(pdfPath));
+
+            // Also show notification with buttons
             const action = await vscode.window.showInformationMessage(
-                `Contract PDF saved to: ${pdfPath}`,
-                'Open PDF',
+                `Contract PDF: ${pdfPath}`,
+                'Open Again',
                 'Show in Finder'
             );
 
-            if (action === 'Open PDF') {
+            if (action === 'Open Again') {
                 await vscode.env.openExternal(vscode.Uri.file(pdfPath));
             } else if (action === 'Show in Finder') {
                 await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(pdfPath));
+            }
+        } else {
+            // Fallback if path parsing fails
+            const contractsDir = path.join(os.homedir(), '.ung', 'contracts');
+            const action = await vscode.window.showInformationMessage(
+                'Contract PDF generated!',
+                'Open Contracts Folder'
+            );
+            if (action === 'Open Contracts Folder') {
+                await vscode.env.openExternal(vscode.Uri.file(contractsDir));
             }
         }
     }

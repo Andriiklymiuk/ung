@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
 import { UngCli } from '../cli/ungCli';
 
 /**
@@ -212,16 +214,30 @@ export class InvoiceCommands {
         });
 
         if (pdfPath) {
+            // Auto-open the PDF
+            await vscode.env.openExternal(vscode.Uri.file(pdfPath));
+
+            // Also show notification with buttons
             const action = await vscode.window.showInformationMessage(
-                `Invoice PDF saved to: ${pdfPath}`,
-                'Open PDF',
+                `Invoice PDF: ${pdfPath}`,
+                'Open Again',
                 'Show in Finder'
             );
 
-            if (action === 'Open PDF') {
+            if (action === 'Open Again') {
                 await vscode.env.openExternal(vscode.Uri.file(pdfPath));
             } else if (action === 'Show in Finder') {
                 await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(pdfPath));
+            }
+        } else {
+            // Fallback if path parsing fails
+            const invoicesDir = path.join(os.homedir(), '.ung', 'invoices');
+            const action = await vscode.window.showInformationMessage(
+                'Invoice PDF generated!',
+                'Open Invoices Folder'
+            );
+            if (action === 'Open Invoices Folder') {
+                await vscode.env.openExternal(vscode.Uri.file(invoicesDir));
             }
         }
     }

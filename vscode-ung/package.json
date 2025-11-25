@@ -385,6 +385,12 @@
         "title": "Backup & Sync Data",
         "category": "UNG",
         "icon": "$(cloud)"
+      },
+      {
+        "command": "ung.importData",
+        "title": "Import Data from CSV",
+        "category": "UNG",
+        "icon": "$(folder-opened)"
       }
     ],
     "viewsContainers": {

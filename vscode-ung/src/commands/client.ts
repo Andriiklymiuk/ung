@@ -103,8 +103,160 @@ export class ClientCommands {
     /**
      * Edit a client
      */
-    async editClient(_clientId?: number): Promise<void> {
-        vscode.window.showInformationMessage('Client editing will be available in a future version. Use the CLI: ung client edit [id]');
+    async editClient(clientId?: number): Promise<void> {
+        if (!clientId) {
+            // Let user select a client first
+            const result = await this.cli.listClients();
+            if (!result.success || !result.stdout) {
+                vscode.window.showErrorMessage('Failed to fetch clients');
+                return;
+            }
+
+            const clients = this.parseClientList(result.stdout);
+            if (clients.length === 0) {
+                vscode.window.showInformationMessage('No clients found. Create one first.');
+                return;
+            }
+
+            const selected = await vscode.window.showQuickPick(
+                clients.map(c => ({
+                    label: c.name,
+                    description: c.email,
+                    detail: c.address || undefined,
+                    id: c.id
+                })),
+                { placeHolder: 'Select a client to edit' }
+            );
+
+            if (!selected) return;
+            clientId = selected.id;
+        }
+
+        // Fetch current client data
+        const result = await this.cli.listClients();
+        if (!result.success || !result.stdout) {
+            vscode.window.showErrorMessage('Failed to fetch client data');
+            return;
+        }
+
+        const clients = this.parseClientList(result.stdout);
+        const client = clients.find(c => c.id === clientId);
+        if (!client) {
+            vscode.window.showErrorMessage('Client not found');
+            return;
+        }
+
+        // Show edit options
+        const editField = await vscode.window.showQuickPick([
+            { label: '$(edit) Edit Name', field: 'name', value: client.name },
+            { label: '$(mail) Edit Email', field: 'email', value: client.email },
+            { label: '$(location) Edit Address', field: 'address', value: client.address || '' },
+            { label: '$(law) Edit Tax ID', field: 'taxId', value: client.taxId || '' },
+            { label: '$(edit) Edit All Fields', field: 'all', value: '' }
+        ], { placeHolder: `Editing: ${client.name}` });
+
+        if (!editField) return;
+
+        const updates: { name?: string; email?: string; address?: string; taxId?: string } = {};
+
+        if (editField.field === 'all') {
+            // Edit all fields
+            const newName = await vscode.window.showInputBox({
+                prompt: 'Client Name',
+                value: client.name,
+                validateInput: v => v ? null : 'Name is required'
+            });
+            if (newName === undefined) return;
+            if (newName !== client.name) updates.name = newName;
+
+            const newEmail = await vscode.window.showInputBox({
+                prompt: 'Client Email',
+                value: client.email,
+                validateInput: v => v && v.includes('@') ? null : 'Valid email is required'
+            });
+            if (newEmail === undefined) return;
+            if (newEmail !== client.email) updates.email = newEmail;
+
+            const newAddress = await vscode.window.showInputBox({
+                prompt: 'Address (optional)',
+                value: client.address || ''
+            });
+            if (newAddress === undefined) return;
+            if (newAddress !== (client.address || '')) updates.address = newAddress;
+
+            const newTaxId = await vscode.window.showInputBox({
+                prompt: 'Tax ID (optional)',
+                value: client.taxId || ''
+            });
+            if (newTaxId === undefined) return;
+            if (newTaxId !== (client.taxId || '')) updates.taxId = newTaxId;
+        } else {
+            // Edit single field
+            const newValue = await vscode.window.showInputBox({
+                prompt: `Edit ${editField.field}`,
+                value: editField.value,
+                validateInput: editField.field === 'email'
+                    ? (v => v && v.includes('@') ? null : 'Valid email is required')
+                    : (editField.field === 'name' ? (v => v ? null : 'Name is required') : undefined)
+            });
+
+            if (newValue === undefined) return;
+            if (newValue !== editField.value) {
+                (updates as any)[editField.field] = newValue;
+            }
+        }
+
+        if (Object.keys(updates).length === 0) {
+            vscode.window.showInformationMessage('No changes made');
+            return;
+        }
+
+        // Apply updates
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Updating client...',
+            cancellable: false
+        }, async () => {
+            const editResult = await this.cli.editClient(clientId!, updates);
+
+            if (editResult.success) {
+                vscode.window.showInformationMessage(`Client "${client.name}" updated successfully!`);
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to update client: ${editResult.error}`);
+            }
+        });
+    }
+
+    /**
+     * Parse client list from CLI output
+     */
+    private parseClientList(output: string): Array<{ id: number; name: string; email: string; address?: string; taxId?: string }> {
+        const lines = output.split('\n').filter(line => line.trim());
+        const clients: Array<{ id: number; name: string; email: string; address?: string; taxId?: string }> = [];
+
+        for (let i = 1; i < lines.length; i++) { // Skip header
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const parts = line.split(/\s{2,}/);
+            if (parts.length >= 3) {
+                const id = parseInt(parts[0]);
+                if (!isNaN(id)) {
+                    clients.push({
+                        id,
+                        name: parts[1],
+                        email: parts[2],
+                        address: parts[3] || undefined,
+                        taxId: parts[4] || undefined
+                    });
+                }
+            }
+        }
+
+        return clients;
     }
 
     /**

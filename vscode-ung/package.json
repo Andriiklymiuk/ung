@@ -391,6 +391,54 @@
         "title": "Import Data from CSV",
         "category": "UNG",
         "icon": "$(folder-opened)"
+      },
+      {
+        "command": "ung.setIncomeGoal",
+        "title": "Set Income Goal",
+        "category": "UNG",
+        "icon": "$(target)"
+      },
+      {
+        "command": "ung.viewGoalStatus",
+        "title": "View Goal Progress",
+        "category": "UNG",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "ung.calculateRate",
+        "title": "Calculate Hourly Rate",
+        "category": "UNG",
+        "icon": "$(symbol-number)"
+      },
+      {
+        "command": "ung.analyzeRates",
+        "title": "Analyze Actual Rates",
+        "category": "UNG",
+        "icon": "$(graph-line)"
+      },
+      {
+        "command": "ung.openProfitDashboard",
+        "title": "Open Profit Dashboard",
+        "category": "UNG",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "ung.weeklyReport",
+        "title": "View Weekly Report",
+        "category": "UNG",
+        "icon": "$(calendar)"
+      },
+      {
+        "command": "ung.monthlyReport",
+        "title": "View Monthly Report",
+        "category": "UNG",
+        "icon": "$(history)"
+      },
+      {
+        "command": "ung.businessInsights",
+        "title": "Business Insights",
+        "category": "UNG",
+        "icon": "$(graph)"
       }
     ],
     "viewsContainers": {

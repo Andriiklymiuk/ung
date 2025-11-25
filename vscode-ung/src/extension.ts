@@ -406,6 +406,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '$(export) Export Data', command: 'ung.exportData' },
                 { label: '$(cloud) Backup & Sync', command: 'ung.syncData' },
                 { label: '$(folder-opened) Import Data', command: 'ung.importData' },
+                { label: '$(dashboard) Business Insights', command: 'ung.businessInsights' },
                 { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
             ];
 
@@ -742,6 +743,159 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 }
             });
+        })
+    );
+
+    // Income goal commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.setIncomeGoal', async () => {
+            const period = await vscode.window.showQuickPick(
+                [
+                    { label: '$(calendar) Monthly', value: 'monthly' },
+                    { label: '$(milestone) Quarterly', value: 'quarterly' },
+                    { label: '$(rocket) Yearly', value: 'yearly' }
+                ],
+                { placeHolder: 'Select goal period', title: 'Set Income Goal' }
+            );
+
+            if (!period) return;
+
+            const amount = await vscode.window.showInputBox({
+                prompt: `Enter ${period.label.replace('$(calendar) ', '').replace('$(milestone) ', '').replace('$(rocket) ', '')} income target`,
+                placeHolder: 'e.g., 10000',
+                validateInput: (val) => {
+                    const num = parseFloat(val);
+                    if (isNaN(num) || num <= 0) {
+                        return 'Please enter a positive number';
+                    }
+                    return null;
+                }
+            });
+
+            if (!amount) return;
+
+            const description = await vscode.window.showInputBox({
+                prompt: 'Goal description (optional)',
+                placeHolder: 'e.g., Q4 revenue target'
+            });
+
+            const terminal = vscode.window.createTerminal('UNG Goal');
+            terminal.show();
+            let cmd = `ung goal set ${amount} -p ${period.value}`;
+            if (description) {
+                cmd += ` -d "${description}"`;
+            }
+            terminal.sendText(cmd);
+        }),
+
+        vscode.commands.registerCommand('ung.viewGoalStatus', async () => {
+            const terminal = vscode.window.createTerminal('UNG Goal');
+            terminal.show();
+            terminal.sendText('ung goal status');
+        })
+    );
+
+    // Rate calculator commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.calculateRate', async () => {
+            const targetType = await vscode.window.showQuickPick(
+                [
+                    { label: '$(symbol-number) Annual income', value: 'annual' },
+                    { label: '$(calendar) Monthly income', value: 'monthly' }
+                ],
+                { placeHolder: 'Calculate rate from:', title: 'Rate Calculator' }
+            );
+
+            if (!targetType) return;
+
+            const amount = await vscode.window.showInputBox({
+                prompt: `Enter target ${targetType.value} income`,
+                placeHolder: 'e.g., 100000',
+                validateInput: (val) => {
+                    const num = parseFloat(val);
+                    if (isNaN(num) || num <= 0) {
+                        return 'Please enter a positive number';
+                    }
+                    return null;
+                }
+            });
+
+            if (!amount) return;
+
+            const hours = await vscode.window.showInputBox({
+                prompt: 'Billable hours per week',
+                placeHolder: '40',
+                value: '40'
+            });
+
+            const terminal = vscode.window.createTerminal('UNG Rate');
+            terminal.show();
+            const flag = targetType.value === 'annual' ? '--annual' : '--monthly';
+            terminal.sendText(`ung rate calc ${flag} ${amount} --hours ${hours || '40'}`);
+        }),
+
+        vscode.commands.registerCommand('ung.analyzeRates', async () => {
+            const terminal = vscode.window.createTerminal('UNG Rate');
+            terminal.show();
+            terminal.sendText('ung rate analyze');
+        })
+    );
+
+    // Profit dashboard command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.openProfitDashboard', async () => {
+            const terminal = vscode.window.createTerminal('UNG Profit');
+            terminal.show();
+            terminal.sendText('ung profit');
+        })
+    );
+
+    // Weekly and monthly report commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.weeklyReport', async () => {
+            const options = await vscode.window.showQuickPick(
+                [
+                    { label: '$(calendar) This Week', value: '' },
+                    { label: '$(history) Last Week', value: '--last' }
+                ],
+                { placeHolder: 'Select report period', title: 'Weekly Report' }
+            );
+
+            if (!options) return;
+
+            const terminal = vscode.window.createTerminal('UNG Report');
+            terminal.show();
+            terminal.sendText(`ung report weekly ${options.value}`.trim());
+        }),
+
+        vscode.commands.registerCommand('ung.monthlyReport', async () => {
+            const terminal = vscode.window.createTerminal('UNG Report');
+            terminal.show();
+            terminal.sendText('ung report monthly');
+        })
+    );
+
+    // Add new commands to quick actions
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.businessInsights', async () => {
+            const actions = [
+                { label: '$(dashboard) Profit Dashboard', command: 'ung.openProfitDashboard' },
+                { label: '$(calendar) Weekly Report', command: 'ung.weeklyReport' },
+                { label: '$(history) Monthly Report', command: 'ung.monthlyReport' },
+                { label: '$(target) Set Income Goal', command: 'ung.setIncomeGoal' },
+                { label: '$(pulse) View Goal Progress', command: 'ung.viewGoalStatus' },
+                { label: '$(symbol-number) Calculate Rate', command: 'ung.calculateRate' },
+                { label: '$(graph-line) Analyze Actual Rates', command: 'ung.analyzeRates' }
+            ];
+
+            const selected = await vscode.window.showQuickPick(actions, {
+                placeHolder: 'Business Insights',
+                title: 'Financial Tools'
+            });
+
+            if (selected) {
+                vscode.commands.executeCommand(selected.command);
+            }
         })
     );
 

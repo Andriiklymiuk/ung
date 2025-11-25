@@ -2,7 +2,7 @@
   "name": "ung",
   "displayName": "UNG - Billing & Time Tracking",
   "description": "Comprehensive billing, invoicing, and time tracking extension for the UNG CLI tool",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "publisher": "andriiklymiuk",
   "icon": "media/icon.png",
   "repository": {
@@ -236,7 +236,7 @@
         {
           "id": "ung",
           "title": "UNG Billing",
-          "icon": "media/icon.svg"
+          "icon": "media/icon.png"
         }
       ]
     },

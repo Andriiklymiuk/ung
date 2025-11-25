@@ -311,7 +311,9 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ung.markInvoicePaid', (item) => invoiceCommands.markAsPaid(item?.itemId)),
         vscode.commands.registerCommand('ung.markInvoiceSent', (item) => invoiceCommands.markAsSent(item?.itemId)),
         vscode.commands.registerCommand('ung.changeInvoiceStatus', (item) => invoiceCommands.changeInvoiceStatus(item?.itemId)),
-        vscode.commands.registerCommand('ung.refreshInvoices', () => invoiceProvider.refresh())
+        vscode.commands.registerCommand('ung.refreshInvoices', () => invoiceProvider.refresh()),
+        vscode.commands.registerCommand('ung.generateAllInvoices', () => invoiceCommands.generateAllInvoices()),
+        vscode.commands.registerCommand('ung.sendAllInvoices', () => invoiceCommands.sendAllInvoices())
     );
 
     // Expense commands
@@ -386,6 +388,8 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '$(debug-stop) Stop Time Tracking', command: 'ung.stopTracking' },
                 { label: '$(add) Log Time Manually', command: 'ung.logTimeManually' },
                 { label: '$(file-add) Create Invoice', command: 'ung.createInvoice' },
+                { label: '$(files) Generate All Invoices', command: 'ung.generateAllInvoices' },
+                { label: '$(send) Send All Pending Invoices', command: 'ung.sendAllInvoices' },
                 { label: '$(file-code) Create Contract', command: 'ung.createContract' },
                 { label: '$(person-add) Add Client', command: 'ung.createClient' },
                 { label: '$(search) Search Everything', command: 'ung.search' },

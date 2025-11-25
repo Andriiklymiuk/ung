@@ -649,6 +649,143 @@ export class InvoiceCommands {
     }
 
     /**
+     * Generate invoices for all clients with unbilled time
+     */
+    async generateAllInvoices(): Promise<void> {
+        // First, show what will be generated
+        const unbilledResult = await this.cli.getUnbilledTimeSummary();
+
+        if (!unbilledResult.success) {
+            vscode.window.showErrorMessage('Failed to fetch unbilled time data');
+            return;
+        }
+
+        // Parse unbilled time to show preview
+        const output = unbilledResult.stdout || '';
+        if (output.includes('No unbilled time') || output.trim().split('\n').length < 2) {
+            vscode.window.showInformationMessage('No unbilled time found for any client.');
+            return;
+        }
+
+        // Ask what actions to take
+        const actions = await vscode.window.showQuickPick([
+            { label: '$(file-text) Generate Invoices Only', value: 'generate', description: 'Create invoices without PDFs' },
+            { label: '$(file-pdf) Generate Invoices + PDFs', value: 'pdf', description: 'Create invoices and generate PDFs' },
+            { label: '$(mail) Generate + PDF + Email', value: 'email', description: 'Create invoices, generate PDFs, and prepare emails' }
+        ], {
+            placeHolder: 'Select what to do for all clients with unbilled time',
+            title: 'Bulk Invoice Generation'
+        });
+
+        if (!actions) return;
+
+        let emailApp: string | undefined;
+        if (actions.value === 'email') {
+            const emailClients = this.getEmailClients();
+            const selected = await vscode.window.showQuickPick(emailClients, {
+                placeHolder: 'Select email client',
+                title: 'Choose Email Application'
+            });
+
+            if (!selected) return;
+            emailApp = selected.value;
+        }
+
+        // Confirm
+        const confirm = await vscode.window.showWarningMessage(
+            'Generate invoices for ALL clients with unbilled time?',
+            { modal: true },
+            'Yes, Generate All',
+            'Cancel'
+        );
+
+        if (confirm !== 'Yes, Generate All') return;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Generating invoices for all clients...',
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.generateAllInvoices({
+                pdf: actions.value === 'pdf' || actions.value === 'email',
+                email: actions.value === 'email',
+                emailApp
+            });
+
+            if (result.success) {
+                vscode.window.showInformationMessage('All invoices generated successfully!');
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to generate invoices: ${result.error}`);
+            }
+        });
+    }
+
+    /**
+     * Send emails for all pending invoices
+     */
+    async sendAllInvoices(): Promise<void> {
+        // Get list of pending invoices first
+        const invoicesResult = await this.cli.listInvoices();
+        if (!invoicesResult.success || !invoicesResult.stdout) {
+            vscode.window.showErrorMessage('Failed to fetch invoices');
+            return;
+        }
+
+        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+        const pendingInvoices = invoices.filter(inv =>
+            inv.status.toLowerCase().includes('pending') ||
+            inv.status.toLowerCase().includes('draft')
+        );
+
+        if (pendingInvoices.length === 0) {
+            vscode.window.showInformationMessage('No pending invoices found to send.');
+            return;
+        }
+
+        // Show preview of what will be sent
+        const previewItems = pendingInvoices.map(inv => `${inv.invoiceNum}: ${inv.client} - ${inv.amount}`);
+
+        const confirm = await vscode.window.showQuickPick([
+            { label: '$(check) Send All', description: `Send ${pendingInvoices.length} invoices` },
+            { label: '$(close) Cancel', description: 'Do not send' }
+        ], {
+            placeHolder: `${pendingInvoices.length} pending invoices: ${previewItems.slice(0, 3).join(', ')}${pendingInvoices.length > 3 ? '...' : ''}`,
+            title: 'Send All Pending Invoices'
+        });
+
+        if (!confirm || confirm.label.includes('Cancel')) return;
+
+        // Select email client
+        const emailClients = this.getEmailClients();
+        const selectedClient = await vscode.window.showQuickPick(emailClients, {
+            placeHolder: 'Select email client',
+            title: 'Choose Email Application'
+        });
+
+        if (!selectedClient) return;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Sending ${pendingInvoices.length} invoices...`,
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.sendAllInvoices(selectedClient.value);
+
+            if (result.success) {
+                vscode.window.showInformationMessage(`${pendingInvoices.length} invoice emails prepared!`);
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to send invoices: ${result.error}`);
+            }
+        });
+    }
+
+    /**
      * Parse contracts from CLI output (tabular format)
      */
     private parseContractsFromOutput(output: string): Array<{

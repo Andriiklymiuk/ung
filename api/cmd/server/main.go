@@ -43,6 +43,7 @@ func main() {
 	contractController := controllers.NewContractController()
 	expenseController := controllers.NewExpenseController()
 	trackingController := controllers.NewTrackingController()
+	dashboardController := controllers.NewDashboardController()
 
 	// Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(apiDB, cfg.JWTSecret)
@@ -57,6 +58,7 @@ func main() {
 		contractController,
 		expenseController,
 		trackingController,
+		dashboardController,
 		authMiddleware,
 		tenantMiddleware,
 	)

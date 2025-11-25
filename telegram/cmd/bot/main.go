@@ -39,6 +39,7 @@ func main() {
 	contractHandler := handlers.NewContractHandler(bot, apiClient, sessionMgr)
 	expenseHandler := handlers.NewExpenseHandler(bot, apiClient, sessionMgr)
 	trackingHandler := handlers.NewTrackingHandler(bot, apiClient, sessionMgr)
+	dashboardHandler := handlers.NewDashboardHandler(bot, apiClient, sessionMgr)
 
 	// Start listening for updates
 	u := tgbotapi.NewUpdate(0)
@@ -51,7 +52,7 @@ func main() {
 	for update := range updates {
 		// Handle messages
 		if update.Message != nil {
-			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, sessionMgr); err != nil {
+			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, sessionMgr); err != nil {
 				log.Printf("Error handling message: %v", err)
 			}
 		}
@@ -76,6 +77,7 @@ func handleMessage(
 	contractHandler *handlers.ContractHandler,
 	expenseHandler *handlers.ExpenseHandler,
 	trackingHandler *handlers.TrackingHandler,
+	dashboardHandler *handlers.DashboardHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	// Handle commands
@@ -117,6 +119,8 @@ func handleMessage(
 			return trackingHandler.HandleActive(message)
 		case "log":
 			return trackingHandler.HandleLog(message)
+		case "dashboard":
+			return dashboardHandler.Handle(message)
 		default:
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Try /help")
 			bot.Send(msg)

@@ -766,3 +766,61 @@ func (c *APIClient) CreateTracking(token string, req TrackingCreateRequest) (*Tr
 
 	return &createdSession, nil
 }
+
+// RevenueProjection represents revenue data from dashboard
+type RevenueProjection struct {
+	TotalMonthlyRevenue    float64              `json:"total_monthly_revenue"`
+	Currency               string               `json:"currency"`
+	ActiveContracts        int                  `json:"active_contracts"`
+	HourlyContractsRevenue float64              `json:"hourly_contracts_revenue"`
+	RetainerRevenue        float64              `json:"retainer_revenue"`
+	ProjectedHours         float64              `json:"projected_hours"`
+	AverageHourlyRate      float64              `json:"average_hourly_rate"`
+	ContractBreakdown      []ContractProjection `json:"contract_breakdown"`
+}
+
+type ContractProjection struct {
+	ContractName   string  `json:"contract_name"`
+	ClientName     string  `json:"client_name"`
+	ContractType   string  `json:"contract_type"`
+	MonthlyRevenue float64 `json:"monthly_revenue"`
+	Currency       string  `json:"currency"`
+}
+
+// GetDashboard fetches revenue projection dashboard
+func (c *APIClient) GetDashboard(token string) (*RevenueProjection, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/dashboard/revenue", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var projection RevenueProjection
+	if err := json.Unmarshal(apiResp.Data, &projection); err != nil {
+		return nil, err
+	}
+
+	return &projection, nil
+}

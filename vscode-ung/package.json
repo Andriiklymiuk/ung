@@ -25,7 +25,8 @@
     "onView:ungContracts",
     "onView:ungClients",
     "onView:ungExpenses",
-    "onView:ungTracking"
+    "onView:ungTracking",
+    "onView:ungDashboard"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -196,6 +197,12 @@
         "title": "Refresh Tracking",
         "category": "UNG",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.refreshDashboard",
+        "title": "Refresh Dashboard",
+        "category": "UNG",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -209,6 +216,10 @@
     },
     "views": {
       "ung": [
+        {
+          "id": "ungDashboard",
+          "name": "Dashboard"
+        },
         {
           "id": "ungInvoices",
           "name": "Invoices"
@@ -233,6 +244,11 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "ung.refreshDashboard",
+          "when": "view == ungDashboard",
+          "group": "navigation"
+        },
         {
           "command": "ung.createInvoice",
           "when": "view == ungInvoices",

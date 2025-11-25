@@ -223,6 +223,12 @@
         "title": "Install UNG CLI",
         "category": "UNG",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "ung.checkForUpdates",
+        "title": "Check for Updates",
+        "category": "UNG",
+        "icon": "$(sync)"
       }
     ],
     "viewsContainers": {
@@ -282,9 +288,14 @@
     "menus": {
       "view/title": [
         {
+          "command": "ung.checkForUpdates",
+          "when": "view == ungDashboard",
+          "group": "navigation@1"
+        },
+        {
           "command": "ung.refreshDashboard",
           "when": "view == ungDashboard",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "ung.createInvoice",

@@ -29,44 +29,88 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize CLI wrapper
     const cli = new UngCli(outputChannel);
 
+    // Register install command (always available)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.installCli', async () => {
+            const action = await vscode.window.showQuickPick(
+                [
+                    { label: '$(terminal) Install via Homebrew', description: 'Recommended for macOS/Linux', value: 'homebrew' },
+                    { label: '$(cloud-download) Download from GitHub', description: 'Download binary directly', value: 'github' },
+                    { label: '$(book) View Instructions', description: 'Open installation guide', value: 'docs' }
+                ],
+                { placeHolder: 'Choose installation method' }
+            );
+
+            if (action?.value === 'homebrew') {
+                const terminal = vscode.window.createTerminal('UNG Installation');
+                terminal.show();
+                terminal.sendText('brew tap Andriiklymiuk/tools && brew install ung');
+                vscode.window.showInformationMessage('Installing UNG CLI... Reload VSCode after installation completes.', 'Reload').then(choice => {
+                    if (choice === 'Reload') {
+                        vscode.commands.executeCommand('workbench.action.reloadWindow');
+                    }
+                });
+            } else if (action?.value === 'github') {
+                vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/releases/latest'));
+            } else if (action?.value === 'docs') {
+                vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#installation'));
+            }
+        })
+    );
+
+    // Register check for updates command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.checkForUpdates', async () => {
+            await vscode.window.withProgress(
+                { location: vscode.ProgressLocation.Notification, title: 'Checking for UNG updates...' },
+                async () => {
+                    try {
+                        const currentVersion = await cli.getVersion();
+                        const response = await fetch('https://api.github.com/repos/Andriiklymiuk/ung/releases/latest');
+                        const data = await response.json() as { tag_name?: string };
+                        const latestVersion = data.tag_name?.replace('v', '') || '';
+
+                        if (!currentVersion || !latestVersion) {
+                            vscode.window.showErrorMessage('Could not check for updates.');
+                            return;
+                        }
+
+                        const current = currentVersion.replace('v', '').trim();
+                        if (current === latestVersion) {
+                            vscode.window.showInformationMessage(`UNG CLI is up to date (v${current})`);
+                        } else {
+                            const action = await vscode.window.showInformationMessage(
+                                `UNG CLI update available: v${current} → v${latestVersion}`,
+                                'Update Now',
+                                'View Release Notes'
+                            );
+
+                            if (action === 'Update Now') {
+                                const terminal = vscode.window.createTerminal('UNG Update');
+                                terminal.show();
+                                terminal.sendText('brew upgrade ung');
+                                vscode.window.showInformationMessage('Updating UNG CLI... Reload VSCode after update completes.', 'Reload').then(choice => {
+                                    if (choice === 'Reload') {
+                                        vscode.commands.executeCommand('workbench.action.reloadWindow');
+                                    }
+                                });
+                            } else if (action === 'View Release Notes') {
+                                vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/releases/latest'));
+                            }
+                        }
+                    } catch (error) {
+                        vscode.window.showErrorMessage('Failed to check for updates. Please check your internet connection.');
+                    }
+                }
+            );
+        })
+    );
+
     // Check if CLI is installed
     const isInstalled = await cli.isInstalled();
+    vscode.commands.executeCommand('setContext', 'ung.cliInstalled', isInstalled);
+
     if (!isInstalled) {
-        // Register install command
-        context.subscriptions.push(
-            vscode.commands.registerCommand('ung.installCli', async () => {
-                const action = await vscode.window.showQuickPick(
-                    [
-                        { label: '$(terminal) Install via Homebrew', description: 'Recommended for macOS/Linux', value: 'homebrew' },
-                        { label: '$(cloud-download) Download from GitHub', description: 'Download binary directly', value: 'github' },
-                        { label: '$(book) View Instructions', description: 'Open installation guide', value: 'docs' }
-                    ],
-                    { placeHolder: 'Choose installation method' }
-                );
-
-                if (action?.value === 'homebrew') {
-                    const terminal = vscode.window.createTerminal('UNG Installation');
-                    terminal.show();
-                    terminal.sendText('brew tap Andriiklymiuk/tools && brew install ung');
-                    vscode.window.showInformationMessage('Installing UNG CLI... Reload VSCode after installation completes.');
-                } else if (action?.value === 'github') {
-                    vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/releases/latest'));
-                } else if (action?.value === 'docs') {
-                    vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#installation'));
-                }
-            })
-        );
-
-        // Show welcome view with install button
-        vscode.window.registerTreeDataProvider('ungDashboard', {
-            getTreeItem: () => {
-                const item = new vscode.TreeItem('Install UNG CLI to get started');
-                item.description = 'Click the button above';
-                return item;
-            },
-            getChildren: () => []
-        });
-
         // Show error with install option
         const action = await vscode.window.showErrorMessage(
             'UNG CLI is not installed. Install it to use billing and time tracking features.',

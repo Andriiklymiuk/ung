@@ -189,6 +189,7 @@ export class InvoiceCommands {
             { label: '$(check) Mark as Paid', action: 'markPaid' },
             { label: '$(send) Mark as Sent', action: 'markSent' },
             { label: '$(list-selection) Change Status...', action: 'changeStatus' },
+            { label: '$(copy) Duplicate Invoice', action: 'duplicate' },
             { label: '$(close) Close', action: 'close' }
         ];
 
@@ -214,8 +215,128 @@ export class InvoiceCommands {
                 case 'changeStatus':
                     await this.changeInvoiceStatus(invoiceId);
                     break;
+                case 'duplicate':
+                    await this.duplicateInvoice(invoiceId);
+                    break;
             }
         }
+    }
+
+    /**
+     * Duplicate an existing invoice
+     */
+    async duplicateInvoice(invoiceId?: number): Promise<void> {
+        if (!invoiceId) {
+            // Show invoice list to select
+            const result = await this.cli.listInvoices();
+            if (!result.success || !result.stdout) {
+                vscode.window.showErrorMessage('Failed to fetch invoices');
+                return;
+            }
+
+            const invoices = this.parseInvoicesFromOutput(result.stdout);
+            if (invoices.length === 0) {
+                vscode.window.showInformationMessage('No invoices found to duplicate');
+                return;
+            }
+
+            const selected = await vscode.window.showQuickPick(
+                invoices.map(inv => ({
+                    label: inv.invoiceNum,
+                    description: `${inv.client} - ${inv.amount}`,
+                    detail: inv.status,
+                    id: inv.id
+                })),
+                { placeHolder: 'Select an invoice to duplicate' }
+            );
+
+            if (!selected) return;
+            invoiceId = selected.id;
+        }
+
+        // Get invoice details
+        const invoicesResult = await this.cli.listInvoices();
+        if (!invoicesResult.success || !invoicesResult.stdout) {
+            vscode.window.showErrorMessage('Failed to fetch invoice details');
+            return;
+        }
+
+        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+        const originalInvoice = invoices.find(inv => inv.id === invoiceId);
+
+        if (!originalInvoice) {
+            vscode.window.showErrorMessage('Invoice not found');
+            return;
+        }
+
+        // Ask for new amount (default to original)
+        const amountStr = await vscode.window.showInputBox({
+            prompt: `Amount for new invoice (original: ${originalInvoice.amount})`,
+            value: originalInvoice.amount.replace(/[^0-9.]/g, ''),
+            validateInput: value => {
+                if (!value) return 'Amount is required';
+                if (isNaN(Number(value))) return 'Must be a valid number';
+                if (Number(value) <= 0) return 'Amount must be greater than 0';
+                return null;
+            }
+        });
+
+        if (!amountStr) return;
+
+        // Parse currency from original
+        const currencyMatch = originalInvoice.amount.match(/(USD|EUR|GBP|CHF|PLN)/);
+        const currency = currencyMatch ? currencyMatch[1] : 'USD';
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Creating duplicate invoice...',
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.createInvoice({
+                clientName: originalInvoice.client,
+                amount: Number(amountStr),
+                currency
+            });
+
+            if (result.success) {
+                vscode.window.showInformationMessage(`Invoice duplicated! New invoice created for ${originalInvoice.client}`);
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to duplicate invoice: ${result.error}`);
+            }
+        });
+    }
+
+    /**
+     * Parse invoices from CLI output
+     */
+    private parseInvoicesFromOutput(output: string): Array<{
+        id: number;
+        invoiceNum: string;
+        client: string;
+        date: string;
+        amount: string;
+        status: string;
+    }> {
+        const lines = output.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        return lines.slice(1).map(line => {
+            const parts = line.split(/\s{2,}/).filter(p => p.trim());
+            const id = parseInt(parts[0], 10);
+            if (isNaN(id)) return null;
+
+            return {
+                id,
+                invoiceNum: parts[1] || '',
+                client: parts[2] || 'Unknown',
+                date: parts[3] || '',
+                amount: parts[4] || '',
+                status: parts[5] || ''
+            };
+        }).filter((inv): inv is NonNullable<typeof inv> => inv !== null);
     }
 
     /**

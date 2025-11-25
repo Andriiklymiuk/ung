@@ -2,7 +2,7 @@
   "name": "ung",
   "displayName": "UNG - Billing & Time Tracking",
   "description": "Comprehensive billing, invoicing, and time tracking extension for the UNG CLI tool",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "publisher": "andriiklymiuk",
   "icon": "resources/icon.png",
   "repository": {
@@ -299,6 +299,56 @@
         "title": "Refresh Quick Setup",
         "category": "UNG",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.openStatistics",
+        "title": "Open Statistics & Reports",
+        "category": "UNG",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "ung.search",
+        "title": "Search Everything",
+        "category": "UNG",
+        "icon": "$(search)"
+      },
+      {
+        "command": "ung.searchInvoices",
+        "title": "Search Invoices",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.searchContracts",
+        "title": "Search Contracts",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.searchClients",
+        "title": "Search Clients",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.duplicateInvoice",
+        "title": "Duplicate Invoice",
+        "category": "UNG",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "ung.toggleTracking",
+        "title": "Toggle Time Tracking",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.quickActions",
+        "title": "Quick Actions",
+        "category": "UNG",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "ung.refreshAll",
+        "title": "Refresh All Views",
+        "category": "UNG",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -474,6 +524,11 @@
           "group": "2_modify"
         },
         {
+          "command": "ung.duplicateInvoice",
+          "when": "view == ungInvoices && viewItem == invoice",
+          "group": "2_modify"
+        },
+        {
           "command": "ung.deleteInvoice",
           "when": "view == ungInvoices && viewItem == invoice",
           "group": "3_delete"
@@ -575,6 +630,24 @@
         "key": "ctrl+alt+r",
         "mac": "cmd+alt+r",
         "when": "!editorFocus"
+      },
+      {
+        "command": "ung.search",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
+        "when": "editorTextFocus || !editorFocus"
+      },
+      {
+        "command": "ung.openStatistics",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "editorTextFocus || !editorFocus"
+      },
+      {
+        "command": "ung.quickActions",
+        "key": "ctrl+alt+u",
+        "mac": "cmd+alt+u",
+        "when": "editorTextFocus || !editorFocus"
       }
     ]
   },

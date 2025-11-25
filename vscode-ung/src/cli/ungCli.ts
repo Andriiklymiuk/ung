@@ -385,6 +385,13 @@ export class UngCli {
     }
 
     /**
+     * List time entries (alias for tracking sessions)
+     */
+    async listTimeEntries(): Promise<CliResult<any[]>> {
+        return this.exec(['track', 'ls']);
+    }
+
+    /**
      * Start time tracking
      */
     async startTracking(data: {

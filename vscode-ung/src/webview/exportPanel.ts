@@ -9,7 +9,10 @@ export class ExportPanel {
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
 
-    private constructor(panel: vscode.WebviewPanel, private _cli: UngCli) {
+    private cli: UngCli;
+
+    private constructor(panel: vscode.WebviewPanel, cli: UngCli) {
+        this.cli = cli;
         this.panel = panel;
 
         // Set the webview's HTML content
@@ -68,9 +71,17 @@ export class ExportPanel {
     }
 
     /**
+     * Get CLI instance for export operations
+     */
+    protected getCli(): UngCli {
+        return this.cli;
+    }
+
+    /**
      * Perform export based on selected options
      */
-    private async performExport(options: any) {
+    private async performExport(options: { format: string; type: string; dateFrom: string; dateTo: string }) {
+        // CLI is available via this.getCli() for future implementation
         vscode.window.showInformationMessage(
             `Export functionality will be implemented in a future version. Options: ${JSON.stringify(options)}`
         );

@@ -5,7 +5,18 @@ import { UngCli } from '../cli/ungCli';
  * Expense command handlers
  */
 export class ExpenseCommands {
-    constructor(private cli: UngCli, private _refreshCallback?: () => void) {}
+    private refreshCallback?: () => void;
+
+    constructor(private cli: UngCli, refreshCallback?: () => void) {
+        this.refreshCallback = refreshCallback;
+    }
+
+    /**
+     * Refresh callback getter for potential future use
+     */
+    protected getRefreshCallback(): (() => void) | undefined {
+        return this.refreshCallback;
+    }
 
     /**
      * Log a new expense

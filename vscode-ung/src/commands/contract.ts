@@ -152,6 +152,8 @@ export class ContractCommands {
             return;
         }
 
+        let pdfPath: string | undefined;
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Generating contract PDF...',
@@ -160,11 +162,34 @@ export class ContractCommands {
             const result = await this.cli.generateContractPDF(contractId);
 
             if (result.success) {
-                vscode.window.showInformationMessage('Contract PDF generated successfully!');
+                pdfPath = this.parsePDFPath(result.stdout || '');
             } else {
                 vscode.window.showErrorMessage(`Failed to generate PDF: ${result.error}`);
             }
         });
+
+        if (pdfPath) {
+            const action = await vscode.window.showInformationMessage(
+                `Contract PDF saved to: ${pdfPath}`,
+                'Open PDF',
+                'Show in Finder'
+            );
+
+            if (action === 'Open PDF') {
+                await vscode.env.openExternal(vscode.Uri.file(pdfPath));
+            } else if (action === 'Show in Finder') {
+                await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(pdfPath));
+            }
+        }
+    }
+
+    /**
+     * Parse PDF path from CLI output
+     */
+    private parsePDFPath(output: string): string | undefined {
+        // Match: "✓ PDF generated successfully: /path/to/file.pdf"
+        const match = output.match(/PDF (?:generated successfully|saved to):\s*(.+\.pdf)/i);
+        return match ? match[1].trim() : undefined;
     }
 
     /**

@@ -113,6 +113,8 @@ func handleMessage(
 			return trackingHandler.HandleStop(message)
 		case "active":
 			return trackingHandler.HandleActive(message)
+		case "log":
+			return trackingHandler.HandleLog(message)
 		default:
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Try /help")
 			bot.Send(msg)
@@ -163,6 +165,13 @@ func handleMessage(
 			return expenseHandler.HandleAmountInput(message)
 		case models.StateExpenseVendor:
 			return expenseHandler.HandleVendorInput(message)
+		// Tracking log states
+		case models.StateTrackLogHours:
+			return trackingHandler.HandleHoursInput(message)
+		case models.StateTrackLogProject:
+			return trackingHandler.HandleProjectInput(message)
+		case models.StateTrackLogNotes:
+			return trackingHandler.HandleNotesInput(message)
 		}
 	}
 
@@ -243,6 +252,10 @@ func handleCallback(
 	// Tracking callbacks
 	if data == "tracking_stop" {
 		return trackingHandler.HandleStopCallback(callbackQuery)
+	}
+
+	if strings.HasPrefix(data, "log_contract_") {
+		return trackingHandler.HandleContractSelected(callbackQuery)
 	}
 
 	// Auth callback

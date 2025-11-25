@@ -17,13 +17,12 @@ import (
 
 var importCmd = &cobra.Command{
 	Use:   "import",
-	Short: "Import data from CSV files",
-	Long: `Import data from CSV files into UNG.
+	Short: "Import data from CSV or SQLite files",
+	Long: `Import data from CSV or SQLite files into UNG.
 
-Supported data types:
-  - clients     Import client list
-  - expenses    Import expense records
-  - time        Import time tracking entries
+Supported sources:
+  - CSV files (clients, expenses, time)
+  - SQLite databases (full database import)
 
 CSV Format Requirements:
   Clients:   name,email,address,tax_id
@@ -31,10 +30,26 @@ CSV Format Requirements:
   Time:      date,client,project,hours,billable,notes
 
 Examples:
-  ung import                         Interactive import wizard
+  ung import                              Interactive import wizard
   ung import --file clients.csv --type clients
-  ung import --file expenses.csv --type expenses`,
+  ung import db backup.db                 Import from SQLite
+  ung import db backup.db --password xyz  Import from encrypted SQLite`,
 	RunE: runImport,
+}
+
+var importDBCmd = &cobra.Command{
+	Use:   "db <file>",
+	Short: "Import data from another UNG SQLite database",
+	Long: `Import all data from another UNG SQLite database.
+
+Supports both encrypted and non-encrypted databases.
+Data is merged with existing records (duplicates are skipped).
+
+Examples:
+  ung import db backup.db                  Import from unencrypted database
+  ung import db backup.db --password mykey Import from encrypted database`,
+	Args: cobra.ExactArgs(1),
+	RunE: runImportDB,
 }
 
 var (
@@ -42,6 +57,7 @@ var (
 	importType     string
 	importSkipRows int
 	importDryRun   bool
+	importPassword string
 )
 
 func init() {
@@ -50,6 +66,11 @@ func init() {
 	importCmd.Flags().IntVar(&importSkipRows, "skip", 1, "Number of header rows to skip")
 	importCmd.Flags().BoolVar(&importDryRun, "dry-run", false, "Preview import without saving")
 
+	// SQLite import flags
+	importDBCmd.Flags().StringVarP(&importPassword, "password", "p", "", "Password for encrypted database")
+	importDBCmd.Flags().BoolVar(&importDryRun, "dry-run", false, "Preview import without saving")
+
+	importCmd.AddCommand(importDBCmd)
 	rootCmd.AddCommand(importCmd)
 }
 
@@ -76,9 +97,10 @@ func runImportInteractive() error {
 			huh.NewSelect[string]().
 				Title("What data do you want to import?").
 				Options(
-					huh.NewOption("Clients (name, email, address, tax_id)", "clients"),
-					huh.NewOption("Expenses (date, description, amount, category)", "expenses"),
-					huh.NewOption("Time Tracking (date, client, project, hours)", "time"),
+					huh.NewOption("SQLite Database (full import)", "sqlite"),
+					huh.NewOption("Clients CSV (name, email, address, tax_id)", "clients"),
+					huh.NewOption("Expenses CSV (date, description, amount, category)", "expenses"),
+					huh.NewOption("Time Tracking CSV (date, client, project, hours)", "time"),
 				).
 				Value(&dataType),
 		),
@@ -86,6 +108,11 @@ func runImportInteractive() error {
 
 	if err := typeForm.Run(); err != nil {
 		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	// Handle SQLite import separately
+	if dataType == "sqlite" {
+		return runImportDBInteractive()
 	}
 
 	// Get file path
@@ -440,4 +467,409 @@ func parseCategory(s string) models.ExpenseCategory {
 	default:
 		return models.ExpenseCategoryOther
 	}
+}
+
+// runImportDB imports data from another UNG SQLite database
+func runImportDB(cmd *cobra.Command, args []string) error {
+	dbFile := args[0]
+
+	// Check if file exists
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
+		return fmt.Errorf("database file not found: %s", dbFile)
+	}
+
+	fmt.Printf("\nImporting from SQLite database: %s\n", dbFile)
+	if importPassword != "" {
+		fmt.Println("Using password for encrypted database")
+	}
+
+	// Build connection string
+	dsn := dbFile
+	if importPassword != "" {
+		dsn = fmt.Sprintf("%s?_pragma_key=%s", dbFile, importPassword)
+	}
+
+	// Open source database using raw SQL
+	sourceDB, err := openSourceDB(dsn, importPassword)
+	if err != nil {
+		return fmt.Errorf("failed to open source database: %w", err)
+	}
+	defer sourceDB.Close()
+
+	// Test if we can read from the database
+	var count int
+	if err := sourceDB.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").Scan(&count); err != nil {
+		if importPassword == "" {
+			return fmt.Errorf("failed to read database. If encrypted, provide password with --password flag: %w", err)
+		}
+		return fmt.Errorf("failed to read database. Check if password is correct: %w", err)
+	}
+
+	imported := make(map[string]int)
+	skipped := make(map[string]int)
+
+	// Import companies
+	companies, skip := importCompaniesFromDB(sourceDB)
+	imported["companies"] = companies
+	skipped["companies"] = skip
+
+	// Import clients
+	clients, skip := importClientsFromDB(sourceDB)
+	imported["clients"] = clients
+	skipped["clients"] = skip
+
+	// Import contracts
+	contracts, skip := importContractsFromDB(sourceDB)
+	imported["contracts"] = contracts
+	skipped["contracts"] = skip
+
+	// Import invoices
+	invoices, skip := importInvoicesFromDB(sourceDB)
+	imported["invoices"] = invoices
+	skipped["invoices"] = skip
+
+	// Import expenses
+	expenses, skip := importExpensesFromDB(sourceDB)
+	imported["expenses"] = expenses
+	skipped["expenses"] = skip
+
+	// Import tracking sessions
+	sessions, skip := importSessionsFromDB(sourceDB)
+	imported["time_entries"] = sessions
+	skipped["time_entries"] = skip
+
+	// Import recurring invoices
+	recurring, skip := importRecurringFromDB(sourceDB)
+	imported["recurring"] = recurring
+	skipped["recurring"] = skip
+
+	fmt.Println("\n✓ Import completed!")
+	fmt.Println("\n  Imported:")
+	for k, v := range imported {
+		if v > 0 {
+			fmt.Printf("    • %d %s\n", v, k)
+		}
+	}
+	if hasSkipped(skipped) {
+		fmt.Println("\n  Skipped (already exist):")
+		for k, v := range skipped {
+			if v > 0 {
+				fmt.Printf("    • %d %s\n", v, k)
+			}
+		}
+	}
+
+	return nil
+}
+
+// runImportDBInteractive runs SQLite import with interactive prompts
+func runImportDBInteractive() error {
+	var dbPath string
+	var password string
+	var usePassword bool
+
+	// Get database file path
+	pathForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("SQLite Database Path").
+				Description("Enter the path to the UNG database file").
+				Placeholder("/path/to/ung.db").
+				Value(&dbPath),
+		),
+	)
+
+	if err := pathForm.Run(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	// Expand ~ to home directory
+	if strings.HasPrefix(dbPath, "~/") {
+		dbPath = strings.Replace(dbPath, "~", os.Getenv("HOME"), 1)
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return fmt.Errorf("database file not found: %s", dbPath)
+	}
+
+	// Ask about encryption
+	encryptForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Is the database encrypted?").
+				Description("If the database is password-protected").
+				Affirmative("Yes").
+				Negative("No").
+				Value(&usePassword),
+		),
+	)
+
+	if err := encryptForm.Run(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	if usePassword {
+		pwForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Database Password").
+					Description("Enter the encryption password").
+					EchoMode(huh.EchoModePassword).
+					Value(&password),
+			),
+		)
+
+		if err := pwForm.Run(); err != nil {
+			return fmt.Errorf("cancelled: %w", err)
+		}
+	}
+
+	// Set global variables and run import
+	importPassword = password
+	return runImportDB(nil, []string{dbPath})
+}
+
+func hasSkipped(m map[string]int) bool {
+	for _, v := range m {
+		if v > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// openSourceDB opens a source SQLite database
+func openSourceDB(dsn, password string) (*db.SQLiteDB, error) {
+	return db.OpenSQLite(dsn, password)
+}
+
+func importCompaniesFromDB(sourceDB *db.SQLiteDB) (int, int) {
+	rows, err := sourceDB.Query(`SELECT name, email, phone, address, registration_address, tax_id, bank_name, bank_account, bank_swift FROM companies`)
+	if err != nil {
+		return 0, 0
+	}
+	defer rows.Close()
+
+	imported := 0
+	skipped := 0
+
+	for rows.Next() {
+		var c models.Company
+		if err := rows.Scan(&c.Name, &c.Email, &c.Phone, &c.Address, &c.RegistrationAddress, &c.TaxID, &c.BankName, &c.BankAccount, &c.BankSWIFT); err != nil {
+			continue
+		}
+
+		// Check if exists
+		var existing models.Company
+		if err := db.DB.Where("email = ?", c.Email).First(&existing).Error; err == nil {
+			skipped++
+			continue
+		}
+
+		if !importDryRun {
+			if err := db.DB.Create(&c).Error; err == nil {
+				imported++
+			}
+		} else {
+			imported++
+		}
+	}
+
+	return imported, skipped
+}
+
+func importClientsFromDB(sourceDB *db.SQLiteDB) (int, int) {
+	rows, err := sourceDB.Query(`SELECT name, email, address, tax_id FROM clients`)
+	if err != nil {
+		return 0, 0
+	}
+	defer rows.Close()
+
+	imported := 0
+	skipped := 0
+
+	for rows.Next() {
+		var c models.Client
+		if err := rows.Scan(&c.Name, &c.Email, &c.Address, &c.TaxID); err != nil {
+			continue
+		}
+
+		var existing models.Client
+		if err := db.DB.Where("email = ?", c.Email).First(&existing).Error; err == nil {
+			skipped++
+			continue
+		}
+
+		if !importDryRun {
+			if err := db.DB.Create(&c).Error; err == nil {
+				imported++
+			}
+		} else {
+			imported++
+		}
+	}
+
+	return imported, skipped
+}
+
+func importContractsFromDB(sourceDB *db.SQLiteDB) (int, int) {
+	rows, err := sourceDB.Query(`SELECT contract_num, client_id, name, contract_type, hourly_rate, fixed_price, currency, start_date, end_date, active, notes FROM contracts`)
+	if err != nil {
+		return 0, 0
+	}
+	defer rows.Close()
+
+	imported := 0
+	skipped := 0
+
+	for rows.Next() {
+		var c models.Contract
+		if err := rows.Scan(&c.ContractNum, &c.ClientID, &c.Name, &c.ContractType, &c.HourlyRate, &c.FixedPrice, &c.Currency, &c.StartDate, &c.EndDate, &c.Active, &c.Notes); err != nil {
+			continue
+		}
+
+		var existing models.Contract
+		if err := db.DB.Where("contract_num = ?", c.ContractNum).First(&existing).Error; err == nil {
+			skipped++
+			continue
+		}
+
+		if !importDryRun {
+			if err := db.DB.Create(&c).Error; err == nil {
+				imported++
+			}
+		} else {
+			imported++
+		}
+	}
+
+	return imported, skipped
+}
+
+func importInvoicesFromDB(sourceDB *db.SQLiteDB) (int, int) {
+	rows, err := sourceDB.Query(`SELECT invoice_num, company_id, amount, currency, description, status, issued_date, due_date FROM invoices`)
+	if err != nil {
+		return 0, 0
+	}
+	defer rows.Close()
+
+	imported := 0
+	skipped := 0
+
+	for rows.Next() {
+		var inv models.Invoice
+		if err := rows.Scan(&inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency, &inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate); err != nil {
+			continue
+		}
+
+		var existing models.Invoice
+		if err := db.DB.Where("invoice_num = ?", inv.InvoiceNum).First(&existing).Error; err == nil {
+			skipped++
+			continue
+		}
+
+		if !importDryRun {
+			if err := db.DB.Create(&inv).Error; err == nil {
+				imported++
+			}
+		} else {
+			imported++
+		}
+	}
+
+	return imported, skipped
+}
+
+func importExpensesFromDB(sourceDB *db.SQLiteDB) (int, int) {
+	rows, err := sourceDB.Query(`SELECT description, amount, currency, category, date, vendor, notes FROM expenses`)
+	if err != nil {
+		return 0, 0
+	}
+	defer rows.Close()
+
+	imported := 0
+	skipped := 0
+
+	for rows.Next() {
+		var e models.Expense
+		if err := rows.Scan(&e.Description, &e.Amount, &e.Currency, &e.Category, &e.Date, &e.Vendor, &e.Notes); err != nil {
+			continue
+		}
+
+		// For expenses, we import all (no unique key to check)
+		if !importDryRun {
+			if err := db.DB.Create(&e).Error; err == nil {
+				imported++
+			}
+		} else {
+			imported++
+		}
+	}
+
+	return imported, skipped
+}
+
+func importSessionsFromDB(sourceDB *db.SQLiteDB) (int, int) {
+	rows, err := sourceDB.Query(`SELECT client_id, contract_id, project_name, start_time, end_time, duration, hours, billable, notes FROM tracking_sessions WHERE deleted_at IS NULL`)
+	if err != nil {
+		return 0, 0
+	}
+	defer rows.Close()
+
+	imported := 0
+	skipped := 0
+
+	for rows.Next() {
+		var s models.TrackingSession
+		if err := rows.Scan(&s.ClientID, &s.ContractID, &s.ProjectName, &s.StartTime, &s.EndTime, &s.Duration, &s.Hours, &s.Billable, &s.Notes); err != nil {
+			continue
+		}
+
+		// Import all sessions (time entries are typically unique)
+		if !importDryRun {
+			if err := db.DB.Create(&s).Error; err == nil {
+				imported++
+			}
+		} else {
+			imported++
+		}
+	}
+
+	return imported, skipped
+}
+
+func importRecurringFromDB(sourceDB *db.SQLiteDB) (int, int) {
+	rows, err := sourceDB.Query(`SELECT client_id, contract_id, amount, currency, description, frequency, day_of_month, day_of_week, next_generation_date, active FROM recurring_invoices`)
+	if err != nil {
+		return 0, 0
+	}
+	defer rows.Close()
+
+	imported := 0
+	skipped := 0
+
+	for rows.Next() {
+		var r models.RecurringInvoice
+		if err := rows.Scan(&r.ClientID, &r.ContractID, &r.Amount, &r.Currency, &r.Description, &r.Frequency, &r.DayOfMonth, &r.DayOfWeek, &r.NextGenerationDate, &r.Active); err != nil {
+			continue
+		}
+
+		// Check for similar recurring invoice
+		var existing models.RecurringInvoice
+		if err := db.DB.Where("client_id = ? AND amount = ? AND frequency = ?", r.ClientID, r.Amount, r.Frequency).First(&existing).Error; err == nil {
+			skipped++
+			continue
+		}
+
+		if !importDryRun {
+			if err := db.DB.Create(&r).Error; err == nil {
+				imported++
+			}
+		} else {
+			imported++
+		}
+	}
+
+	return imported, skipped
 }

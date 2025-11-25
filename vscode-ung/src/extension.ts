@@ -16,6 +16,7 @@ import { DashboardProvider } from './views/dashboardProvider';
 import { WelcomeProvider, GettingStartedProvider } from './views/welcomeProvider';
 import { ExportPanel } from './webview/exportPanel';
 import { StatisticsPanel } from './webview/statisticsPanel';
+import { PomodoroPanel } from './webview/pomodoroPanel';
 import { StatusBarManager } from './utils/statusBar';
 
 /**
@@ -211,6 +212,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const statusBar = new StatusBarManager(cli);
     context.subscriptions.push(statusBar);
     await statusBar.start();
+
+    // Initialize pomodoro status bar item
+    const pomodoroStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 200);
+    pomodoroStatusBar.command = 'ung.startPomodoro';
+    context.subscriptions.push(pomodoroStatusBar);
 
     // Initialize tree view providers
     const invoiceProvider = new InvoiceProvider(cli);
@@ -428,27 +434,10 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Pomodoro timer command
+    // Pomodoro timer command - opens native VS Code panel
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.startPomodoro', async () => {
-            const durations = [
-                { label: '🍅 25 min (standard)', value: 25 },
-                { label: '⏱ 15 min (short)', value: 15 },
-                { label: '🔥 45 min (deep work)', value: 45 },
-                { label: '⚡ 50 min (extended)', value: 50 }
-            ];
-
-            const duration = await vscode.window.showQuickPick(durations, {
-                placeHolder: 'Select focus session duration',
-                title: 'Pomodoro Timer'
-            });
-
-            if (!duration) return;
-
-            // Open terminal with pomodoro command
-            const terminal = vscode.window.createTerminal('🍅 Pomodoro');
-            terminal.show();
-            terminal.sendText(`ung pomodoro --work ${duration.value}`);
+            PomodoroPanel.createOrShow(context.extensionUri, pomodoroStatusBar);
         })
     );
 
@@ -633,9 +622,10 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.importData', async () => {
             const dataTypes = [
-                { label: '$(person) Clients', value: 'clients', description: 'name, email, address, tax_id' },
-                { label: '$(credit-card) Expenses', value: 'expenses', description: 'date, description, amount, category' },
-                { label: '$(clock) Time Entries', value: 'time', description: 'date, client, project, hours' }
+                { label: '$(database) SQLite Database', value: 'sqlite', description: 'Full import from another UNG database' },
+                { label: '$(person) Clients CSV', value: 'clients', description: 'name, email, address, tax_id' },
+                { label: '$(credit-card) Expenses CSV', value: 'expenses', description: 'date, description, amount, category' },
+                { label: '$(clock) Time Entries CSV', value: 'time', description: 'date, client, project, hours' }
             ];
 
             const dataType = await vscode.window.showQuickPick(dataTypes, {
@@ -645,7 +635,66 @@ export async function activate(context: vscode.ExtensionContext) {
 
             if (!dataType) return;
 
-            // Show file picker
+            // Handle SQLite import
+            if (dataType.value === 'sqlite') {
+                const files = await vscode.window.showOpenDialog({
+                    canSelectMany: false,
+                    filters: { 'SQLite Database': ['db', 'sqlite', 'sqlite3'], 'All Files': ['*'] },
+                    title: 'Select UNG database file to import'
+                });
+
+                if (!files || files.length === 0) return;
+
+                const filePath = files[0].fsPath;
+
+                // Ask about encryption
+                const isEncrypted = await vscode.window.showQuickPick(
+                    [
+                        { label: '$(unlock) Not encrypted', value: false },
+                        { label: '$(lock) Password protected', value: true }
+                    ],
+                    { placeHolder: 'Is the database encrypted?' }
+                );
+
+                if (!isEncrypted) return;
+
+                let password: string | undefined;
+                if (isEncrypted.value) {
+                    password = await vscode.window.showInputBox({
+                        prompt: 'Enter database password',
+                        password: true,
+                        title: 'Database Password'
+                    });
+                    if (!password) return;
+                }
+
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Importing database...'
+                }, async () => {
+                    const result = await cli.importDatabase(filePath, password);
+                    outputChannel.clear();
+                    outputChannel.appendLine('=== Database Import Results ===\n');
+                    outputChannel.appendLine(result.stdout || 'No output');
+                    if (result.stderr) {
+                        outputChannel.appendLine('\nErrors:\n' + result.stderr);
+                    }
+                    outputChannel.show();
+
+                    if (result.success) {
+                        vscode.window.showInformationMessage('Database import completed!');
+                        // Refresh all views
+                        clientProvider.refresh();
+                        expenseProvider.refresh();
+                        trackingProvider.refresh();
+                        invoiceProvider.refresh();
+                        contractProvider.refresh();
+                    }
+                });
+                return;
+            }
+
+            // Show file picker for CSV
             const files = await vscode.window.showOpenDialog({
                 canSelectMany: false,
                 filters: { 'CSV Files': ['csv'], 'All Files': ['*'] },

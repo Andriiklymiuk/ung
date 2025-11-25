@@ -583,4 +583,13 @@ export class UngCli {
         if (dryRun) args.push('--dry-run');
         return this.exec(args);
     }
+
+    /**
+     * Import data from SQLite database (encrypted or not)
+     */
+    async importDatabase(filePath: string, password?: string): Promise<CliResult> {
+        const args = ['import', 'db', filePath];
+        if (password) args.push('--password', password);
+        return this.exec(args);
+    }
 }

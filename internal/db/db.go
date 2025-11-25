@@ -356,3 +356,30 @@ func runInlineSchema() error {
 	_, err := DB.Exec(schema)
 	return err
 }
+
+// SQLiteDB wraps a raw SQL database connection for import operations
+type SQLiteDB struct {
+	*sql.DB
+}
+
+// OpenSQLite opens a SQLite database for reading (used for imports)
+func OpenSQLite(path, password string) (*SQLiteDB, error) {
+	dsn := path
+	if password != "" {
+		// SQLCipher format for encrypted databases
+		dsn = fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_page_size=4096", path, password)
+	}
+
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Test connection
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	return &SQLiteDB{db}, nil
+}

@@ -509,4 +509,25 @@ export class UngCli {
     async deleteRecurringInvoice(id: number): Promise<CliResult> {
         return this.exec(['recurring', 'delete', id.toString()]);
     }
+
+    // ========== Pomodoro Commands ==========
+
+    /**
+     * Start pomodoro timer (note: runs in terminal for interactive experience)
+     */
+    async startPomodoro(options?: {
+        workMinutes?: number;
+        breakMinutes?: number;
+        client?: string;
+        project?: string;
+        autoTrack?: boolean;
+    }): Promise<CliResult> {
+        const args = ['pomodoro'];
+        if (options?.workMinutes) args.push('--work', options.workMinutes.toString());
+        if (options?.breakMinutes) args.push('--break', options.breakMinutes.toString());
+        if (options?.client) args.push('--client', options.client);
+        if (options?.project) args.push('--project', options.project);
+        if (options?.autoTrack) args.push('--track');
+        return this.exec(args);
+    }
 }

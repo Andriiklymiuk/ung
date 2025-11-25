@@ -367,6 +367,12 @@
         "title": "Manage Recurring Invoices",
         "category": "UNG",
         "icon": "$(sync)"
+      },
+      {
+        "command": "ung.startPomodoro",
+        "title": "Start Pomodoro Timer",
+        "category": "UNG",
+        "icon": "$(watch)"
       }
     ],
     "viewsContainers": {

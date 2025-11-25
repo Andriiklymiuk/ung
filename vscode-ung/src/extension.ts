@@ -395,6 +395,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '$(search) Search Everything', command: 'ung.search' },
                 { label: '$(graph) View Statistics', command: 'ung.openStatistics' },
                 { label: '$(credit-card) Log Expense', command: 'ung.logExpense' },
+                { label: '$(watch) Pomodoro Timer', command: 'ung.startPomodoro' },
                 { label: '$(sync) Recurring Invoices', command: 'ung.manageRecurring' },
                 { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
             ];
@@ -421,6 +422,30 @@ export async function activate(context: vscode.ExtensionContext) {
             gettingStartedProvider.refresh();
             statusBar.forceUpdate();
             vscode.window.showInformationMessage('All views refreshed!');
+        })
+    );
+
+    // Pomodoro timer command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.startPomodoro', async () => {
+            const durations = [
+                { label: '🍅 25 min (standard)', value: 25 },
+                { label: '⏱ 15 min (short)', value: 15 },
+                { label: '🔥 45 min (deep work)', value: 45 },
+                { label: '⚡ 50 min (extended)', value: 50 }
+            ];
+
+            const duration = await vscode.window.showQuickPick(durations, {
+                placeHolder: 'Select focus session duration',
+                title: 'Pomodoro Timer'
+            });
+
+            if (!duration) return;
+
+            // Open terminal with pomodoro command
+            const terminal = vscode.window.createTerminal('🍅 Pomodoro');
+            terminal.show();
+            terminal.sendText(`ung pomodoro --work ${duration.value}`);
         })
     );
 

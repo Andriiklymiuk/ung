@@ -80,18 +80,33 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 	fmt.Printf("\n🎉 New version available: %s\n", release.Name)
 	fmt.Printf("📝 Release page: %s\n", release.HTMLURL)
 
-	// Provide upgrade instructions based on installation method
+	// Auto-upgrade based on installation method
 	switch installMethod {
 	case "homebrew":
-		fmt.Println("\n📦 You installed ung via Homebrew.")
-		fmt.Println("To upgrade, run:")
-		fmt.Println("   brew update")
-		fmt.Println("   brew upgrade ung")
+		fmt.Println("\n📦 Upgrading via Homebrew...")
+		fmt.Println("   Running: brew update && brew upgrade ung")
+		cmd := exec.Command("sh", "-c", "brew update && brew upgrade ung")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("\n❌ Homebrew upgrade failed: %v\n", err)
+			fmt.Println("Try running manually: brew update && brew upgrade ung")
+			return
+		}
+		fmt.Println("\n✅ Successfully upgraded via Homebrew!")
 		return
 	case "go install":
-		fmt.Println("\n📦 You installed ung via 'go install'.")
-		fmt.Println("To upgrade, run:")
-		fmt.Println("   go install github.com/Andriiklymiuk/ung@latest")
+		fmt.Println("\n📦 Upgrading via go install...")
+		fmt.Println("   Running: go install github.com/Andriiklymiuk/ung@latest")
+		cmd := exec.Command("go", "install", "github.com/Andriiklymiuk/ung@latest")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("\n❌ go install failed: %v\n", err)
+			fmt.Println("Try running manually: go install github.com/Andriiklymiuk/ung@latest")
+			return
+		}
+		fmt.Println("\n✅ Successfully upgraded via go install!")
 		return
 	}
 

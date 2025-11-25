@@ -9,12 +9,37 @@ class DashboardMetricItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly value: string,
-        public readonly icon: string
+        public readonly icon: string,
+        public readonly colorId?: string
     ) {
         super(label, vscode.TreeItemCollapsibleState.None);
         this.description = value;
         this.tooltip = `${label}: ${value}`;
-        this.iconPath = new vscode.ThemeIcon(icon);
+        this.iconPath = colorId
+            ? new vscode.ThemeIcon(icon, new vscode.ThemeColor(colorId))
+            : new vscode.ThemeIcon(icon);
+    }
+}
+
+/**
+ * Dashboard action item for quick actions
+ */
+class DashboardActionItem extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly icon: string,
+        public readonly commandId: string,
+        public readonly colorId?: string
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.None);
+        this.iconPath = colorId
+            ? new vscode.ThemeIcon(icon, new vscode.ThemeColor(colorId))
+            : new vscode.ThemeIcon(icon);
+        this.command = {
+            command: commandId,
+            title: label
+        };
+        this.contextValue = 'action';
     }
 }
 
@@ -25,26 +50,30 @@ class DashboardSectionItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly section: string,
-        public readonly icon: string = 'folder'
+        public readonly icon: string = 'folder',
+        collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.Expanded
     ) {
-        super(label, vscode.TreeItemCollapsibleState.Expanded);
+        super(label, collapsibleState);
         this.contextValue = `dashboard_${section}`;
         this.iconPath = new vscode.ThemeIcon(icon);
     }
 }
 
+type DashboardItem = DashboardSectionItem | DashboardMetricItem | DashboardActionItem;
+
 /**
  * Dashboard tree data provider
  */
-export class DashboardProvider implements vscode.TreeDataProvider<DashboardSectionItem | DashboardMetricItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<DashboardSectionItem | DashboardMetricItem | undefined | null | void> =
-        new vscode.EventEmitter<DashboardSectionItem | DashboardMetricItem | undefined | null | void>();
-    readonly onDidChangeTreeData: vscode.Event<DashboardSectionItem | DashboardMetricItem | undefined | null | void> =
+export class DashboardProvider implements vscode.TreeDataProvider<DashboardItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<DashboardItem | undefined | null | void> =
+        new vscode.EventEmitter<DashboardItem | undefined | null | void>();
+    readonly onDidChangeTreeData: vscode.Event<DashboardItem | undefined | null | void> =
         this._onDidChangeTreeData.event;
 
     private cachedMetrics: any = null;
     private cacheTimestamp: number = 0;
     private readonly CACHE_DURATION = 60000; // 1 minute
+    private activeTracking: { project: string; client: string; duration: string } | null = null;
 
     constructor(private cli: UngCli) {}
 
@@ -53,31 +82,160 @@ export class DashboardProvider implements vscode.TreeDataProvider<DashboardSecti
         this._onDidChangeTreeData.fire();
     }
 
-    getTreeItem(element: DashboardSectionItem | DashboardMetricItem): vscode.TreeItem {
+    getTreeItem(element: DashboardItem): vscode.TreeItem {
         return element;
     }
 
-    async getChildren(element?: DashboardSectionItem | DashboardMetricItem): Promise<(DashboardSectionItem | DashboardMetricItem)[]> {
+    async getChildren(element?: DashboardItem): Promise<DashboardItem[]> {
         if (!element) {
             // Root level - show dashboard sections
-            return [
-                new DashboardSectionItem('Revenue', 'revenue', 'dollar'),
-                new DashboardSectionItem('Contracts', 'contracts', 'briefcase'),
-                new DashboardSectionItem('Quick Stats', 'stats', 'dashboard'),
-            ];
+            const sections: DashboardItem[] = [];
+
+            // Check for active tracking session
+            await this.checkActiveTracking();
+            if (this.activeTracking) {
+                sections.push(new DashboardSectionItem('Active Session', 'active', 'pulse', vscode.TreeItemCollapsibleState.Expanded));
+            }
+
+            sections.push(
+                new DashboardSectionItem('Quick Actions', 'actions', 'zap', vscode.TreeItemCollapsibleState.Expanded),
+                new DashboardSectionItem('Revenue Overview', 'revenue', 'graph-line'),
+                new DashboardSectionItem('Business Summary', 'stats', 'dashboard'),
+                new DashboardSectionItem('Top Contracts', 'contracts', 'briefcase', vscode.TreeItemCollapsibleState.Collapsed)
+            );
+
+            return sections;
         }
 
         if (element instanceof DashboardSectionItem) {
-            if (element.section === 'revenue') {
-                return this.getRevenueMetrics();
-            } else if (element.section === 'contracts') {
-                return this.getContractMetrics();
-            } else if (element.section === 'stats') {
-                return this.getStatsMetrics();
+            switch (element.section) {
+                case 'active':
+                    return this.getActiveTrackingItems();
+                case 'actions':
+                    return this.getQuickActions();
+                case 'revenue':
+                    return this.getRevenueMetrics();
+                case 'contracts':
+                    return this.getContractMetrics();
+                case 'stats':
+                    return this.getStatsMetrics();
+                default:
+                    return [];
             }
         }
 
         return [];
+    }
+
+    private async checkActiveTracking(): Promise<void> {
+        try {
+            const result = await this.cli.exec(['tracking', 'status']);
+            if (result.success && result.stdout && !result.stdout.includes('No active')) {
+                // Parse active session
+                const lines = result.stdout.split('\n');
+                let project = 'Unknown';
+                let client = '';
+                let duration = '0:00';
+
+                for (const line of lines) {
+                    if (line.includes('Project:')) {
+                        project = line.split(':')[1]?.trim() || 'Unknown';
+                    } else if (line.includes('Client:')) {
+                        client = line.split(':')[1]?.trim() || '';
+                    } else if (line.includes('Duration:') || line.includes('Elapsed:')) {
+                        duration = line.split(':').slice(1).join(':').trim() || '0:00';
+                    }
+                }
+
+                this.activeTracking = { project, client, duration };
+            } else {
+                this.activeTracking = null;
+            }
+        } catch {
+            this.activeTracking = null;
+        }
+    }
+
+    private getActiveTrackingItems(): DashboardItem[] {
+        if (!this.activeTracking) {
+            return [];
+        }
+
+        const items: DashboardItem[] = [];
+
+        items.push(new DashboardMetricItem(
+            this.activeTracking.project,
+            this.activeTracking.duration,
+            'record',
+            'charts.red'
+        ));
+
+        if (this.activeTracking.client) {
+            items.push(new DashboardMetricItem(
+                'Client',
+                this.activeTracking.client,
+                'person',
+                'charts.blue'
+            ));
+        }
+
+        items.push(new DashboardActionItem(
+            'Stop Tracking',
+            'debug-stop',
+            'ung.stopTracking',
+            'charts.red'
+        ));
+
+        return items;
+    }
+
+    private getQuickActions(): DashboardItem[] {
+        const actions: DashboardItem[] = [];
+
+        // Most common actions with intuitive icons
+        if (!this.activeTracking) {
+            actions.push(new DashboardActionItem(
+                'Start Time Tracking',
+                'play',
+                'ung.startTracking',
+                'charts.green'
+            ));
+        }
+
+        actions.push(new DashboardActionItem(
+            'Create Invoice',
+            'new-file',
+            'ung.createInvoice',
+            'charts.blue'
+        ));
+
+        actions.push(new DashboardActionItem(
+            'Generate from Time',
+            'combine',
+            'ung.generateFromTime',
+            'charts.purple'
+        ));
+
+        actions.push(new DashboardActionItem(
+            'Log Expense',
+            'credit-card',
+            'ung.logExpense',
+            'charts.orange'
+        ));
+
+        actions.push(new DashboardActionItem(
+            'Add Client',
+            'person-add',
+            'ung.createClient'
+        ));
+
+        actions.push(new DashboardActionItem(
+            'New Contract',
+            'file-add',
+            'ung.createContract'
+        ));
+
+        return actions;
     }
 
     private async getRevenueMetrics(): Promise<DashboardMetricItem[]> {
@@ -86,40 +244,45 @@ export class DashboardProvider implements vscode.TreeDataProvider<DashboardSecti
             const items: DashboardMetricItem[] = [];
 
             items.push(new DashboardMetricItem(
-                'Monthly Revenue',
+                'Total Revenue',
                 Formatter.formatCurrency(metrics.totalMonthlyRevenue || 0, metrics.currency || 'USD'),
-                'symbol-number'
+                'graph-line',
+                'charts.green'
             ));
 
             items.push(new DashboardMetricItem(
-                'Hourly Revenue',
+                'From Hourly',
                 Formatter.formatCurrency(metrics.hourlyRevenue || 0, metrics.currency || 'USD'),
-                'symbol-numeric'
+                'clock',
+                'charts.blue'
             ));
 
             items.push(new DashboardMetricItem(
-                'Retainer Revenue',
+                'From Retainers',
                 Formatter.formatCurrency(metrics.retainerRevenue || 0, metrics.currency || 'USD'),
-                'symbol-numeric'
+                'calendar',
+                'charts.purple'
             ));
 
             items.push(new DashboardMetricItem(
-                'Projected Hours',
+                'Hours This Month',
                 `${(metrics.projectedHours || 0).toFixed(1)}h`,
-                'clock'
+                'watch',
+                'charts.yellow'
             ));
 
             if (metrics.averageHourlyRate > 0) {
                 items.push(new DashboardMetricItem(
-                    'Average Rate',
+                    'Avg. Hourly Rate',
                     `$${metrics.averageHourlyRate.toFixed(0)}/hr`,
-                    'symbol-number'
+                    'tag',
+                    'charts.orange'
                 ));
             }
 
             return items;
         } catch (error) {
-            return [new DashboardMetricItem('Error', 'Failed to load revenue metrics', 'error')];
+            return [new DashboardMetricItem('Error', 'Failed to load revenue', 'error', 'errorForeground')];
         }
     }
 
@@ -131,24 +294,27 @@ export class DashboardProvider implements vscode.TreeDataProvider<DashboardSecti
             items.push(new DashboardMetricItem(
                 'Active Contracts',
                 String(metrics.activeContracts || 0),
-                'briefcase'
+                'briefcase',
+                'charts.blue'
             ));
 
             // Show top contracts if available
             if (metrics.topContracts && metrics.topContracts.length > 0) {
+                const colors = ['charts.green', 'charts.purple', 'charts.orange'];
                 for (let i = 0; i < Math.min(3, metrics.topContracts.length); i++) {
                     const contract = metrics.topContracts[i];
                     items.push(new DashboardMetricItem(
                         contract.clientName,
                         Formatter.formatCurrency(contract.monthlyRevenue || 0, contract.currency || 'USD'),
-                        'briefcase'
+                        'organization',
+                        colors[i]
                     ));
                 }
             }
 
             return items;
         } catch (error) {
-            return [new DashboardMetricItem('Error', 'Failed to load contract metrics', 'error')];
+            return [new DashboardMetricItem('Error', 'Failed to load contracts', 'error', 'errorForeground')];
         }
     }
 
@@ -158,26 +324,38 @@ export class DashboardProvider implements vscode.TreeDataProvider<DashboardSecti
             const items: DashboardMetricItem[] = [];
 
             items.push(new DashboardMetricItem(
-                'Total Clients',
+                'Active Clients',
                 String(metrics.totalClients || 0),
-                'person'
+                'people',
+                'charts.blue'
             ));
 
+            items.push(new DashboardMetricItem(
+                'Active Contracts',
+                String(metrics.activeContracts || 0),
+                'briefcase',
+                'charts.purple'
+            ));
+
+            const pendingCount = metrics.pendingInvoices || 0;
             items.push(new DashboardMetricItem(
                 'Pending Invoices',
-                String(metrics.pendingInvoices || 0),
-                'clock'
+                String(pendingCount),
+                pendingCount > 0 ? 'bell' : 'bell-slash',
+                pendingCount > 0 ? 'charts.yellow' : 'charts.gray'
             ));
 
+            const unpaidAmount = metrics.unpaidAmount || 0;
             items.push(new DashboardMetricItem(
                 'Unpaid Amount',
-                Formatter.formatCurrency(metrics.unpaidAmount || 0, metrics.currency || 'USD'),
-                'warning'
+                Formatter.formatCurrency(unpaidAmount, metrics.currency || 'USD'),
+                unpaidAmount > 0 ? 'alert' : 'check',
+                unpaidAmount > 0 ? 'charts.red' : 'charts.green'
             ));
 
             return items;
         } catch (error) {
-            return [new DashboardMetricItem('Error', 'Failed to load statistics', 'error')];
+            return [new DashboardMetricItem('Error', 'Failed to load stats', 'error', 'errorForeground')];
         }
     }
 

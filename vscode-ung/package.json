@@ -2,7 +2,7 @@
   "name": "ung",
   "displayName": "UNG - Billing & Time Tracking",
   "description": "Comprehensive billing, invoicing, and time tracking extension for the UNG CLI tool",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "publisher": "andriiklymiuk",
   "icon": "resources/icon.png",
   "repository": {
@@ -244,6 +244,61 @@
         "title": "Check for Updates",
         "category": "UNG",
         "icon": "$(sync)"
+      },
+      {
+        "command": "ung.installViaHomebrew",
+        "title": "Install via Homebrew",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.installViaScoop",
+        "title": "Install via Scoop (Windows)",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.installViaGo",
+        "title": "Install via Go",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.downloadBinary",
+        "title": "Download Binary",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.openReleases",
+        "title": "View GitHub Releases",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.openDocs",
+        "title": "Open Documentation",
+        "category": "UNG",
+        "icon": "$(book)"
+      },
+      {
+        "command": "ung.openGitHub",
+        "title": "Open GitHub Repository",
+        "category": "UNG",
+        "icon": "$(github)"
+      },
+      {
+        "command": "ung.reportIssue",
+        "title": "Report an Issue",
+        "category": "UNG",
+        "icon": "$(bug)"
+      },
+      {
+        "command": "ung.recheckCli",
+        "title": "Recheck CLI Installation",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.refreshGettingStarted",
+        "title": "Refresh Quick Setup",
+        "category": "UNG",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -258,14 +313,19 @@
     "views": {
       "ung": [
         {
+          "id": "ungWelcome",
+          "name": "Get Started",
+          "when": "!ung.cliInstalled"
+        },
+        {
           "id": "ungDashboard",
           "name": "Dashboard",
           "when": "ung.cliInstalled"
         },
         {
-          "id": "ungWelcome",
-          "name": "Welcome",
-          "when": "!ung.cliInstalled"
+          "id": "ungGettingStarted",
+          "name": "Quick Setup",
+          "when": "ung.cliInstalled"
         },
         {
           "id": "ungInvoices",
@@ -294,14 +354,13 @@
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "ungWelcome",
-        "contents": "UNG CLI is not installed.\n\nInstall it to manage invoices, contracts, clients, expenses and track your time.\n\n[$(cloud-download) Install UNG CLI](command:ung.installCli)\n\n[View on GitHub](https://github.com/Andriiklymiuk/ung)"
-      }
-    ],
     "menus": {
       "view/title": [
+        {
+          "command": "ung.recheckCli",
+          "when": "view == ungWelcome",
+          "group": "navigation"
+        },
         {
           "command": "ung.checkForUpdates",
           "when": "view == ungDashboard",
@@ -311,6 +370,16 @@
           "command": "ung.refreshDashboard",
           "when": "view == ungDashboard",
           "group": "navigation@2"
+        },
+        {
+          "command": "ung.refreshGettingStarted",
+          "when": "view == ungGettingStarted",
+          "group": "navigation"
+        },
+        {
+          "command": "ung.openDocs",
+          "when": "view == ungGettingStarted",
+          "group": "navigation"
         },
         {
           "command": "ung.createInvoice",

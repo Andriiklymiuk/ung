@@ -98,7 +98,12 @@ release:
 	@echo "✓ Version bumped, committed, tagged v$(NEW_VERSION), and pushed. Release workflow triggered."
 
 release-vs-code-extension:
-	cd vscode-ung && npm run compile && vsce package patch && vsce publish
+	cd vscode-ung && npm run compile
+	cd vscode-ung && vsce package patch
+	cd vscode-ung && git add .
+	cd vscode-ung && git commit -m "vscode: release new version"
+	cd vscode-ung && git push
+	cd vscode-ung && vsce publish
 
 # Help
 help:
@@ -114,4 +119,5 @@ help:
 	@echo "  dev        - Build with race detector"
 	@echo "  build-all  - Cross-compile for all platforms"
 	@echo "  release    - Create and push a release tag (auto-bumps patch, or: make release v=1.2.3)"
+	@echo "  release-vs-code-extension - Compile, package, commit, push and publish VS Code extension"
 	@echo "  help       - Show this help message"

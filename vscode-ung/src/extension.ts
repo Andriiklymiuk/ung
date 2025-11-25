@@ -397,6 +397,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '$(credit-card) Log Expense', command: 'ung.logExpense' },
                 { label: '$(watch) Pomodoro Timer', command: 'ung.startPomodoro' },
                 { label: '$(sync) Recurring Invoices', command: 'ung.manageRecurring' },
+                { label: '$(export) Export Data', command: 'ung.exportData' },
                 { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
             ];
 
@@ -515,6 +516,62 @@ export async function activate(context: vscode.ExtensionContext) {
                     break;
                 }
             }
+        })
+    );
+
+    // Export data command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.exportData', async () => {
+            const formats = [
+                { label: '$(file) CSV (Universal)', value: 'csv', description: 'Works with any spreadsheet' },
+                { label: '$(book) QuickBooks (IIF)', value: 'quickbooks', description: 'Import into QuickBooks' },
+                { label: '$(json) JSON (Custom)', value: 'json', description: 'For custom integrations' }
+            ];
+
+            const format = await vscode.window.showQuickPick(formats, {
+                placeHolder: 'Select export format',
+                title: 'Export Data'
+            });
+
+            if (!format) return;
+
+            const dataTypes = [
+                { label: '$(file-text) Invoices', value: 'invoices', picked: true },
+                { label: '$(credit-card) Expenses', value: 'expenses', picked: true },
+                { label: '$(clock) Time Tracking', value: 'time', picked: true }
+            ];
+
+            const selected = await vscode.window.showQuickPick(dataTypes, {
+                placeHolder: 'Select data to export',
+                canPickMany: true,
+                title: 'What to Export'
+            });
+
+            if (!selected || selected.length === 0) return;
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Exporting data...'
+            }, async () => {
+                const result = await cli.exportData(format.value, selected.map(s => s.value));
+                if (result.success) {
+                    const openFolder = await vscode.window.showInformationMessage(
+                        'Export complete! Files saved to ~/.ung/exports',
+                        'Open Folder',
+                        'Show Output'
+                    );
+                    if (openFolder === 'Open Folder') {
+                        const homeDir = process.env.HOME || '';
+                        vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(`${homeDir}/.ung/exports`));
+                    } else if (openFolder === 'Show Output') {
+                        outputChannel.clear();
+                        outputChannel.appendLine(result.stdout || 'Export completed');
+                        outputChannel.show();
+                    }
+                } else {
+                    vscode.window.showErrorMessage(`Export failed: ${result.error}`);
+                }
+            });
         })
     );
 

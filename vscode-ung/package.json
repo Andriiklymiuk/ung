@@ -373,6 +373,12 @@
         "title": "Start Pomodoro Timer",
         "category": "UNG",
         "icon": "$(watch)"
+      },
+      {
+        "command": "ung.exportData",
+        "title": "Export Data for Accounting",
+        "category": "UNG",
+        "icon": "$(export)"
       }
     ],
     "viewsContainers": {

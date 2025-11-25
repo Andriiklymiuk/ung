@@ -1,450 +1,223 @@
 import * as vscode from 'vscode';
 import { UngCli } from '../cli/ungCli';
-import { BaseCommand } from '../utils/baseCommand';
-import { NotificationManager } from '../utils/notifications';
-import { Formatter } from '../utils/formatting';
 
-/**
- * Search result item
- */
 interface SearchResult {
-    type: 'invoice' | 'client' | 'contract' | 'expense';
+    type: 'invoice' | 'contract' | 'client' | 'expense' | 'time';
     id: number;
     label: string;
     description: string;
-    detail?: string;
+    detail: string;
 }
 
 /**
- * Search command handlers
+ * Universal search across all UNG data
  */
-export class SearchCommands extends BaseCommand {
-    constructor(cli: UngCli) {
-        super(cli);
-    }
+export class SearchCommands {
+    constructor(private cli: UngCli) {}
 
     /**
-     * Global search across all entities
+     * Show universal search dialog
      */
-    async globalSearch(): Promise<void> {
-        const query = await this.getInput('Search', {
-            placeholder: 'Search invoices, clients, contracts, expenses...',
-            required: true
+    async universalSearch(): Promise<void> {
+        const quickPick = vscode.window.createQuickPick<SearchResult & vscode.QuickPickItem>();
+        quickPick.placeholder = 'Search invoices, contracts, clients, expenses...';
+        quickPick.matchOnDescription = true;
+        quickPick.matchOnDetail = true;
+
+        quickPick.busy = true;
+        const allResults = await this.loadAllData();
+        quickPick.items = allResults;
+        quickPick.busy = false;
+
+        quickPick.onDidChangeValue(value => {
+            if (!value) {
+                quickPick.items = allResults;
+            }
         });
 
-        if (!query) {
-            return;
-        }
-
-        await NotificationManager.withProgress(
-            'Searching...',
-            async () => {
-                const results = await this.performSearch(query);
-
-                if (results.length === 0) {
-                    NotificationManager.info(`No results found for "${query}"`);
-                    return;
-                }
-
-                await this.showSearchResults(results, query);
+        quickPick.onDidAccept(async () => {
+            const selected = quickPick.selectedItems[0];
+            if (selected) {
+                quickPick.hide();
+                await this.handleSelection(selected);
             }
-        );
+        });
+
+        quickPick.onDidHide(() => quickPick.dispose());
+        quickPick.show();
     }
 
-    /**
-     * Search invoices
-     */
     async searchInvoices(): Promise<void> {
-        const query = await this.getInput('Search Invoices', {
-            placeholder: 'Search by invoice number, client, amount...',
-            required: true
-        });
-
-        if (!query) {
-            return;
-        }
-
-        await NotificationManager.withProgress(
-            'Searching invoices...',
-            async () => {
-                const results = await this.searchInvoiceData(query);
-                await this.showSearchResults(results, query);
-            }
-        );
-    }
-
-    /**
-     * Search clients
-     */
-    async searchClients(): Promise<void> {
-        const query = await this.getInput('Search Clients', {
-            placeholder: 'Search by name, email...',
-            required: true
-        });
-
-        if (!query) {
-            return;
-        }
-
-        await NotificationManager.withProgress(
-            'Searching clients...',
-            async () => {
-                const results = await this.searchClientData(query);
-                await this.showSearchResults(results, query);
-            }
-        );
-    }
-
-    /**
-     * Filter invoices by status
-     */
-    async filterInvoicesByStatus(): Promise<void> {
-        const status = await this.showQuickPick([
-            { label: 'Paid', description: 'Show paid invoices' },
-            { label: 'Pending', description: 'Show pending invoices' },
-            { label: 'Overdue', description: 'Show overdue invoices' },
-            { label: 'All', description: 'Show all invoices' }
-        ], {
-            placeHolder: 'Select invoice status to filter'
-        });
-
-        if (!status) {
-            return;
-        }
-
-        await NotificationManager.withProgress(
-            'Filtering invoices...',
-            async () => {
-                const results = await this.getInvoicesByStatus(status.label);
-                await this.showSearchResults(results, `Status: ${status.label}`);
-            }
-        );
-    }
-
-    /**
-     * Filter invoices by date range
-     */
-    async filterInvoicesByDateRange(): Promise<void> {
-        const rangeType = await this.showQuickPick([
-            { label: 'This Month', description: 'Invoices from current month' },
-            { label: 'Last Month', description: 'Invoices from last month' },
-            { label: 'This Quarter', description: 'Invoices from current quarter' },
-            { label: 'This Year', description: 'Invoices from current year' },
-            { label: 'Custom Range', description: 'Specify custom date range' }
-        ], {
-            placeHolder: 'Select date range'
-        });
-
-        if (!rangeType) {
-            return;
-        }
-
-        let startDate: string;
-        let endDate: string;
-
-        if (rangeType.label === 'Custom Range') {
-            const start = await this.getDateInput('Start Date', { required: true });
-            const end = await this.getDateInput('End Date', { required: true });
-
-            if (!start || !end) {
-                return;
-            }
-
-            startDate = start;
-            endDate = end;
-        } else {
-            const dates = this.getDateRangeForPeriod(rangeType.label);
-            startDate = dates.start;
-            endDate = dates.end;
-        }
-
-        await NotificationManager.withProgress(
-            'Filtering invoices...',
-            async () => {
-                const results = await this.getInvoicesByDateRange(startDate, endDate);
-                await this.showSearchResults(
-                    results,
-                    `${rangeType.label}: ${startDate} to ${endDate}`
-                );
-            }
-        );
-    }
-
-    /**
-     * Perform global search
-     */
-    private async performSearch(query: string): Promise<SearchResult[]> {
-        const results: SearchResult[] = [];
-
-        // Search invoices
-        const invoiceResults = await this.searchInvoiceData(query);
-        results.push(...invoiceResults);
-
-        // Search clients
-        const clientResults = await this.searchClientData(query);
-        results.push(...clientResults);
-
-        // Search contracts
-        const contractResults = await this.searchContractData(query);
-        results.push(...contractResults);
-
-        // Search expenses
-        const expenseResults = await this.searchExpenseData(query);
-        results.push(...expenseResults);
-
-        return results;
-    }
-
-    /**
-     * Search invoice data
-     */
-    private async searchInvoiceData(query: string): Promise<SearchResult[]> {
-        const result = await this.cli.listInvoices();
-        if (!result.success || !result.stdout) {
-            return [];
-        }
-
-        const results: SearchResult[] = [];
-        const lowerQuery = query.toLowerCase();
-        const lines = this.parseListOutput(result.stdout);
-
-        for (const parts of lines) {
-            if (parts.length >= 6) {
-                const id = parseInt(parts[0]);
-                const invoiceNum = parts[1];
-                const amount = parts[2];
-                const status = parts[3];
-                const client = parts[4];
-                const dueDate = parts[5];
-
-                const searchText = `${invoiceNum} ${client} ${amount} ${status}`.toLowerCase();
-                if (searchText.includes(lowerQuery)) {
-                    results.push({
-                        type: 'invoice',
-                        id,
-                        label: `${invoiceNum} - ${client}`,
-                        description: `${amount} • ${status}`,
-                        detail: `Due: ${dueDate}`
-                    });
-                }
-            }
-        }
-
-        return results;
-    }
-
-    /**
-     * Search client data
-     */
-    private async searchClientData(query: string): Promise<SearchResult[]> {
-        const result = await this.cli.listClients();
-        if (!result.success || !result.stdout) {
-            return [];
-        }
-
-        const results: SearchResult[] = [];
-        const lowerQuery = query.toLowerCase();
-        const lines = this.parseListOutput(result.stdout);
-
-        for (const parts of lines) {
-            if (parts.length >= 3) {
-                const id = parseInt(parts[0]);
-                const name = parts[1];
-                const email = parts[2];
-
-                const searchText = `${name} ${email}`.toLowerCase();
-                if (searchText.includes(lowerQuery)) {
-                    results.push({
-                        type: 'client',
-                        id,
-                        label: name,
-                        description: email,
-                        detail: 'Client'
-                    });
-                }
-            }
-        }
-
-        return results;
-    }
-
-    /**
-     * Search contract data
-     */
-    private async searchContractData(query: string): Promise<SearchResult[]> {
-        const result = await this.cli.listContracts();
-        if (!result.success || !result.stdout) {
-            return [];
-        }
-
-        const results: SearchResult[] = [];
-        const lowerQuery = query.toLowerCase();
-        const lines = this.parseListOutput(result.stdout);
-
-        for (const parts of lines) {
-            if (parts.length >= 4) {
-                const id = parseInt(parts[0]);
-                const client = parts[1];
-                const type = parts[2];
-                const rate = parts[3];
-
-                const searchText = `${client} ${type} ${rate}`.toLowerCase();
-                if (searchText.includes(lowerQuery)) {
-                    results.push({
-                        type: 'contract',
-                        id,
-                        label: `${client} - ${type}`,
-                        description: rate,
-                        detail: 'Contract'
-                    });
-                }
-            }
-        }
-
-        return results;
-    }
-
-    /**
-     * Search expense data
-     */
-    private async searchExpenseData(query: string): Promise<SearchResult[]> {
-        const result = await this.cli.listExpenses();
-        if (!result.success || !result.stdout) {
-            return [];
-        }
-
-        const results: SearchResult[] = [];
-        const lowerQuery = query.toLowerCase();
-        const lines = this.parseListOutput(result.stdout);
-
-        for (const parts of lines) {
-            if (parts.length >= 4) {
-                const id = parseInt(parts[0]);
-                const description = parts[1];
-                const amount = parts[2];
-                const date = parts[3];
-
-                const searchText = `${description} ${amount}`.toLowerCase();
-                if (searchText.includes(lowerQuery)) {
-                    results.push({
-                        type: 'expense',
-                        id,
-                        label: description,
-                        description: amount,
-                        detail: `Date: ${date}`
-                    });
-                }
-            }
-        }
-
-        return results;
-    }
-
-    /**
-     * Get invoices by status
-     */
-    private async getInvoicesByStatus(status: string): Promise<SearchResult[]> {
-        if (status === 'All') {
-            return this.searchInvoiceData('');
-        }
-        return this.searchInvoiceData(status);
-    }
-
-    /**
-     * Get invoices by date range
-     */
-    private async getInvoicesByDateRange(startDate: string, endDate: string): Promise<SearchResult[]> {
-        const allInvoices = await this.searchInvoiceData('');
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        return allInvoices.filter(invoice => {
-            if (!invoice.detail) return false;
-            const dueDateMatch = invoice.detail.match(/Due: (\d{4}-\d{2}-\d{2})/);
-            if (!dueDateMatch) return false;
-
-            const dueDate = new Date(dueDateMatch[1]);
-            return dueDate >= start && dueDate <= end;
-        });
-    }
-
-    /**
-     * Get date range for period
-     */
-    private getDateRangeForPeriod(period: string): { start: string; end: string } {
-        const now = new Date();
-        let start: Date;
-        let end: Date = now;
-
-        switch (period) {
-            case 'This Month':
-                start = new Date(now.getFullYear(), now.getMonth(), 1);
-                break;
-            case 'Last Month':
-                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                end = new Date(now.getFullYear(), now.getMonth(), 0);
-                break;
-            case 'This Quarter':
-                const quarter = Math.floor(now.getMonth() / 3);
-                start = new Date(now.getFullYear(), quarter * 3, 1);
-                break;
-            case 'This Year':
-                start = new Date(now.getFullYear(), 0, 1);
-                break;
-            default:
-                start = new Date(now.getFullYear(), now.getMonth(), 1);
-        }
-
-        return {
-            start: Formatter.formatDate(start),
-            end: Formatter.formatDate(end)
-        };
-    }
-
-    /**
-     * Show search results
-     */
-    private async showSearchResults(results: SearchResult[], query: string): Promise<void> {
-        if (results.length === 0) {
-            NotificationManager.info(`No results found for "${query}"`);
-            return;
-        }
-
-        const quickPickItems = results.map(result => ({
-            label: result.label,
-            description: result.description,
-            detail: result.detail,
-            result
-        }));
-
-        const selected = await vscode.window.showQuickPick(quickPickItems, {
-            placeHolder: `${results.length} result(s) for "${query}"`,
+        const results = await this.loadInvoices();
+        const selected = await vscode.window.showQuickPick(results, {
+            placeHolder: 'Search invoices...',
             matchOnDescription: true,
             matchOnDetail: true
         });
+        if (selected) await this.handleSelection(selected);
+    }
 
-        if (selected) {
-            await this.openSearchResult(selected.result);
+    async searchContracts(): Promise<void> {
+        const results = await this.loadContracts();
+        const selected = await vscode.window.showQuickPick(results, {
+            placeHolder: 'Search contracts...',
+            matchOnDescription: true,
+            matchOnDetail: true
+        });
+        if (selected) await this.handleSelection(selected);
+    }
+
+    async searchClients(): Promise<void> {
+        const results = await this.loadClients();
+        const selected = await vscode.window.showQuickPick(results, {
+            placeHolder: 'Search clients...',
+            matchOnDescription: true,
+            matchOnDetail: true
+        });
+        if (selected) await this.handleSelection(selected);
+    }
+
+    private async loadAllData(): Promise<Array<SearchResult & vscode.QuickPickItem>> {
+        const [invoices, contracts, clients, expenses] = await Promise.all([
+            this.loadInvoices(),
+            this.loadContracts(),
+            this.loadClients(),
+            this.loadExpenses()
+        ]);
+        return [...invoices, ...contracts, ...clients, ...expenses];
+    }
+
+    private async loadInvoices(): Promise<Array<SearchResult & vscode.QuickPickItem>> {
+        const result = await this.cli.listInvoices();
+        if (!result.success || !result.stdout) return [];
+        const lines = result.stdout.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        const items: Array<SearchResult & vscode.QuickPickItem> = [];
+        for (const line of lines.slice(1)) {
+            const parts = line.split(/\s{2,}/).filter((p: string) => p.trim());
+            const id = parseInt(parts[0], 10);
+            if (!isNaN(id)) {
+                items.push({
+                    type: 'invoice',
+                    id,
+                    label: `$(file-text) ${parts[1] || ''}`,
+                    description: `${parts[2] || 'Unknown'} - ${parts[3] || ''}`,
+                    detail: `Invoice - ${parts[4] || ''}`
+                });
+            }
+        }
+        return items;
+    }
+
+    private async loadContracts(): Promise<Array<SearchResult & vscode.QuickPickItem>> {
+        const result = await this.cli.listContracts();
+        if (!result.success || !result.stdout) return [];
+        const lines = result.stdout.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        const items: Array<SearchResult & vscode.QuickPickItem> = [];
+        for (const line of lines.slice(1)) {
+            const parts = line.split(/\s{2,}/).filter((p: string) => p.trim());
+            const id = parseInt(parts[0], 10);
+            if (!isNaN(id)) {
+                const isActive = line.includes('✓');
+                items.push({
+                    type: 'contract',
+                    id,
+                    label: `$(file-code) ${parts[2] || 'Unknown'}`,
+                    description: `${parts[3] || ''} - ${parts[4] || ''} - ${parts[5] || ''}`,
+                    detail: `Contract - ${isActive ? 'Active' : 'Inactive'}`
+                });
+            }
+        }
+        return items;
+    }
+
+    private async loadClients(): Promise<Array<SearchResult & vscode.QuickPickItem>> {
+        const result = await this.cli.listClients();
+        if (!result.success || !result.stdout) return [];
+        const lines = result.stdout.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        const items: Array<SearchResult & vscode.QuickPickItem> = [];
+        for (const line of lines.slice(1)) {
+            const parts = line.split(/\s{2,}/).filter((p: string) => p.trim());
+            const id = parseInt(parts[0], 10);
+            if (!isNaN(id)) {
+                items.push({
+                    type: 'client',
+                    id,
+                    label: `$(person) ${parts[1] || 'Unknown'}`,
+                    description: parts[2] || '',
+                    detail: 'Client'
+                });
+            }
+        }
+        return items;
+    }
+
+    private async loadExpenses(): Promise<Array<SearchResult & vscode.QuickPickItem>> {
+        const result = await this.cli.listExpenses();
+        if (!result.success || !result.stdout) return [];
+        const lines = result.stdout.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        const items: Array<SearchResult & vscode.QuickPickItem> = [];
+        for (const line of lines.slice(1)) {
+            const parts = line.split(/\s{2,}/).filter((p: string) => p.trim());
+            const id = parseInt(parts[0], 10);
+            if (!isNaN(id)) {
+                items.push({
+                    type: 'expense',
+                    id,
+                    label: `$(credit-card) ${parts[4] || parts[3] || 'Expense'}`,
+                    description: `${parts[1] || ''} - ${parts[2] || ''}`,
+                    detail: `Expense - ${parts[3] || ''}`
+                });
+            }
+        }
+        return items;
+    }
+
+    private async handleSelection(selected: SearchResult): Promise<void> {
+        const actions = this.getActionsForType(selected.type);
+        const action = await vscode.window.showQuickPick(actions, {
+            placeHolder: `Actions for ${selected.label.replace(/\$\([^)]+\)\s*/, '')}`
+        });
+        if (action) {
+            await vscode.commands.executeCommand(action.command, { itemId: selected.id });
         }
     }
 
-    /**
-     * Open selected search result
-     */
-    private async openSearchResult(result: SearchResult): Promise<void> {
-        switch (result.type) {
+    private getActionsForType(type: string): Array<{ label: string; command: string }> {
+        switch (type) {
             case 'invoice':
-                await vscode.commands.executeCommand('ung.viewInvoice', { id: result.id });
-                break;
-            case 'client':
-                await vscode.commands.executeCommand('ung.editClient', { id: result.id });
-                break;
+                return [
+                    { label: '$(eye) View Invoice', command: 'ung.viewInvoice' },
+                    { label: '$(file-pdf) Export PDF', command: 'ung.exportInvoice' },
+                    { label: '$(mail) Email Invoice', command: 'ung.emailInvoice' },
+                    { label: '$(check) Mark as Paid', command: 'ung.markInvoicePaid' },
+                    { label: '$(edit) Edit Invoice', command: 'ung.editInvoice' }
+                ];
             case 'contract':
-                await vscode.commands.executeCommand('ung.viewContract', { id: result.id });
-                break;
+                return [
+                    { label: '$(eye) View Contract', command: 'ung.viewContract' },
+                    { label: '$(file-pdf) Generate PDF', command: 'ung.generateContractPDF' },
+                    { label: '$(edit) Edit Contract', command: 'ung.editContract' }
+                ];
+            case 'client':
+                return [
+                    { label: '$(edit) Edit Client', command: 'ung.editClient' },
+                    { label: '$(trash) Delete Client', command: 'ung.deleteClient' }
+                ];
             case 'expense':
-                await vscode.commands.executeCommand('ung.editExpense', { id: result.id });
-                break;
+                return [
+                    { label: '$(edit) Edit Expense', command: 'ung.editExpense' },
+                    { label: '$(trash) Delete Expense', command: 'ung.deleteExpense' }
+                ];
+            default:
+                return [];
         }
     }
 }

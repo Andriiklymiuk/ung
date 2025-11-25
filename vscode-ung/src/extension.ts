@@ -6,6 +6,7 @@ import { ContractCommands } from './commands/contract';
 import { InvoiceCommands } from './commands/invoice';
 import { ExpenseCommands } from './commands/expense';
 import { TrackingCommands } from './commands/tracking';
+import { SearchCommands } from './commands/search';
 import { InvoiceProvider } from './views/invoiceProvider';
 import { ContractProvider } from './views/contractProvider';
 import { ClientProvider } from './views/clientProvider';
@@ -14,6 +15,7 @@ import { TrackingProvider } from './views/trackingProvider';
 import { DashboardProvider } from './views/dashboardProvider';
 import { WelcomeProvider, GettingStartedProvider } from './views/welcomeProvider';
 import { ExportPanel } from './webview/exportPanel';
+import { StatisticsPanel } from './webview/statisticsPanel';
 import { StatusBarManager } from './utils/statusBar';
 
 /**
@@ -343,6 +345,78 @@ export async function activate(context: vscode.ExtensionContext) {
     // Export wizard command
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.openExportWizard', () => ExportPanel.createOrShow(cli))
+    );
+
+    // Statistics panel command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.openStatistics', () => StatisticsPanel.createOrShow(cli))
+    );
+
+    // Search commands
+    const searchCommands = new SearchCommands(cli);
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.search', () => searchCommands.universalSearch()),
+        vscode.commands.registerCommand('ung.searchInvoices', () => searchCommands.searchInvoices()),
+        vscode.commands.registerCommand('ung.searchContracts', () => searchCommands.searchContracts()),
+        vscode.commands.registerCommand('ung.searchClients', () => searchCommands.searchClients())
+    );
+
+    // Duplicate invoice command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.duplicateInvoice', (item) => invoiceCommands.duplicateInvoice(item?.itemId))
+    );
+
+    // Toggle tracking command (for status bar)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.toggleTracking', async () => {
+            if (statusBar.getIsTracking()) {
+                await trackingCommands.stopTracking();
+            } else {
+                await trackingCommands.startTracking();
+            }
+            await statusBar.forceUpdate();
+        })
+    );
+
+    // Quick actions command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.quickActions', async () => {
+            const actions = [
+                { label: '$(play) Start Time Tracking', command: 'ung.startTracking' },
+                { label: '$(debug-stop) Stop Time Tracking', command: 'ung.stopTracking' },
+                { label: '$(add) Log Time Manually', command: 'ung.logTimeManually' },
+                { label: '$(file-add) Create Invoice', command: 'ung.createInvoice' },
+                { label: '$(file-code) Create Contract', command: 'ung.createContract' },
+                { label: '$(person-add) Add Client', command: 'ung.createClient' },
+                { label: '$(search) Search Everything', command: 'ung.search' },
+                { label: '$(graph) View Statistics', command: 'ung.openStatistics' },
+                { label: '$(credit-card) Log Expense', command: 'ung.logExpense' },
+                { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
+            ];
+
+            const selected = await vscode.window.showQuickPick(actions, {
+                placeHolder: 'UNG Quick Actions'
+            });
+
+            if (selected) {
+                vscode.commands.executeCommand(selected.command);
+            }
+        })
+    );
+
+    // Refresh all command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.refreshAll', () => {
+            invoiceProvider.refresh();
+            contractProvider.refresh();
+            clientProvider.refresh();
+            expenseProvider.refresh();
+            trackingProvider.refresh();
+            dashboardProvider.refresh();
+            gettingStartedProvider.refresh();
+            statusBar.forceUpdate();
+            vscode.window.showInformationMessage('All views refreshed!');
+        })
     );
 
     // Show welcome message

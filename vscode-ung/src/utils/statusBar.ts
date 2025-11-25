@@ -8,17 +8,38 @@ import { Config } from './config';
  */
 export class StatusBarManager {
     private statusBarItem: vscode.StatusBarItem;
+    private earningsItem: vscode.StatusBarItem;
+    private quickActionItem: vscode.StatusBarItem;
     private cli: UngCli;
     private updateInterval: NodeJS.Timeout | null = null;
     private activeSessionData: any = null;
+    private isTracking: boolean = false;
 
     constructor(cli: UngCli) {
         this.cli = cli;
+
+        // Main tracking status bar item
         this.statusBarItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Left,
             100
         );
-        this.statusBarItem.command = 'ung.viewActiveSession';
+        this.statusBarItem.command = 'ung.toggleTracking';
+
+        // Earnings today item
+        this.earningsItem = vscode.window.createStatusBarItem(
+            vscode.StatusBarAlignment.Left,
+            99
+        );
+        this.earningsItem.command = 'ung.openStatistics';
+
+        // Quick action button
+        this.quickActionItem = vscode.window.createStatusBarItem(
+            vscode.StatusBarAlignment.Left,
+            98
+        );
+        this.quickActionItem.text = '$(add)';
+        this.quickActionItem.tooltip = 'UNG Quick Actions';
+        this.quickActionItem.command = 'ung.quickActions';
     }
 
     /**
@@ -31,11 +52,20 @@ export class StatusBarManager {
 
         // Update immediately
         await this.update();
+        await this.updateEarnings();
+
+        // Show quick action button
+        this.quickActionItem.show();
 
         // Update every 5 seconds
         this.updateInterval = setInterval(() => {
             this.update();
         }, 5000);
+
+        // Update earnings every minute
+        setInterval(() => {
+            this.updateEarnings();
+        }, 60000);
     }
 
     /**
@@ -47,6 +77,8 @@ export class StatusBarManager {
             this.updateInterval = null;
         }
         this.statusBarItem.hide();
+        this.earningsItem.hide();
+        this.quickActionItem.hide();
     }
 
     /**
@@ -65,27 +97,93 @@ export class StatusBarManager {
             const output = result.stdout;
 
             if (output.includes('No active tracking session')) {
-                this.statusBarItem.hide();
+                this.isTracking = false;
+                this.statusBarItem.text = '$(play) Start Tracking';
+                this.statusBarItem.tooltip = 'Click to start time tracking';
+                this.statusBarItem.backgroundColor = undefined;
+                this.statusBarItem.show();
                 this.activeSessionData = null;
             } else {
                 // Parse session data from output
                 this.activeSessionData = this.parseSessionData(output);
+                this.isTracking = true;
 
                 if (this.activeSessionData) {
                     const elapsed = this.calculateElapsed(this.activeSessionData.started);
                     const project = this.activeSessionData.project || 'Tracking';
 
-                    this.statusBarItem.text = `$(clock) ${Formatter.formatDuration(elapsed)} - ${project}`;
-                    this.statusBarItem.tooltip = `Active Time Tracking\nProject: ${project}\nStarted: ${this.activeSessionData.started}\nClick to view details`;
+                    this.statusBarItem.text = `$(debug-stop) ${Formatter.formatDuration(elapsed)} - ${project}`;
+                    this.statusBarItem.tooltip = `Active Time Tracking\nProject: ${project}\nStarted: ${this.activeSessionData.started}\nClick to stop`;
+                    this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
                     this.statusBarItem.show();
                 } else {
-                    this.statusBarItem.hide();
+                    this.isTracking = false;
+                    this.statusBarItem.text = '$(play) Start Tracking';
+                    this.statusBarItem.tooltip = 'Click to start time tracking';
+                    this.statusBarItem.backgroundColor = undefined;
+                    this.statusBarItem.show();
                 }
             }
         } else {
-            this.statusBarItem.hide();
+            this.isTracking = false;
+            this.statusBarItem.text = '$(play) Start Tracking';
+            this.statusBarItem.tooltip = 'Click to start time tracking';
+            this.statusBarItem.backgroundColor = undefined;
+            this.statusBarItem.show();
             this.activeSessionData = null;
         }
+    }
+
+    /**
+     * Update earnings display
+     */
+    async updateEarnings(): Promise<void> {
+        if (!Config.shouldShowStatusBar()) {
+            this.earningsItem.hide();
+            return;
+        }
+
+        try {
+            const result = await this.cli.listTimeEntries();
+            if (result.success && result.stdout) {
+                const today = new Date().toISOString().split('T')[0];
+                const lines = result.stdout.trim().split('\n');
+
+                let todayHours = 0;
+
+                for (const line of lines.slice(1)) {
+                    const parts = line.split(/\s{2,}/).filter((p: string) => p.trim());
+                    if (parts.length >= 3) {
+                        const dateStr = parts[1] || '';
+                        if (dateStr.includes(today.slice(5))) { // Match MM-DD
+                            const hoursMatch = parts[2]?.match(/([\d.]+)\s*h/);
+                            if (hoursMatch) {
+                                todayHours += parseFloat(hoursMatch[1]);
+                            }
+                        }
+                    }
+                }
+
+                if (todayHours > 0) {
+                    this.earningsItem.text = `$(graph) ${todayHours.toFixed(1)}h today`;
+                    this.earningsItem.tooltip = `Hours tracked today: ${todayHours.toFixed(1)}h\nClick to view statistics`;
+                    this.earningsItem.show();
+                } else {
+                    this.earningsItem.text = '$(graph) 0h today';
+                    this.earningsItem.tooltip = 'No time tracked today\nClick to view statistics';
+                    this.earningsItem.show();
+                }
+            }
+        } catch {
+            this.earningsItem.hide();
+        }
+    }
+
+    /**
+     * Check if currently tracking
+     */
+    getIsTracking(): boolean {
+        return this.isTracking;
     }
 
     /**
@@ -134,5 +232,7 @@ export class StatusBarManager {
     dispose(): void {
         this.stop();
         this.statusBarItem.dispose();
+        this.earningsItem.dispose();
+        this.quickActionItem.dispose();
     }
 }

@@ -37,4 +37,7 @@ func init() {
 	updateCmd.Use = "update"
 	updateCmd.Aliases = []string{}
 	rootCmd.AddCommand(&updateCmd)
+
+	// Documentation generation
+	rootCmd.AddCommand(docsCmd)
 }

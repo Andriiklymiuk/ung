@@ -1,0 +1,110 @@
+// @ts-check
+
+/** @type {import('@docusaurus/types').Config} */
+const config = {
+  title: 'UNG',
+  tagline: 'Universal Next-Gen Billing & Tracking CLI',
+  url: 'https://andriiklymiuk.github.io',
+  baseUrl: '/ung/',
+  onBrokenLinks: 'throw',
+  onBrokenMarkdownLinks: 'warn',
+  favicon: 'img/favicon.ico',
+
+  organizationName: 'Andriiklymiuk',
+  projectName: 'ung',
+  deploymentBranch: 'gh-pages',
+  trailingSlash: false,
+
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en'],
+  },
+
+  presets: [
+    [
+      'classic',
+      /** @type {import('@docusaurus/preset-classic').Options} */
+      ({
+        docs: {
+          routeBasePath: '/',
+          sidebarPath: require.resolve('./sidebars.js'),
+          editUrl: 'https://github.com/Andriiklymiuk/ung/tree/main/ung-docs/',
+        },
+        blog: false,
+        theme: {
+          customCss: require.resolve('./src/css/custom.css'),
+        },
+      }),
+    ],
+  ],
+
+  themeConfig:
+    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+    ({
+      navbar: {
+        title: 'UNG',
+        logo: {
+          alt: 'UNG Logo',
+          src: 'img/logo.svg',
+        },
+        items: [
+          {
+            type: 'doc',
+            docId: 'intro',
+            position: 'left',
+            label: 'Docs',
+          },
+          {
+            type: 'doc',
+            docId: 'cli/ung',
+            position: 'left',
+            label: 'CLI Reference',
+          },
+          {
+            href: 'https://github.com/Andriiklymiuk/ung',
+            label: 'GitHub',
+            position: 'right',
+          },
+        ],
+      },
+      footer: {
+        style: 'dark',
+        links: [
+          {
+            title: 'Docs',
+            items: [
+              {
+                label: 'Introduction',
+                to: '/',
+              },
+              {
+                label: 'CLI Reference',
+                to: '/cli/ung',
+              },
+            ],
+          },
+          {
+            title: 'More',
+            items: [
+              {
+                label: 'GitHub',
+                href: 'https://github.com/Andriiklymiuk/ung',
+              },
+              {
+                label: 'Releases',
+                href: 'https://github.com/Andriiklymiuk/ung/releases',
+              },
+            ],
+          },
+        ],
+        copyright: `Copyright © ${new Date().getFullYear()} UNG. Built with Docusaurus.`,
+      },
+      prism: {
+        theme: require('prism-react-renderer').themes.github,
+        darkTheme: require('prism-react-renderer').themes.dracula,
+        additionalLanguages: ['bash', 'go'],
+      },
+    }),
+};
+
+module.exports = config;

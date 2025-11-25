@@ -395,6 +395,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '$(search) Search Everything', command: 'ung.search' },
                 { label: '$(graph) View Statistics', command: 'ung.openStatistics' },
                 { label: '$(credit-card) Log Expense', command: 'ung.logExpense' },
+                { label: '$(sync) Recurring Invoices', command: 'ung.manageRecurring' },
                 { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
             ];
 
@@ -420,6 +421,75 @@ export async function activate(context: vscode.ExtensionContext) {
             gettingStartedProvider.refresh();
             statusBar.forceUpdate();
             vscode.window.showInformationMessage('All views refreshed!');
+        })
+    );
+
+    // Recurring invoice commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.manageRecurring', async () => {
+            const actions = [
+                { label: '$(list-flat) View Recurring Invoices', action: 'list' },
+                { label: '$(play) Generate Due Invoices', action: 'generate' },
+                { label: '$(add) Create New (opens terminal)', action: 'add' }
+            ];
+
+            const selected = await vscode.window.showQuickPick(actions, {
+                placeHolder: 'Manage Recurring Invoices',
+                title: 'Recurring Invoices'
+            });
+
+            if (!selected) return;
+
+            switch (selected.action) {
+                case 'list': {
+                    const result = await cli.listRecurringInvoices();
+                    if (result.success && result.stdout) {
+                        outputChannel.clear();
+                        outputChannel.appendLine('=== Recurring Invoices ===\n');
+                        outputChannel.appendLine(result.stdout);
+                        outputChannel.show();
+                    } else {
+                        vscode.window.showInformationMessage('No recurring invoices found. Use terminal to create one: ung recurring add');
+                    }
+                    break;
+                }
+                case 'generate': {
+                    const confirm = await vscode.window.showWarningMessage(
+                        'Generate all due recurring invoices?',
+                        { modal: true },
+                        'Generate',
+                        'Preview First'
+                    );
+
+                    if (confirm === 'Preview First') {
+                        const result = await cli.generateRecurringInvoices({ dryRun: true });
+                        outputChannel.clear();
+                        outputChannel.appendLine('=== Recurring Invoice Preview ===\n');
+                        outputChannel.appendLine(result.stdout || 'No invoices due');
+                        outputChannel.show();
+                    } else if (confirm === 'Generate') {
+                        await vscode.window.withProgress({
+                            location: vscode.ProgressLocation.Notification,
+                            title: 'Generating recurring invoices...'
+                        }, async () => {
+                            const result = await cli.generateRecurringInvoices();
+                            if (result.success) {
+                                vscode.window.showInformationMessage('Recurring invoices generated!');
+                                invoiceProvider.refresh();
+                            } else {
+                                vscode.window.showErrorMessage(`Failed: ${result.error}`);
+                            }
+                        });
+                    }
+                    break;
+                }
+                case 'add': {
+                    const terminal = vscode.window.createTerminal('UNG Recurring');
+                    terminal.show();
+                    terminal.sendText('ung recurring add');
+                    break;
+                }
+            }
         })
     );
 

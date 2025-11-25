@@ -314,6 +314,32 @@ func runInlineSchema() error {
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS recurring_invoices (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		client_id INTEGER NOT NULL,
+		contract_id INTEGER,
+		amount REAL NOT NULL,
+		currency TEXT DEFAULT 'USD',
+		description TEXT,
+		frequency TEXT NOT NULL,
+		day_of_month INTEGER DEFAULT 1,
+		day_of_week INTEGER DEFAULT 1,
+		next_generation_date TIMESTAMP NOT NULL,
+		last_generated_date TIMESTAMP,
+		last_invoice_id INTEGER,
+		active BOOLEAN DEFAULT 1,
+		auto_send BOOLEAN DEFAULT 0,
+		auto_pdf BOOLEAN DEFAULT 1,
+		email_app TEXT,
+		generated_count INTEGER DEFAULT 0,
+		notes TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (client_id) REFERENCES clients(id),
+		FOREIGN KEY (contract_id) REFERENCES contracts(id),
+		FOREIGN KEY (last_invoice_id) REFERENCES invoices(id)
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_invoices_company ON invoices(company_id);
 	CREATE INDEX IF NOT EXISTS idx_invoice_recipients_invoice ON invoice_recipients(invoice_id);
 	CREATE INDEX IF NOT EXISTS idx_invoice_recipients_client ON invoice_recipients(client_id);
@@ -322,6 +348,9 @@ func runInlineSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_contracts_client ON contracts(client_id);
 	CREATE INDEX IF NOT EXISTS idx_contracts_active ON contracts(active);
 	CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice ON invoice_line_items(invoice_id);
+	CREATE INDEX IF NOT EXISTS idx_recurring_invoices_client ON recurring_invoices(client_id);
+	CREATE INDEX IF NOT EXISTS idx_recurring_invoices_active ON recurring_invoices(active);
+	CREATE INDEX IF NOT EXISTS idx_recurring_invoices_next_date ON recurring_invoices(next_generation_date);
 	`
 
 	_, err := DB.Exec(schema)

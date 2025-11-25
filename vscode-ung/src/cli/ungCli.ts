@@ -530,4 +530,18 @@ export class UngCli {
         if (options?.autoTrack) args.push('--track');
         return this.exec(args);
     }
+
+    // ========== Export Commands ==========
+
+    /**
+     * Export data for accounting software
+     */
+    async exportData(format: string, dataTypes: string[], options?: { year?: number }): Promise<CliResult> {
+        const args = ['export', '--format', format];
+        for (const dt of dataTypes) {
+            args.push(`--${dt}`);
+        }
+        if (options?.year) args.push('--year', options.year.toString());
+        return this.exec(args);
+    }
 }

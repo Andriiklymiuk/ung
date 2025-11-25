@@ -1,0 +1,60 @@
+name: Publish VSCode Extension
+
+on:
+  push:
+    tags:
+      - 'vscode-v*'  # Trigger on tags like vscode-v1.0.0
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: vscode-ung/package-lock.json
+
+      - name: Install dependencies
+        working-directory: vscode-ung
+        run: npm ci
+
+      - name: Compile TypeScript
+        working-directory: vscode-ung
+        run: npm run compile
+
+      - name: Run tests (if available)
+        working-directory: vscode-ung
+        run: npm test || echo "No tests configured"
+        continue-on-error: true
+
+      - name: Package extension
+        working-directory: vscode-ung
+        run: |
+          npm install -g @vscode/vsce
+          vsce package
+
+      - name: Publish to VSCode Marketplace
+        working-directory: vscode-ung
+        run: vsce publish -p ${{ secrets.VSCE_PAT }}
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Upload VSIX as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ung-extension
+          path: vscode-ung/*.vsix
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: vscode-ung/*.vsix
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

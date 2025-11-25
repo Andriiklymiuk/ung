@@ -1,13 +1,12 @@
 import * as vscode from 'vscode';
 import { UngCli } from '../cli/ungCli';
-import { Formatter } from '../utils/formatting';
 
 /**
  * Contract tree item
  */
 export class ContractItem extends vscode.TreeItem {
     constructor(
-        public readonly id: number,
+        public readonly itemId: number,
         public readonly name: string,
         public readonly clientName: string,
         public readonly type: string,
@@ -17,6 +16,7 @@ export class ContractItem extends vscode.TreeItem {
     ) {
         super(name, collapsibleState);
 
+        this.id = String(itemId);
         this.tooltip = `${name}\nClient: ${clientName}\nType: ${type}\nRate: ${rate}\nActive: ${active}`;
         this.description = `${clientName} • ${rate}`;
         this.contextValue = 'contract';

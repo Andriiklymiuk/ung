@@ -1,13 +1,12 @@
 import * as vscode from 'vscode';
 import { UngCli } from '../cli/ungCli';
-import { Formatter } from '../utils/formatting';
 
 /**
  * Tracking session tree item
  */
 export class TrackingItem extends vscode.TreeItem {
     constructor(
-        public readonly id: number,
+        public readonly itemId: number,
         public readonly project: string,
         public readonly client: string,
         public readonly duration: string,
@@ -17,6 +16,7 @@ export class TrackingItem extends vscode.TreeItem {
     ) {
         super(project || 'Untitled Session', collapsibleState);
 
+        this.id = String(itemId);
         this.tooltip = `${project || 'Untitled Session'}\nClient: ${client}\nDuration: ${duration}\nDate: ${date}\nBillable: ${billable}`;
         this.description = `${client} • ${duration}`;
         this.contextValue = 'tracking';

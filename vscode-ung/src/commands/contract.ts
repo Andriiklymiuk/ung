@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
 import { UngCli } from '../cli/ungCli';
-import { Config } from '../utils/config';
 
 /**
  * Contract command handlers
  */
 export class ContractCommands {
-    constructor(private cli: UngCli, private refreshCallback?: () => void) {}
+    constructor(private cli: UngCli, private _refreshCallback?: () => void) {}
 
     /**
      * Create a new contract

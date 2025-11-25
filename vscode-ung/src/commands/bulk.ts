@@ -17,7 +17,7 @@ interface BulkItem {
  * Bulk operations command handlers
  */
 export class BulkCommands extends BaseCommand {
-    constructor(cli: UngCli, private refreshCallback?: () => void) {
+    constructor(cli: UngCli, refreshCallback?: () => void) {
         super(cli, refreshCallback);
     }
 

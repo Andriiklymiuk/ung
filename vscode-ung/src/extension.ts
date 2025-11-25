@@ -15,7 +15,6 @@ import { DashboardProvider } from './views/dashboardProvider';
 import { InvoicePanel } from './webview/invoicePanel';
 import { ExportPanel } from './webview/exportPanel';
 import { StatusBarManager } from './utils/statusBar';
-import { Config } from './utils/config';
 
 /**
  * Extension activation
@@ -104,8 +103,8 @@ export async function activate(context: vscode.ExtensionContext) {
     // Client commands
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.createClient', () => clientCommands.createClient()),
-        vscode.commands.registerCommand('ung.editClient', (item) => clientCommands.editClient(item?.id)),
-        vscode.commands.registerCommand('ung.deleteClient', (item) => clientCommands.deleteClient(item?.id)),
+        vscode.commands.registerCommand('ung.editClient', (item) => clientCommands.editClient(item?.itemId)),
+        vscode.commands.registerCommand('ung.deleteClient', (item) => clientCommands.deleteClient(item?.itemId)),
         vscode.commands.registerCommand('ung.listClients', () => clientCommands.listClients()),
         vscode.commands.registerCommand('ung.refreshClients', () => clientProvider.refresh())
     );
@@ -113,10 +112,10 @@ export async function activate(context: vscode.ExtensionContext) {
     // Contract commands
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.createContract', () => contractCommands.createContract()),
-        vscode.commands.registerCommand('ung.viewContract', (item) => contractCommands.viewContract(item?.id)),
-        vscode.commands.registerCommand('ung.editContract', (item) => contractCommands.editContract(item?.id)),
-        vscode.commands.registerCommand('ung.deleteContract', (item) => contractCommands.deleteContract(item?.id)),
-        vscode.commands.registerCommand('ung.generateContractPDF', (item) => contractCommands.generateContractPDF(item?.id)),
+        vscode.commands.registerCommand('ung.viewContract', (item) => contractCommands.viewContract(item?.itemId)),
+        vscode.commands.registerCommand('ung.editContract', (item) => contractCommands.editContract(item?.itemId)),
+        vscode.commands.registerCommand('ung.deleteContract', (item) => contractCommands.deleteContract(item?.itemId)),
+        vscode.commands.registerCommand('ung.generateContractPDF', (item) => contractCommands.generateContractPDF(item?.itemId)),
         vscode.commands.registerCommand('ung.refreshContracts', () => contractProvider.refresh())
     );
 
@@ -125,24 +124,24 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ung.createInvoice', () => invoiceCommands.createInvoice()),
         vscode.commands.registerCommand('ung.generateFromTime', () => invoiceCommands.generateFromTime()),
         vscode.commands.registerCommand('ung.viewInvoice', (item) => {
-            if (item?.id) {
-                InvoicePanel.createOrShow(cli, item.id);
+            if (item?.itemId) {
+                InvoicePanel.createOrShow(cli, item.itemId);
             } else {
-                invoiceCommands.viewInvoice(item?.id);
+                invoiceCommands.viewInvoice(item?.itemId);
             }
         }),
-        vscode.commands.registerCommand('ung.editInvoice', (item) => invoiceCommands.editInvoice(item?.id)),
-        vscode.commands.registerCommand('ung.deleteInvoice', (item) => invoiceCommands.deleteInvoice(item?.id)),
-        vscode.commands.registerCommand('ung.exportInvoice', (item) => invoiceCommands.exportInvoice(item?.id)),
-        vscode.commands.registerCommand('ung.emailInvoice', (item) => invoiceCommands.emailInvoice(item?.id)),
+        vscode.commands.registerCommand('ung.editInvoice', (item) => invoiceCommands.editInvoice(item?.itemId)),
+        vscode.commands.registerCommand('ung.deleteInvoice', (item) => invoiceCommands.deleteInvoice(item?.itemId)),
+        vscode.commands.registerCommand('ung.exportInvoice', (item) => invoiceCommands.exportInvoice(item?.itemId)),
+        vscode.commands.registerCommand('ung.emailInvoice', (item) => invoiceCommands.emailInvoice(item?.itemId)),
         vscode.commands.registerCommand('ung.refreshInvoices', () => invoiceProvider.refresh())
     );
 
     // Expense commands
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.logExpense', () => expenseCommands.logExpense()),
-        vscode.commands.registerCommand('ung.editExpense', (item) => expenseCommands.editExpense(item?.id)),
-        vscode.commands.registerCommand('ung.deleteExpense', (item) => expenseCommands.deleteExpense(item?.id)),
+        vscode.commands.registerCommand('ung.editExpense', (item) => expenseCommands.editExpense(item?.itemId)),
+        vscode.commands.registerCommand('ung.deleteExpense', (item) => expenseCommands.deleteExpense(item?.itemId)),
         vscode.commands.registerCommand('ung.viewExpenseReport', () => expenseCommands.viewExpenseReport()),
         vscode.commands.registerCommand('ung.refreshExpenses', () => expenseProvider.refresh())
     );

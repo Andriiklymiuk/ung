@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { UngCli } from '../cli/ungCli';
 import { Config } from '../utils/config';
-import { Formatter } from '../utils/formatting';
 
 /**
  * Invoice command handlers

@@ -6,9 +6,11 @@ import { Formatter } from '../utils/formatting';
  * Expense tree item
  */
 export class ExpenseItem extends vscode.TreeItem {
+    public readonly expenseDescription: string;
+
     constructor(
-        public readonly id: number,
-        public readonly description: string,
+        public readonly itemId: number,
+        description: string,
         public readonly amount: number,
         public readonly currency: string,
         public readonly category: string,
@@ -17,6 +19,8 @@ export class ExpenseItem extends vscode.TreeItem {
     ) {
         super(description, collapsibleState);
 
+        this.id = String(itemId);
+        this.expenseDescription = description;
         this.tooltip = `${description}\nAmount: ${Formatter.formatCurrency(amount, currency)}\nCategory: ${category}\nDate: ${Formatter.formatDate(date)}`;
         this.description = `${Formatter.formatCurrency(amount, currency)} • ${category}`;
         this.contextValue = 'expense';

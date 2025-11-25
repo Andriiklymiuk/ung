@@ -20,4 +20,12 @@ export class Config {
         const config = vscode.workspace.getConfiguration('ung');
         return config.get<boolean>('showStatusBar', true);
     }
+
+    /**
+     * Get default currency
+     */
+    static getDefaultCurrency(): string {
+        const config = vscode.workspace.getConfiguration('ung');
+        return config.get<string>('defaultCurrency', 'USD');
+    }
 }

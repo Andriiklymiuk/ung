@@ -175,7 +175,6 @@ export class SearchCommands extends BaseCommand {
      */
     private async performSearch(query: string): Promise<SearchResult[]> {
         const results: SearchResult[] = [];
-        const lowerQuery = query.toLowerCase();
 
         // Search invoices
         const invoiceResults = await this.searchInvoiceData(query);

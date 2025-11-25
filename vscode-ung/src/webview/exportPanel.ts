@@ -9,7 +9,7 @@ export class ExportPanel {
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
 
-    private constructor(panel: vscode.WebviewPanel, private cli: UngCli) {
+    private constructor(panel: vscode.WebviewPanel, private _cli: UngCli) {
         this.panel = panel;
 
         // Set the webview's HTML content

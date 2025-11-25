@@ -6,13 +6,14 @@ import { UngCli } from '../cli/ungCli';
  */
 export class ClientItem extends vscode.TreeItem {
     constructor(
-        public readonly id: number,
+        public readonly itemId: number,
         public readonly name: string,
         public readonly email: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState
     ) {
         super(name, collapsibleState);
 
+        this.id = String(itemId);
         this.tooltip = `${name}\n${email}`;
         this.description = email;
         this.contextValue = 'client';

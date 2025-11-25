@@ -28,28 +28,28 @@ export class NotificationManager {
     /**
      * Show success notification
      */
-    static success(message: string, options?: NotificationOptions): Promise<string | undefined> {
+    static success(message: string, options?: NotificationOptions): Thenable<string | undefined> {
         return this.show(NotificationType.SUCCESS, message, options);
     }
 
     /**
      * Show error notification
      */
-    static error(message: string, options?: NotificationOptions): Promise<string | undefined> {
+    static error(message: string, options?: NotificationOptions): Thenable<string | undefined> {
         return this.show(NotificationType.ERROR, message, options);
     }
 
     /**
      * Show warning notification
      */
-    static warning(message: string, options?: NotificationOptions): Promise<string | undefined> {
+    static warning(message: string, options?: NotificationOptions): Thenable<string | undefined> {
         return this.show(NotificationType.WARNING, message, options);
     }
 
     /**
      * Show info notification
      */
-    static info(message: string, options?: NotificationOptions): Promise<string | undefined> {
+    static info(message: string, options?: NotificationOptions): Thenable<string | undefined> {
         return this.show(NotificationType.INFO, message, options);
     }
 
@@ -100,7 +100,7 @@ export class NotificationManager {
                     title,
                     cancellable: true
                 },
-                async (progress, token) => {
+                async (_progress, token) => {
                     if (token.isCancellationRequested) {
                         return undefined;
                     }
@@ -220,7 +220,7 @@ export class NotificationManager {
         type: NotificationType,
         message: string,
         options?: NotificationOptions
-    ): Promise<string | undefined> {
+    ): Thenable<string | undefined> {
         const modalOptions = options?.modal ? { modal: true } : {};
         const actions = options?.actions || [];
 

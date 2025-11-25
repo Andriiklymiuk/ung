@@ -198,7 +198,7 @@ export abstract class BaseProvider<T extends vscode.TreeItem> implements vscode.
             const aVal = a[field];
             const bVal = b[field];
 
-            if (aVal === undefined || bVal === undefined) {
+            if (aVal === undefined || aVal === null || bVal === undefined || bVal === null) {
                 return 0;
             }
 

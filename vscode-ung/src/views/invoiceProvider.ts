@@ -7,7 +7,7 @@ import { Formatter } from '../utils/formatting';
  */
 export class InvoiceItem extends vscode.TreeItem {
     constructor(
-        public readonly id: number,
+        public readonly itemId: number,
         public readonly invoiceNum: string,
         public readonly amount: number,
         public readonly currency: string,
@@ -17,6 +17,7 @@ export class InvoiceItem extends vscode.TreeItem {
     ) {
         super(invoiceNum, collapsibleState);
 
+        this.id = String(itemId);
         this.tooltip = `${invoiceNum} - ${Formatter.formatCurrency(amount, currency)}\nStatus: ${status}\nDue: ${Formatter.formatDate(dueDate)}`;
         this.description = `${Formatter.formatCurrency(amount, currency)} • ${status}`;
         this.contextValue = 'invoice';

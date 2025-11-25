@@ -103,7 +103,7 @@ export class ClientCommands {
     /**
      * Edit a client
      */
-    async editClient(clientId?: number): Promise<void> {
+    async editClient(_clientId?: number): Promise<void> {
         vscode.window.showInformationMessage('Client editing will be available in a future version. Use the CLI: ung client edit [id]');
     }
 

@@ -248,26 +248,37 @@
         },
         {
           "id": "ungInvoices",
-          "name": "Invoices"
+          "name": "Invoices",
+          "when": "ung.cliInstalled"
         },
         {
           "id": "ungContracts",
-          "name": "Contracts"
+          "name": "Contracts",
+          "when": "ung.cliInstalled"
         },
         {
           "id": "ungClients",
-          "name": "Clients"
+          "name": "Clients",
+          "when": "ung.cliInstalled"
         },
         {
           "id": "ungExpenses",
-          "name": "Expenses"
+          "name": "Expenses",
+          "when": "ung.cliInstalled"
         },
         {
           "id": "ungTracking",
-          "name": "Time Tracking"
+          "name": "Time Tracking",
+          "when": "ung.cliInstalled"
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "ungWelcome",
+        "contents": "UNG CLI is not installed.\n\nInstall it to manage invoices, contracts, clients, expenses and track your time.\n\n[$(cloud-download) Install UNG CLI](command:ung.installCli)\n\n[View on GitHub](https://github.com/Andriiklymiuk/ung)"
+      }
+    ],
     "menus": {
       "view/title": [
         {

@@ -88,7 +88,9 @@ func handleMessage(
 		case "invoice":
 			return invoiceHandler.HandleCreate(message)
 		case "invoices":
-			return invoiceHandler.HandleList(message)
+			return invoiceHandler.HandleListWithPDF(message)
+		case "pdf":
+			return invoiceHandler.HandlePDF(message)
 		case "client":
 			return clientHandler.HandleCreate(message)
 		case "clients":
@@ -256,6 +258,11 @@ func handleCallback(
 
 	if strings.HasPrefix(data, "log_contract_") {
 		return trackingHandler.HandleContractSelected(callbackQuery)
+	}
+
+	// Invoice PDF callbacks
+	if strings.HasPrefix(data, "invoice_pdf_") {
+		return invoiceHandler.HandlePDFCallback(callbackQuery)
 	}
 
 	// Auth callback

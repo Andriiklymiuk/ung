@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -324,4 +327,172 @@ func (h *InvoiceHandler) sendError(chatID int64, message string) error {
 	msg := tgbotapi.NewMessage(chatID, "❌ "+message)
 	_, err := h.bot.Send(msg)
 	return err
+}
+
+// HandlePDF generates and sends a PDF for an invoice using the UNG CLI
+func (h *InvoiceHandler) HandlePDF(message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	// Check authentication
+	if !h.sessionMgr.IsAuthenticated(telegramID) {
+		return h.sendAuthRequired(chatID)
+	}
+
+	// Parse invoice number from command (e.g., "/pdf INV-001" or just the invoice number)
+	args := strings.Fields(message.Text)
+	if len(args) < 2 {
+		msg := tgbotapi.NewMessage(chatID, "Usage: /pdf <invoice-number>\n\nExample: /pdf INV-001")
+		h.bot.Send(msg)
+		return nil
+	}
+
+	invoiceNum := args[1]
+
+	// Send "generating PDF" message
+	statusMsg := tgbotapi.NewMessage(chatID, "📄 Generating PDF for "+invoiceNum+"...")
+	sentMsg, _ := h.bot.Send(statusMsg)
+
+	// Execute UNG CLI to generate PDF
+	cmd := exec.Command("ung", "invoice", "pdf", invoiceNum)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		errorMsg := fmt.Sprintf("❌ Failed to generate PDF: %s", string(output))
+		h.bot.Send(tgbotapi.NewEditMessageText(chatID, sentMsg.MessageID, errorMsg))
+		return fmt.Errorf("CLI error: %w - %s", err, string(output))
+	}
+
+	// Parse PDF path from CLI output (typically: "PDF saved to: /path/to/file.pdf")
+	outputStr := string(output)
+	var pdfPath string
+
+	// Look for the PDF path in the output
+	lines := strings.Split(outputStr, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, ".pdf") {
+			// Extract path - it's usually the full path in the output
+			if strings.Contains(line, "PDF saved to:") || strings.Contains(line, "Generated:") {
+				parts := strings.Split(line, ":")
+				if len(parts) >= 2 {
+					pdfPath = strings.TrimSpace(strings.Join(parts[1:], ":"))
+				}
+			} else if strings.HasSuffix(line, ".pdf") {
+				pdfPath = strings.TrimSpace(line)
+			}
+		}
+	}
+
+	// If path not found in output, check default location
+	if pdfPath == "" {
+		homeDir, _ := os.UserHomeDir()
+		pdfPath = filepath.Join(homeDir, ".ung", "invoices", invoiceNum+".pdf")
+	}
+
+	// Check if PDF file exists
+	if _, err := os.Stat(pdfPath); os.IsNotExist(err) {
+		errorMsg := "❌ PDF was generated but file not found at expected location"
+		h.bot.Send(tgbotapi.NewEditMessageText(chatID, sentMsg.MessageID, errorMsg))
+		return fmt.Errorf("PDF file not found: %s", pdfPath)
+	}
+
+	// Delete status message
+	h.bot.Request(tgbotapi.NewDeleteMessage(chatID, sentMsg.MessageID))
+
+	// Send PDF file
+	pdfFile := tgbotapi.NewDocument(chatID, tgbotapi.FilePath(pdfPath))
+	pdfFile.Caption = fmt.Sprintf("📄 Invoice %s", invoiceNum)
+
+	if _, err := h.bot.Send(pdfFile); err != nil {
+		return fmt.Errorf("failed to send PDF: %w", err)
+	}
+
+	// Clean up PDF file after sending
+	go func() {
+		time.Sleep(30 * time.Second)
+		os.Remove(pdfPath)
+	}()
+
+	return nil
+}
+
+// HandleListWithPDF lists invoices with inline PDF buttons
+func (h *InvoiceHandler) HandleListWithPDF(message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	if !h.sessionMgr.IsAuthenticated(telegramID) {
+		return h.sendAuthRequired(chatID)
+	}
+
+	user := h.sessionMgr.GetUser(telegramID)
+
+	invoices, err := h.apiClient.ListInvoices(user.APIToken)
+	if err != nil {
+		return h.sendError(chatID, "Failed to fetch invoices: "+err.Error())
+	}
+
+	if len(invoices) == 0 {
+		msg := tgbotapi.NewMessage(chatID, "You don't have any invoices yet.\n\nCreate one with /invoice")
+		h.bot.Send(msg)
+		return nil
+	}
+
+	text := "*Your Invoices:*\n\n"
+	var buttons [][]tgbotapi.InlineKeyboardButton
+
+	for i, inv := range invoices {
+		if i >= 10 {
+			text += fmt.Sprintf("\n_...and %d more_", len(invoices)-10)
+			break
+		}
+
+		statusEmoji := "⏳"
+		switch inv.Status {
+		case "paid":
+			statusEmoji = "✅"
+		case "overdue":
+			statusEmoji = "⚠️"
+		}
+
+		text += fmt.Sprintf("%s *%s* - $%.2f - %s\n", statusEmoji, inv.InvoiceNum, inv.Amount, inv.Status)
+
+		// Add PDF button for each invoice
+		button := tgbotapi.NewInlineKeyboardButtonData(
+			"📄 "+inv.InvoiceNum,
+			fmt.Sprintf("invoice_pdf_%s", inv.InvoiceNum),
+		)
+		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{button})
+	}
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "Markdown"
+
+	if len(buttons) > 0 {
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+		msg.ReplyMarkup = keyboard
+	}
+
+	_, err = h.bot.Send(msg)
+	return err
+}
+
+// HandlePDFCallback handles PDF generation from inline button callback
+func (h *InvoiceHandler) HandlePDFCallback(callbackQuery *tgbotapi.CallbackQuery) error {
+	// Extract invoice number from callback data
+	data := callbackQuery.Data
+	invoiceNum := strings.TrimPrefix(data, "invoice_pdf_")
+
+	// Answer the callback
+	callback := tgbotapi.NewCallback(callbackQuery.ID, "Generating PDF...")
+	h.bot.Request(callback)
+
+	// Create a fake message to reuse HandlePDF logic
+	fakeMessage := &tgbotapi.Message{
+		Chat: callbackQuery.Message.Chat,
+		From: callbackQuery.From,
+		Text: "/pdf " + invoiceNum,
+	}
+
+	return h.HandlePDF(fakeMessage)
 }

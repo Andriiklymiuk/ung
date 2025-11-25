@@ -698,3 +698,71 @@ func (c *APIClient) StopTracking(token string) (*TrackingSession, error) {
 
 	return &session, nil
 }
+
+// TrackingCreateRequest represents manual time entry request
+type TrackingCreateRequest struct {
+	ContractID  uint    `json:"contract_id"`
+	ClientID    uint    `json:"client_id"`
+	ProjectName string  `json:"project_name"`
+	Hours       float64 `json:"hours"`
+	Notes       string  `json:"notes"`
+	Billable    bool    `json:"billable"`
+}
+
+// CreateTracking creates a manual time tracking entry
+func (c *APIClient) CreateTracking(token string, req TrackingCreateRequest) (*TrackingSession, error) {
+	// Calculate start and end times based on hours
+	now := time.Now()
+	startTime := now.Add(-time.Duration(req.Hours * float64(time.Hour)))
+
+	payload := map[string]interface{}{
+		"contract_id":  req.ContractID,
+		"client_id":    req.ClientID,
+		"project_name": req.ProjectName,
+		"start_time":   startTime.Format(time.RFC3339),
+		"end_time":     now.Format(time.RFC3339),
+		"hours":        req.Hours,
+		"billable":     req.Billable,
+		"notes":        req.Notes,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequest("POST", c.baseURL+"/api/v1/tracking", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var createdSession TrackingSession
+	if err := json.Unmarshal(apiResp.Data, &createdSession); err != nil {
+		return nil, err
+	}
+
+	return &createdSession, nil
+}

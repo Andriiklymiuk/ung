@@ -66,4 +66,9 @@ const (
 	StateExpenseAmount      SessionState = "expense_amount"
 	StateExpenseCategory    SessionState = "expense_category"
 	StateExpenseVendor      SessionState = "expense_vendor"
+	// Tracking log states (manual time entry)
+	StateTrackLogSelectContract SessionState = "track_log_select_contract"
+	StateTrackLogHours          SessionState = "track_log_hours"
+	StateTrackLogProject        SessionState = "track_log_project"
+	StateTrackLogNotes          SessionState = "track_log_notes"
 )

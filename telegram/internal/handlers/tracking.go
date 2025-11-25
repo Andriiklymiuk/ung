@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"ung-telegram/internal/models"
 	"ung-telegram/internal/services"
 )
 
@@ -284,6 +285,209 @@ func (h *TrackingHandler) sendError(chatID int64, errorMsg string) error {
 	msg := tgbotapi.NewMessage(chatID, "❌ "+errorMsg)
 	_, err := h.bot.Send(msg)
 	return err
+}
+
+// HandleLog starts manual time logging flow
+func (h *TrackingHandler) HandleLog(message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	// Check authentication
+	if !h.sessionMgr.IsAuthenticated(telegramID) {
+		return h.sendAuthRequired(chatID)
+	}
+
+	user := h.sessionMgr.GetUser(telegramID)
+
+	// Fetch contracts
+	contracts, err := h.apiClient.ListContracts(user.APIToken)
+	if err != nil {
+		return h.sendError(chatID, "Failed to fetch contracts: "+err.Error())
+	}
+
+	if len(contracts) == 0 {
+		msg := tgbotapi.NewMessage(chatID, "You don't have any contracts yet.\n\nCreate a contract first with /contract")
+		h.bot.Send(msg)
+		return nil
+	}
+
+	// Build inline keyboard with contracts
+	var buttons [][]tgbotapi.InlineKeyboardButton
+	for _, contract := range contracts {
+		contractLabel := contract.Name
+		if contract.Rate > 0 {
+			contractLabel = fmt.Sprintf("%s ($%.0f/hr)", contract.Name, contract.Rate)
+		}
+
+		button := tgbotapi.NewInlineKeyboardButtonData(
+			contractLabel,
+			fmt.Sprintf("log_contract_%d", contract.ID),
+		)
+		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{button})
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+
+	msg := tgbotapi.NewMessage(chatID, "⏱️ *Log Time Manually*\n\nSelect the contract you worked on:")
+	msg.ParseMode = "Markdown"
+	msg.ReplyMarkup = keyboard
+
+	h.bot.Send(msg)
+
+	return nil
+}
+
+// HandleContractSelected handles contract selection for manual time logging
+func (h *TrackingHandler) HandleContractSelected(callbackQuery *tgbotapi.CallbackQuery) error {
+	chatID := callbackQuery.Message.Chat.ID
+	telegramID := callbackQuery.From.ID
+	data := callbackQuery.Data
+
+	// Extract contract ID
+	var contractID uint
+	fmt.Sscanf(data, "log_contract_%d", &contractID)
+
+	// Answer callback
+	callback := tgbotapi.NewCallback(callbackQuery.ID, "Contract selected")
+	h.bot.Request(callback)
+
+	// Store contract ID and move to hours input
+	h.sessionMgr.SetSession(&models.Session{
+		TelegramID: telegramID,
+		State:      string(models.StateTrackLogHours),
+		Data: map[string]interface{}{
+			"contract_id": float64(contractID),
+		},
+	})
+
+	msg := tgbotapi.NewMessage(chatID, "How many hours did you work?\n\n_Example: 2.5 or 8_")
+	msg.ParseMode = "Markdown"
+	h.bot.Send(msg)
+
+	return nil
+}
+
+// HandleHoursInput handles hours input
+func (h *TrackingHandler) HandleHoursInput(message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	session := h.sessionMgr.GetSession(telegramID)
+	if session == nil {
+		return h.sendError(chatID, "Session expired. Please start again with /log")
+	}
+
+	// Parse hours
+	var hours float64
+	_, err := fmt.Sscanf(message.Text, "%f", &hours)
+	if err != nil || hours <= 0 || hours > 24 {
+		msg := tgbotapi.NewMessage(chatID, "❌ Invalid hours. Please enter a positive number (e.g., 2.5)")
+		h.bot.Send(msg)
+		return nil
+	}
+
+	// Store hours
+	session.Data["hours"] = hours
+	session.State = string(models.StateTrackLogProject)
+	h.sessionMgr.SetSession(session)
+
+	msg := tgbotapi.NewMessage(chatID, "What project/task were you working on?\n\n_Type /skip if you don't want to add a project name_")
+	msg.ParseMode = "Markdown"
+	h.bot.Send(msg)
+
+	return nil
+}
+
+// HandleProjectInput handles project name input
+func (h *TrackingHandler) HandleProjectInput(message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	session := h.sessionMgr.GetSession(telegramID)
+	if session == nil {
+		return h.sendError(chatID, "Session expired. Please start again with /log")
+	}
+
+	projectName := ""
+	if message.Text != "/skip" {
+		projectName = message.Text
+	}
+
+	// Store project
+	session.Data["project_name"] = projectName
+	session.State = string(models.StateTrackLogNotes)
+	h.sessionMgr.SetSession(session)
+
+	msg := tgbotapi.NewMessage(chatID, "Any notes about this work?\n\n_Type /skip to finish_")
+	msg.ParseMode = "Markdown"
+	h.bot.Send(msg)
+
+	return nil
+}
+
+// HandleNotesInput handles notes input and creates the time log
+func (h *TrackingHandler) HandleNotesInput(message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	session := h.sessionMgr.GetSession(telegramID)
+	if session == nil {
+		return h.sendError(chatID, "Session expired. Please start again with /log")
+	}
+
+	user := h.sessionMgr.GetUser(telegramID)
+
+	notes := ""
+	if message.Text != "/skip" {
+		notes = message.Text
+	}
+
+	// Extract data from session
+	contractID := uint(session.Data["contract_id"].(float64))
+	hours := session.Data["hours"].(float64)
+	projectName := ""
+	if pn, ok := session.Data["project_name"].(string); ok {
+		projectName = pn
+	}
+
+	// Create time log
+	req := services.TrackingCreateRequest{
+		ContractID:  contractID,
+		ProjectName: projectName,
+		Hours:       hours,
+		Notes:       notes,
+		Billable:    true,
+	}
+
+	loggedSession, err := h.apiClient.CreateTracking(user.APIToken, req)
+	if err != nil {
+		h.sessionMgr.ClearSession(telegramID)
+		return h.sendError(chatID, "Failed to log time: "+err.Error())
+	}
+
+	// Clear session
+	h.sessionMgr.ClearSession(telegramID)
+
+	// Send success message
+	var text strings.Builder
+	text.WriteString("✅ *Time logged successfully!*\n\n")
+	text.WriteString(fmt.Sprintf("⏱️ Hours: %.2f\n", hours))
+	if projectName != "" {
+		text.WriteString(fmt.Sprintf("📋 Project: %s\n", projectName))
+	}
+	if notes != "" {
+		text.WriteString(fmt.Sprintf("📝 Notes: %s\n", notes))
+	}
+	if loggedSession.Duration > 0 {
+		billableAmount := hours * 100 // Assuming $100/hr for display
+		text.WriteString(fmt.Sprintf("\n💰 Estimated: $%.2f (at $100/hr)", billableAmount))
+	}
+
+	msg := tgbotapi.NewMessage(chatID, text.String())
+	msg.ParseMode = "Markdown"
+	h.bot.Send(msg)
+
+	return nil
 }
 
 func formatTime(timeStr string) string {

@@ -1,6 +1,6 @@
 module github.com/Andriiklymiuk/ung
 
-go 1.24.7
+go 1.25.4
 
 require (
 	github.com/charmbracelet/huh v0.8.0

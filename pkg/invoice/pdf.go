@@ -2,6 +2,8 @@ package invoice
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/Andriiklymiuk/ung/internal/config"
 	"github.com/Andriiklymiuk/ung/internal/models"
@@ -159,9 +161,14 @@ func GeneratePDF(invoice models.Invoice, company models.Company, client models.C
 	pdf.SetXY(leftMargin, termsY+6)
 	pdf.Cell(contentWidth, 4, cfg.Invoice.Terms)
 
-	// Save PDF
+	// Save PDF to configured invoices directory
+	invoicesDir := config.GetInvoicesDir()
+	if err := os.MkdirAll(invoicesDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create invoices directory: %w", err)
+	}
+
 	filename := fmt.Sprintf("%s.pdf", invoice.InvoiceNum)
-	pdfPath := filename
+	pdfPath := filepath.Join(invoicesDir, filename)
 
 	err := pdf.OutputFileAndClose(pdfPath)
 	if err != nil {

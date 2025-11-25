@@ -1,0 +1,3 @@
+-- SQLite doesn't support DROP COLUMN directly
+-- To rollback, you'd need to recreate the table without the column
+-- This is a no-op for safety

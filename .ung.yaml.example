@@ -14,6 +14,87 @@ language: "en"
 #   invoice_html: "~/custom-templates/invoice.html"
 #   contract_html: "~/custom-templates/contract.html"
 
+# =============================================================================
+# PDF Configuration - Enhanced Features
+# =============================================================================
+pdf:
+  # Color theme (RGB values 0-255)
+  # Default is Zoho-style orange theme
+  primary_color:
+    r: 232
+    g: 119
+    b: 34
+  secondary_color:
+    r: 80
+    g: 80
+    b: 80
+  text_color:
+    r: 60
+    g: 60
+    b: 60
+
+  # Watermark settings
+  # Shows PAID/OVERDUE watermark diagonally across the page
+  show_watermark: true
+  # watermark_text: "CONFIDENTIAL"  # Optional: override automatic status watermark
+
+  # Layout options
+  show_logo: true          # Display company logo (set logo_path in company settings)
+  show_qr_code: false      # QR code for payment (requires additional setup)
+  show_page_number: true   # Show "Page X of Y" on multi-page documents
+  show_tax_breakdown: false # Show VAT/tax line in totals
+
+  # Tax/VAT settings (when show_tax_breakdown is true)
+  tax_rate: 0.0            # Tax rate as decimal (0.20 = 20%)
+  tax_label: "VAT"         # Label for tax (VAT, GST, Tax, etc.)
+  tax_inclusive: false     # Whether line item prices include tax
+
+  # Labels (customize for your language or preference)
+  subtotal_label: "Subtotal"
+  discount_label: "Discount"
+  tax_amount_label: "VAT"
+  balance_due_label: "Balance Due"
+  paid_label: "PAID"
+  draft_label: "DRAFT"
+  overdue_label: "OVERDUE"
+
+# ===== Blue Professional Theme Example =====
+# pdf:
+#   primary_color:
+#     r: 41
+#     g: 128
+#     b: 185
+#   secondary_color:
+#     r: 52
+#     g: 73
+#     b: 94
+#   text_color:
+#     r: 44
+#     g: 62
+#     b: 80
+
+# ===== Green Nature Theme Example =====
+# pdf:
+#   primary_color:
+#     r: 39
+#     g: 174
+#     b: 96
+#   secondary_color:
+#     r: 46
+#     g: 64
+#     b: 83
+#   text_color:
+#     r: 52
+#     g: 73
+#     b: 94
+
+# ===== European VAT Example =====
+# pdf:
+#   show_tax_breakdown: true
+#   tax_rate: 0.20           # 20% VAT
+#   tax_label: "VAT"
+#   tax_inclusive: false
+
 # Invoice configuration
 invoice:
   # Terms & Conditions text

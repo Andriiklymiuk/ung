@@ -14,9 +14,49 @@ type Config struct {
 	InvoicesDir  string           `yaml:"invoices_dir"`
 	Language     string           `yaml:"language"`      // e.g., "en", "uk", "de"
 	Invoice      InvoiceConfig    `yaml:"invoice"`
+	PDF          PDFConfig        `yaml:"pdf"`
 	Templates    TemplateConfig   `yaml:"templates"`
 	Email        EmailConfig      `yaml:"email"`
 	Security     SecurityConfig   `yaml:"security"`
+}
+
+// PDFConfig represents PDF generation configuration
+type PDFConfig struct {
+	// Color theme (RGB values)
+	PrimaryColor   ColorRGB `yaml:"primary_color"`   // Header/accent color (default: orange #E87722)
+	SecondaryColor ColorRGB `yaml:"secondary_color"` // Secondary accent color
+	TextColor      ColorRGB `yaml:"text_color"`      // Main text color
+
+	// Watermark settings
+	ShowWatermark bool   `yaml:"show_watermark"` // Show status watermark (PAID, DRAFT, etc.)
+	WatermarkText string `yaml:"watermark_text"` // Custom watermark text (overrides status)
+
+	// Layout options
+	ShowLogo       bool `yaml:"show_logo"`        // Show company logo
+	ShowQRCode     bool `yaml:"show_qr_code"`     // Show payment QR code
+	ShowPageNumber bool `yaml:"show_page_number"` // Show page numbers on multi-page documents
+	ShowTaxBreakdown bool `yaml:"show_tax_breakdown"` // Show VAT/tax breakdown
+
+	// Tax settings
+	TaxRate     float64 `yaml:"tax_rate"`      // Tax/VAT rate (e.g., 0.20 for 20%)
+	TaxLabel    string  `yaml:"tax_label"`     // e.g., "VAT", "GST", "Tax"
+	TaxInclusive bool   `yaml:"tax_inclusive"` // Whether prices include tax
+
+	// Additional labels
+	SubtotalLabel   string `yaml:"subtotal_label"`
+	DiscountLabel   string `yaml:"discount_label"`
+	TaxAmountLabel  string `yaml:"tax_amount_label"`
+	BalanceDueLabel string `yaml:"balance_due_label"`
+	PaidLabel       string `yaml:"paid_label"`
+	DraftLabel      string `yaml:"draft_label"`
+	OverdueLabel    string `yaml:"overdue_label"`
+}
+
+// ColorRGB represents an RGB color
+type ColorRGB struct {
+	R int `yaml:"r"`
+	G int `yaml:"g"`
+	B int `yaml:"b"`
 }
 
 // TemplateConfig represents template paths for PDF generation
@@ -145,6 +185,50 @@ func getDefaultConfig() *Config {
 			RateLabel:        "Rate",
 			AmountLabel:      "Amount",
 		},
+		PDF: PDFConfig{
+			PrimaryColor:   ColorRGB{R: 232, G: 119, B: 34},  // Orange #E87722
+			SecondaryColor: ColorRGB{R: 80, G: 80, B: 80},    // Gray
+			TextColor:      ColorRGB{R: 60, G: 60, B: 60},    // Dark gray
+			ShowWatermark:  true,
+			ShowLogo:       true,
+			ShowQRCode:     false, // Disabled by default until library is added
+			ShowPageNumber: true,
+			ShowTaxBreakdown: false,
+			TaxRate:        0.0,
+			TaxLabel:       "VAT",
+			TaxInclusive:   false,
+			SubtotalLabel:   "Subtotal",
+			DiscountLabel:   "Discount",
+			TaxAmountLabel:  "VAT",
+			BalanceDueLabel: "Balance Due",
+			PaidLabel:       "PAID",
+			DraftLabel:      "DRAFT",
+			OverdueLabel:    "OVERDUE",
+		},
+	}
+}
+
+// GetDefaultPDFConfig returns the default PDF configuration
+func GetDefaultPDFConfig() PDFConfig {
+	return PDFConfig{
+		PrimaryColor:   ColorRGB{R: 232, G: 119, B: 34},
+		SecondaryColor: ColorRGB{R: 80, G: 80, B: 80},
+		TextColor:      ColorRGB{R: 60, G: 60, B: 60},
+		ShowWatermark:  true,
+		ShowLogo:       true,
+		ShowQRCode:     false,
+		ShowPageNumber: true,
+		ShowTaxBreakdown: false,
+		TaxRate:        0.0,
+		TaxLabel:       "VAT",
+		TaxInclusive:   false,
+		SubtotalLabel:   "Subtotal",
+		DiscountLabel:   "Discount",
+		TaxAmountLabel:  "VAT",
+		BalanceDueLabel: "Balance Due",
+		PaidLabel:       "PAID",
+		DraftLabel:      "DRAFT",
+		OverdueLabel:    "OVERDUE",
 	}
 }
 

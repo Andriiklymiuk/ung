@@ -215,20 +215,14 @@ export class UngCli {
      * Create a new invoice
      */
     async createInvoice(data: {
-        companyId: number;
-        clientId: number;
+        clientName: string;
         amount: number;
         currency?: string;
-        description?: string;
-        dueDate?: string;
     }): Promise<CliResult> {
         const args = ['invoice', 'new'];
-        args.push('--company', data.companyId.toString());
-        args.push('--client', data.clientId.toString());
+        args.push('--client-name', data.clientName);
         args.push('--price', data.amount.toString());
         if (data.currency) args.push('--currency', data.currency);
-        if (data.description) args.push('--description', data.description);
-        if (data.dueDate) args.push('--due', data.dueDate);
 
         return this.exec(args);
     }

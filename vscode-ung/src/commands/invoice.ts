@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { UngCli } from '../cli/ungCli';
-import { Config } from '../utils/config';
 
 /**
  * Invoice command handlers
@@ -12,71 +11,81 @@ export class InvoiceCommands {
      * Create a new invoice
      */
     async createInvoice(): Promise<void> {
-        // Get company ID (assume 1 for now)
-        const companyId = 1;
-
-        // Get client list to select from
-        const clientResult = await this.cli.listClients();
-        if (!clientResult.success) {
-            vscode.window.showErrorMessage('Failed to fetch clients');
+        // Get contracts to select from (they have client, rate, and currency info)
+        const contractResult = await this.cli.listContracts();
+        if (!contractResult.success) {
+            vscode.window.showErrorMessage('Failed to fetch contracts');
             return;
         }
 
-        // Parse clients from CLI output
-        const clients = this.parseClientsFromOutput(clientResult.stdout || '');
-        if (clients.length === 0) {
-            vscode.window.showErrorMessage('No clients found. Create one first with "ung client add"');
+        // Parse contracts from CLI output
+        const contracts = this.parseContractsFromOutput(contractResult.stdout || '');
+        if (contracts.length === 0) {
+            vscode.window.showErrorMessage('No contracts found. Create one first with "ung contract add"');
             return;
         }
 
-        // Show client dropdown
-        const clientItems = clients.map(c => ({
-            label: c.name,
-            description: c.email,
-            detail: c.address || undefined,
-            id: c.id
+        // Show contract dropdown with client name and rate info
+        const contractItems = contracts.map(c => ({
+            label: c.client,
+            description: `${c.type} - ${c.ratePrice}`,
+            detail: c.name,
+            contract: c
         }));
 
-        const selectedClient = await vscode.window.showQuickPick(clientItems, {
-            placeHolder: 'Select a client',
+        const selectedContract = await vscode.window.showQuickPick(contractItems, {
+            placeHolder: 'Select a contract',
             matchOnDescription: true,
             matchOnDetail: true
         });
 
-        if (!selectedClient) return;
-        const clientId = selectedClient.id;
+        if (!selectedContract) return;
 
-        const amountStr = await vscode.window.showInputBox({
-            prompt: 'Invoice Amount',
-            placeHolder: 'e.g., 1500.00',
-            validateInput: (value) => {
-                if (!value) return 'Amount is required';
-                if (isNaN(Number(value))) return 'Must be a valid number';
-                if (Number(value) <= 0) return 'Amount must be greater than 0';
-                return null;
-            }
-        });
+        const contract = selectedContract.contract;
 
-        if (!amountStr) return;
-        const amount = Number(amountStr);
+        // Parse currency and amount from ratePrice (e.g., "4500.00 USD" or "29.00 USD/hr")
+        let currency = 'USD';
+        const rateMatch = contract.ratePrice.match(/^([\d.]+)\s*(\w+)/);
+        if (rateMatch) {
+            currency = rateMatch[2].replace('/hr', '');
+        }
 
-        const currency = await vscode.window.showQuickPick(
-            ['USD', 'EUR', 'GBP', 'UAH', 'CAD'],
-            {
-                placeHolder: 'Select currency',
-                canPickMany: false
-            }
-        ) || Config.getDefaultCurrency();
+        let amount: number;
 
-        const description = await vscode.window.showInputBox({
-            prompt: 'Description (optional)',
-            placeHolder: 'e.g., Development services'
-        });
+        if (contract.type === 'fixed_price') {
+            // Use the fixed price directly, just confirm
+            amount = parseFloat(rateMatch?.[1] || '0');
 
-        const dueDateStr = await vscode.window.showInputBox({
-            prompt: 'Due Date (optional)',
-            placeHolder: 'YYYY-MM-DD (leave empty for 30 days from now)'
-        });
+            const confirmAmount = await vscode.window.showInputBox({
+                prompt: `Invoice amount for ${contract.client}`,
+                value: amount.toString(),
+                placeHolder: 'e.g., 4500.00',
+                validateInput: (value) => {
+                    if (!value) return 'Amount is required';
+                    if (isNaN(Number(value))) return 'Must be a valid number';
+                    if (Number(value) <= 0) return 'Amount must be greater than 0';
+                    return null;
+                }
+            });
+
+            if (!confirmAmount) return;
+            amount = Number(confirmAmount);
+        } else {
+            // Hourly contract - ask for amount
+            const amountStr = await vscode.window.showInputBox({
+                prompt: `Invoice amount for ${contract.client} (rate: ${contract.ratePrice})`,
+                placeHolder: 'e.g., 1500.00',
+                validateInput: (value) => {
+                    if (!value) return 'Amount is required';
+                    if (isNaN(Number(value))) return 'Must be a valid number';
+                    if (Number(value) <= 0) return 'Amount must be greater than 0';
+                    return null;
+                }
+            });
+
+            if (!amountStr) return;
+            amount = Number(amountStr);
+        }
 
         // Show progress
         await vscode.window.withProgress({
@@ -85,12 +94,9 @@ export class InvoiceCommands {
             cancellable: false
         }, async () => {
             const result = await this.cli.createInvoice({
-                companyId,
-                clientId,
+                clientName: contract.client,
                 amount,
-                currency,
-                description,
-                dueDate: dueDateStr
+                currency
             });
 
             if (result.success) {
@@ -282,32 +288,51 @@ export class InvoiceCommands {
     }
 
     /**
-     * Parse clients from CLI output (tabular format)
+     * Parse contracts from CLI output (tabular format)
      */
-    private parseClientsFromOutput(output: string): Array<{ id: number; name: string; email: string; address?: string }> {
+    private parseContractsFromOutput(output: string): Array<{
+        id: number;
+        contractNum: string;
+        name: string;
+        client: string;
+        type: string;
+        ratePrice: string;
+        active: boolean;
+    }> {
         const lines = output.trim().split('\n');
         if (lines.length < 2) return [];
 
         // Skip header line
         const dataLines = lines.slice(1);
-        const clients: Array<{ id: number; name: string; email: string; address?: string }> = [];
+        const contracts: Array<{
+            id: number;
+            contractNum: string;
+            name: string;
+            client: string;
+            type: string;
+            ratePrice: string;
+            active: boolean;
+        }> = [];
 
         for (const line of dataLines) {
-            // Parse tab-separated values: ID  NAME  EMAIL  ADDRESS  TAX ID  CREATED
+            // Parse: ID  CONTRACT#  NAME  CLIENT  TYPE  RATE/PRICE  ACTIVE
             const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(p => p);
-            if (parts.length >= 3) {
+            if (parts.length >= 6) {
                 const id = parseInt(parts[0], 10);
                 if (!isNaN(id)) {
-                    clients.push({
+                    contracts.push({
                         id,
-                        name: parts[1],
-                        email: parts[2],
-                        address: parts[3] || undefined
+                        contractNum: parts[1],
+                        name: parts[2],
+                        client: parts[3],
+                        type: parts[4],
+                        ratePrice: parts[5],
+                        active: parts[6] === '✓'
                     });
                 }
             }
         }
 
-        return clients;
+        return contracts;
     }
 }

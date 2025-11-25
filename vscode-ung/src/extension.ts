@@ -12,6 +12,7 @@ import { ClientProvider } from './views/clientProvider';
 import { ExpenseProvider } from './views/expenseProvider';
 import { TrackingProvider } from './views/trackingProvider';
 import { DashboardProvider } from './views/dashboardProvider';
+import { WelcomeProvider, GettingStartedProvider } from './views/welcomeProvider';
 import { ExportPanel } from './webview/exportPanel';
 import { StatusBarManager } from './utils/statusBar';
 
@@ -28,7 +29,15 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize CLI wrapper
     const cli = new UngCli(outputChannel);
 
-    // Register install command (always available)
+    // Register Welcome provider for when CLI is not installed
+    const welcomeProvider = new WelcomeProvider();
+    const welcomeTree = vscode.window.createTreeView('ungWelcome', {
+        treeDataProvider: welcomeProvider,
+        showCollapseAll: false
+    });
+    context.subscriptions.push(welcomeTree);
+
+    // Register install commands (always available)
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.installCli', async () => {
             const action = await vscode.window.showQuickPick(
@@ -41,18 +50,83 @@ export async function activate(context: vscode.ExtensionContext) {
             );
 
             if (action?.value === 'homebrew') {
-                const terminal = vscode.window.createTerminal('UNG Installation');
-                terminal.show();
-                terminal.sendText('brew tap Andriiklymiuk/tools && brew install ung');
-                vscode.window.showInformationMessage('Installing UNG CLI... Reload VSCode after installation completes.', 'Reload').then(choice => {
-                    if (choice === 'Reload') {
-                        vscode.commands.executeCommand('workbench.action.reloadWindow');
-                    }
-                });
+                vscode.commands.executeCommand('ung.installViaHomebrew');
             } else if (action?.value === 'github') {
                 vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/releases/latest'));
             } else if (action?.value === 'docs') {
                 vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#installation'));
+            }
+        }),
+
+        vscode.commands.registerCommand('ung.installViaHomebrew', () => {
+            const terminal = vscode.window.createTerminal('UNG Installation');
+            terminal.show();
+            terminal.sendText('brew tap Andriiklymiuk/tools && brew install ung');
+            vscode.window.showInformationMessage('Installing UNG CLI via Homebrew... Reload VS Code after installation completes.', 'Reload').then(choice => {
+                if (choice === 'Reload') {
+                    vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+            });
+        }),
+
+        vscode.commands.registerCommand('ung.installViaScoop', () => {
+            const terminal = vscode.window.createTerminal('UNG Installation');
+            terminal.show();
+            terminal.sendText('scoop bucket add ung https://github.com/Andriiklymiuk/scoop-bucket && scoop install ung');
+            vscode.window.showInformationMessage('Installing UNG CLI via Scoop... Reload VS Code after installation completes.', 'Reload').then(choice => {
+                if (choice === 'Reload') {
+                    vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+            });
+        }),
+
+        vscode.commands.registerCommand('ung.installViaGo', () => {
+            const terminal = vscode.window.createTerminal('UNG Installation');
+            terminal.show();
+            terminal.sendText('go install github.com/Andriiklymiuk/ung@latest');
+            vscode.window.showInformationMessage('Installing UNG CLI via Go... Reload VS Code after installation completes.', 'Reload').then(choice => {
+                if (choice === 'Reload') {
+                    vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+            });
+        }),
+
+        vscode.commands.registerCommand('ung.downloadBinary', (platform?: string) => {
+            const url = platform === 'darwin'
+                ? 'https://github.com/Andriiklymiuk/ung/releases/latest/download/ung_darwin_amd64.tar.gz'
+                : platform === 'windows'
+                    ? 'https://github.com/Andriiklymiuk/ung/releases/latest/download/ung_windows_amd64.zip'
+                    : 'https://github.com/Andriiklymiuk/ung/releases/latest/download/ung_linux_amd64.tar.gz';
+            vscode.env.openExternal(vscode.Uri.parse(url));
+        }),
+
+        vscode.commands.registerCommand('ung.openReleases', () => {
+            vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/releases'));
+        }),
+
+        vscode.commands.registerCommand('ung.openDocs', () => {
+            vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#readme'));
+        }),
+
+        vscode.commands.registerCommand('ung.openGitHub', () => {
+            vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung'));
+        }),
+
+        vscode.commands.registerCommand('ung.reportIssue', () => {
+            vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/issues/new'));
+        }),
+
+        vscode.commands.registerCommand('ung.recheckCli', async () => {
+            const isNowInstalled = await cli.isInstalled();
+            vscode.commands.executeCommand('setContext', 'ung.cliInstalled', isNowInstalled);
+            if (isNowInstalled) {
+                vscode.window.showInformationMessage('UNG CLI detected! Reloading to enable features...', 'Reload').then(choice => {
+                    if (choice === 'Reload') {
+                        vscode.commands.executeCommand('workbench.action.reloadWindow');
+                    }
+                });
+            } else {
+                vscode.window.showWarningMessage('UNG CLI not found. Please install it first.');
             }
         })
     );
@@ -110,14 +184,17 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'ung.cliInstalled', isInstalled);
 
     if (!isInstalled) {
-        // Show error with install option
-        const action = await vscode.window.showErrorMessage(
-            'UNG CLI is not installed. Install it to use billing and time tracking features.',
-            'Install Now'
+        // Show friendly welcome message for new users
+        const action = await vscode.window.showInformationMessage(
+            'Welcome to UNG! Install the CLI to start tracking time and managing invoices.',
+            'Install Now',
+            'Learn More'
         );
 
         if (action === 'Install Now') {
             vscode.commands.executeCommand('ung.installCli');
+        } else if (action === 'Learn More') {
+            vscode.commands.executeCommand('ung.openDocs');
         }
         return;
     }
@@ -141,6 +218,23 @@ export async function activate(context: vscode.ExtensionContext) {
     const trackingProvider = new TrackingProvider(cli);
     const dashboardProvider = new DashboardProvider(cli);
 
+    // Initialize Getting Started provider with data checks
+    const gettingStartedProvider = new GettingStartedProvider(
+        async (): Promise<boolean> => {
+            const result = await cli.exec(['company', 'list']);
+            return !!(result.success && result.stdout && !result.stdout.includes('No company'));
+        },
+        async (): Promise<boolean> => {
+            const result = await cli.exec(['client', 'list']);
+            return !!(result.success && result.stdout && result.stdout.split('\n').length > 2);
+        },
+        async (): Promise<boolean> => {
+            const result = await cli.exec(['contract', 'list']);
+            return !!(result.success && result.stdout && result.stdout.split('\n').length > 2);
+        }
+    );
+    await gettingStartedProvider.refresh();
+
     // Register tree views
     const invoicesTree = vscode.window.createTreeView('ungInvoices', {
         treeDataProvider: invoiceProvider
@@ -160,8 +254,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const dashboardTree = vscode.window.createTreeView('ungDashboard', {
         treeDataProvider: dashboardProvider
     });
+    const gettingStartedTree = vscode.window.createTreeView('ungGettingStarted', {
+        treeDataProvider: gettingStartedProvider
+    });
 
-    context.subscriptions.push(invoicesTree, contractsTree, clientsTree, expensesTree, trackingTree, dashboardTree);
+    context.subscriptions.push(invoicesTree, contractsTree, clientsTree, expensesTree, trackingTree, dashboardTree, gettingStartedTree);
 
     // Initialize command handlers
     const companyCommands = new CompanyCommands(cli);
@@ -236,6 +333,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // Dashboard commands
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.refreshDashboard', () => dashboardProvider.refresh())
+    );
+
+    // Getting Started commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.refreshGettingStarted', () => gettingStartedProvider.refresh())
     );
 
     // Export wizard command

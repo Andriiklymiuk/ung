@@ -2,26 +2,33 @@
 
 A comprehensive VSCode extension for managing billing, invoicing, and time tracking using the UNG CLI tool.
 
-## Features
+## Key Features
 
-### Company & Client Management
+### 📊 Dashboard
+- Monthly revenue projections with real-time calculations
+- Contract breakdown by type (hourly, retainer, fixed-price)
+- Quick stats (clients, invoices, expenses)
+- **Auto-rounding:** Hours rounded up (9.5h → 10h) for accurate billing
+
+### 💼 Company & Client Management
 - Create and manage company profiles
 - Add and manage client information
 - View client list directly in VSCode sidebar
 
-### Contract Management
+### 📋 Contract Management
 - View all contracts in a tree view
 - Generate contract PDFs
 - Email contracts to clients
 - Toggle contract active status
 
-### Invoice Management
+### 📄 Invoice Management
 - Create new invoices with interactive forms
 - Generate invoices from tracked time
 - View invoice details in webview panels
-- Export invoices to PDF
+- Export invoices to PDF and open in external viewer
 - Email invoices directly from VSCode
 - View all invoices with status badges (pending, paid, overdue)
+- **Rounded hours display** for transparent billing calculations
 
 ### Expense Tracking
 - Log business expenses
@@ -123,7 +130,12 @@ Right-click on any item for quick actions:
 
 ### Keyboard Shortcuts
 
-No default keyboard shortcuts are set. You can customize them in VSCode:
+| Command | Windows/Linux | macOS |
+|---------|--------------|-------|
+| Quick Start Time Tracking | `Ctrl+Alt+T` | `Cmd+Alt+T` |
+| Create Invoice | `Ctrl+Alt+I` | `Cmd+Alt+I` |
+
+Additional shortcuts can be customized in VSCode:
 1. Open Keyboard Shortcuts (`Cmd/Ctrl + K, Cmd/Ctrl + S`)
 2. Search for "UNG"
 3. Assign your preferred shortcuts
@@ -137,7 +149,9 @@ Optional settings (via `Preferences > Settings > Extensions > UNG`):
 ```json
 {
   "ung.autoRefresh": true,
-  "ung.showStatusBar": true
+  "ung.showStatusBar": true,
+  "ung.roundHours": true,
+  "ung.roundRevenue": true
 }
 ```
 
@@ -150,6 +164,16 @@ Optional settings (via `Preferences > Settings > Extensions > UNG`):
 - Show active time tracking in status bar
 - Default: `true`
 - Shows elapsed time and project name while tracking
+
+**ung.roundHours** (boolean)
+- Round hours up to nearest integer for billing (9.5h → 10h)
+- Default: `true`
+- Ensures fair billing for partial hours worked
+
+**ung.roundRevenue** (boolean)
+- Round revenue projections up to nearest dollar
+- Default: `true`
+- Provides conservative revenue estimates
 
 That's it! The CLI handles all other configuration (currency, date formats, etc.).
 

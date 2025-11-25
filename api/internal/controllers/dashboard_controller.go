@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"math"
 	"net/http"
 	"time"
 
@@ -94,8 +95,8 @@ func (c *DashboardController) GetRevenue(w http.ResponseWriter, r *http.Request)
 
 				// Project to monthly revenue
 				cp.HourlyRate = *contract.HourlyRate
-				cp.EstimatedHours = totalHours // Last 30 days
-				cp.MonthlyRevenue = totalHours * (*contract.HourlyRate)
+				cp.EstimatedHours = math.Ceil(totalHours) // Round up hours
+				cp.MonthlyRevenue = cp.EstimatedHours * (*contract.HourlyRate)
 
 				projection.HourlyContractsRevenue += cp.MonthlyRevenue
 				projection.ProjectedHours += totalHours

@@ -179,6 +179,50 @@ export class UngCli {
         return this.exec(['client', 'delete', id.toString()]);
     }
 
+    /**
+     * Edit a client
+     */
+    async editClient(id: number, data: {
+        name?: string;
+        email?: string;
+        address?: string;
+        taxId?: string;
+    }): Promise<CliResult> {
+        const args = ['client', 'edit', id.toString()];
+        if (data.name) args.push('--name', `"${data.name}"`);
+        if (data.email) args.push('--email', data.email);
+        if (data.address) args.push('--address', `"${data.address}"`);
+        if (data.taxId) args.push('--tax-id', data.taxId);
+
+        return this.exec(args);
+    }
+
+    // ========== Company Commands (Edit) ==========
+
+    /**
+     * Edit a company
+     */
+    async editCompany(id: number, data: {
+        name?: string;
+        email?: string;
+        address?: string;
+        taxId?: string;
+        bankName?: string;
+        bankAccount?: string;
+        bankSwift?: string;
+    }): Promise<CliResult> {
+        const args = ['company', 'edit', id.toString()];
+        if (data.name) args.push('--name', `"${data.name}"`);
+        if (data.email) args.push('--email', data.email);
+        if (data.address) args.push('--address', `"${data.address}"`);
+        if (data.taxId) args.push('--tax-id', data.taxId);
+        if (data.bankName) args.push('--bank-name', `"${data.bankName}"`);
+        if (data.bankAccount) args.push('--bank-account', data.bankAccount);
+        if (data.bankSwift) args.push('--bank-swift', data.bankSwift);
+
+        return this.exec(args);
+    }
+
     // ========== Contract Commands ==========
 
     /**
@@ -200,6 +244,26 @@ export class UngCli {
      */
     async emailContract(id: number): Promise<CliResult> {
         return this.exec(['contract', 'email', id.toString()]);
+    }
+
+    /**
+     * Edit a contract
+     */
+    async editContract(id: number, data: {
+        name?: string;
+        rate?: number;
+        price?: number;
+        currency?: string;
+        active?: boolean;
+    }): Promise<CliResult> {
+        const args = ['contract', 'edit', id.toString()];
+        if (data.name) args.push('--name', `"${data.name}"`);
+        if (data.rate !== undefined) args.push('--rate', data.rate.toString());
+        if (data.price !== undefined) args.push('--price', data.price.toString());
+        if (data.currency) args.push('--currency', data.currency);
+        if (data.active !== undefined) args.push('--active', data.active.toString());
+
+        return this.exec(args);
     }
 
     // ========== Invoice Commands ==========

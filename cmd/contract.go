@@ -84,6 +84,14 @@ func init() {
 	contractAddCmd.Flags().Float64Var(&contractRate, "rate", 0, "Hourly rate (for hourly contracts)")
 	contractAddCmd.Flags().Float64Var(&contractPrice, "price", 0, "Fixed price (for fixed_price contracts)")
 	contractAddCmd.Flags().StringVar(&contractCurrency, "currency", "USD", "Currency")
+
+	// Edit flags
+	contractEditCmd.Flags().StringVar(&contractName, "name", "", "Contract name")
+	contractEditCmd.Flags().Float64Var(&contractRate, "rate", 0, "Hourly rate")
+	contractEditCmd.Flags().Float64Var(&contractPrice, "price", 0, "Fixed price")
+	contractEditCmd.Flags().StringVar(&contractCurrency, "currency", "", "Currency")
+	contractEditCmd.Flags().BoolVar(&contractActive, "active", true, "Contract active status")
+	contractEditCmd.Flags().StringVar(&contractNotes, "notes", "", "Contract notes")
 }
 
 func getClients() ([]models.Client, error) {
@@ -359,8 +367,7 @@ func runContractEdit(cmd *cobra.Command, args []string) error {
 			SELECT c.id, c.name, cl.name
 			FROM contracts c
 			JOIN clients cl ON c.client_id = cl.id
-			WHERE c.active = 1
-			ORDER BY c.id DESC
+			ORDER BY c.active DESC, c.id DESC
 		`)
 		if err != nil {
 			return fmt.Errorf("failed to query contracts: %w", err)
@@ -383,7 +390,7 @@ func runContractEdit(cmd *cobra.Command, args []string) error {
 		}
 
 		if len(contracts) == 0 {
-			return fmt.Errorf("no active contracts found")
+			return fmt.Errorf("no contracts found")
 		}
 
 		// Build options
@@ -411,13 +418,120 @@ func runContractEdit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// For now, just allow toggling active status
-	var active bool
+	// Check if any flags were provided (non-interactive mode)
+	hasFlags := cmd.Flags().Changed("name") || cmd.Flags().Changed("rate") ||
+		cmd.Flags().Changed("price") || cmd.Flags().Changed("currency") ||
+		cmd.Flags().Changed("active") || cmd.Flags().Changed("notes")
+
+	if hasFlags {
+		// Non-interactive mode - use flags to update
+		updates := make(map[string]interface{})
+		if cmd.Flags().Changed("name") {
+			updates["name"] = contractName
+		}
+		if cmd.Flags().Changed("rate") {
+			updates["hourly_rate"] = contractRate
+		}
+		if cmd.Flags().Changed("price") {
+			updates["fixed_price"] = contractPrice
+		}
+		if cmd.Flags().Changed("currency") {
+			updates["currency"] = contractCurrency
+		}
+		if cmd.Flags().Changed("active") {
+			updates["active"] = contractActive
+		}
+		if cmd.Flags().Changed("notes") {
+			updates["notes"] = contractNotes
+		}
+
+		if len(updates) == 0 {
+			return fmt.Errorf("no fields to update")
+		}
+
+		query := "UPDATE contracts SET "
+		argsList := []interface{}{}
+		i := 0
+		for key, val := range updates {
+			if i > 0 {
+				query += ", "
+			}
+			query += key + " = ?"
+			argsList = append(argsList, val)
+			i++
+		}
+		query += ", updated_at = ? WHERE id = ?"
+		argsList = append(argsList, time.Now(), contractID)
+
+		result, err := db.DB.Exec(query, argsList...)
+		if err != nil {
+			return fmt.Errorf("failed to update contract: %w", err)
+		}
+
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			return fmt.Errorf("contract with ID %d not found", contractID)
+		}
+
+		fmt.Printf("✓ Contract %d updated successfully\n", contractID)
+		return nil
+	}
+
+	// Interactive mode - fetch current values and show form
+	var currentName, currentCurrency string
+	var currentRate, currentPrice *float64
+	var currentActive bool
+
+	err = db.DB.QueryRow(`
+		SELECT name, hourly_rate, fixed_price, currency, active
+		FROM contracts WHERE id = ?
+	`, contractID).Scan(&currentName, &currentRate, &currentPrice, &currentCurrency, &currentActive)
+	if err != nil {
+		return fmt.Errorf("contract not found: %w", err)
+	}
+
+	// Prepare form values
+	editName := currentName
+	editCurrency := currentCurrency
+	editActive := currentActive
+	editRateStr := ""
+	editPriceStr := ""
+	if currentRate != nil {
+		editRateStr = fmt.Sprintf("%.2f", *currentRate)
+	}
+	if currentPrice != nil {
+		editPriceStr = fmt.Sprintf("%.2f", *currentPrice)
+	}
+
 	form := huh.NewForm(
 		huh.NewGroup(
+			huh.NewInput().
+				Title("Contract Name").
+				Value(&editName).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("name is required")
+					}
+					return nil
+				}),
+
+			huh.NewInput().
+				Title("Hourly Rate").
+				Description("Leave empty if not applicable").
+				Value(&editRateStr),
+
+			huh.NewInput().
+				Title("Fixed Price").
+				Description("Leave empty if not applicable").
+				Value(&editPriceStr),
+
+			huh.NewInput().
+				Title("Currency").
+				Value(&editCurrency),
+
 			huh.NewConfirm().
-				Title("Is this contract still active?").
-				Value(&active),
+				Title("Is this contract active?").
+				Value(&editActive),
 		),
 	)
 
@@ -425,7 +539,59 @@ func runContractEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("form cancelled: %w", err)
 	}
 
-	_, err = db.DB.Exec("UPDATE contracts SET active = ?, updated_at = ? WHERE id = ?", active, time.Now(), contractID)
+	// Build update query
+	updates := make(map[string]interface{})
+
+	if editName != currentName {
+		updates["name"] = editName
+	}
+	if editCurrency != currentCurrency {
+		updates["currency"] = editCurrency
+	}
+	if editActive != currentActive {
+		updates["active"] = editActive
+	}
+
+	// Handle rate changes
+	if editRateStr != "" {
+		newRate, err := strconv.ParseFloat(editRateStr, 64)
+		if err == nil && (currentRate == nil || newRate != *currentRate) {
+			updates["hourly_rate"] = newRate
+		}
+	} else if currentRate != nil {
+		updates["hourly_rate"] = nil
+	}
+
+	// Handle price changes
+	if editPriceStr != "" {
+		newPrice, err := strconv.ParseFloat(editPriceStr, 64)
+		if err == nil && (currentPrice == nil || newPrice != *currentPrice) {
+			updates["fixed_price"] = newPrice
+		}
+	} else if currentPrice != nil {
+		updates["fixed_price"] = nil
+	}
+
+	if len(updates) == 0 {
+		fmt.Println("No changes made")
+		return nil
+	}
+
+	query := "UPDATE contracts SET "
+	argsList := []interface{}{}
+	i := 0
+	for key, val := range updates {
+		if i > 0 {
+			query += ", "
+		}
+		query += key + " = ?"
+		argsList = append(argsList, val)
+		i++
+	}
+	query += ", updated_at = ? WHERE id = ?"
+	argsList = append(argsList, time.Now(), contractID)
+
+	_, err = db.DB.Exec(query, argsList...)
 	if err != nil {
 		return fmt.Errorf("failed to update contract: %w", err)
 	}

@@ -237,8 +237,8 @@ export class UngCli {
     /**
      * Email invoice
      */
-    async emailInvoice(id: number): Promise<CliResult> {
-        return this.exec(['invoice', 'email', id.toString()]);
+    async emailInvoice(id: number, client: string): Promise<CliResult> {
+        return this.exec(['invoice', 'email', id.toString(), '--client', client]);
     }
 
     /**

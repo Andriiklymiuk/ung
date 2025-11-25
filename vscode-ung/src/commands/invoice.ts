@@ -272,12 +272,27 @@ export class InvoiceCommands {
             return;
         }
 
+        // Ask user to select email client
+        const emailClients = [
+            { label: 'Apple Mail', value: 'apple' },
+            { label: 'Outlook', value: 'outlook' },
+            { label: 'Gmail (Browser)', value: 'gmail' }
+        ];
+
+        const selected = await vscode.window.showQuickPick(emailClients, {
+            placeHolder: 'Select email client'
+        });
+
+        if (!selected) {
+            return;
+        }
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Preparing invoice email...',
             cancellable: false
         }, async () => {
-            const result = await this.cli.emailInvoice(invoiceId);
+            const result = await this.cli.emailInvoice(invoiceId, selected.value);
 
             if (result.success) {
                 vscode.window.showInformationMessage('Invoice email prepared!');

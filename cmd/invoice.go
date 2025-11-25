@@ -68,6 +68,7 @@ var (
 	invoiceCurrency    string
 	invoiceDescription string
 	invoiceDueDate     string
+	invoiceEmailClient string
 )
 
 func init() {
@@ -87,6 +88,9 @@ func init() {
 	invoiceNewCmd.Flags().StringVar(&invoiceDescription, "description", "", "Invoice description")
 	invoiceNewCmd.Flags().StringVar(&invoiceDueDate, "due", "", "Due date (YYYY-MM-DD)")
 	invoiceNewCmd.MarkFlagRequired("price")
+
+	// Email invoice flags
+	invoiceEmailCmd.Flags().StringVar(&invoiceEmailClient, "client", "", "Email client (apple, outlook, gmail)")
 }
 
 func runInvoiceNew(cmd *cobra.Command, args []string) error {
@@ -404,24 +408,33 @@ func runInvoiceEmail(cmd *cobra.Command, args []string) error {
 	body := fmt.Sprintf("Hi,\n\nHere is the invoice for %s %s.\n\nBest regards,\n%s",
 		inv.IssuedDate.Format("January"), year, company.Name)
 
-	// Prompt for email client selection
+	// Determine email client (from flag or interactive prompt)
 	var emailClient string
 
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Select email client").
-				Options(
-					huh.NewOption("Apple Mail", "apple"),
-					huh.NewOption("Outlook", "outlook"),
-					huh.NewOption("Gmail (Browser)", "gmail"),
-				).
-				Value(&emailClient),
-		),
-	)
+	if invoiceEmailClient != "" {
+		// Non-interactive mode - use flag value
+		emailClient = invoiceEmailClient
+		if emailClient != "apple" && emailClient != "outlook" && emailClient != "gmail" {
+			return fmt.Errorf("invalid email client: %s (valid: apple, outlook, gmail)", emailClient)
+		}
+	} else {
+		// Interactive mode - prompt for selection
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("Select email client").
+					Options(
+						huh.NewOption("Apple Mail", "apple"),
+						huh.NewOption("Outlook", "outlook"),
+						huh.NewOption("Gmail (Browser)", "gmail"),
+					).
+					Value(&emailClient),
+			),
+		)
 
-	if err := form.Run(); err != nil {
-		return fmt.Errorf("email export cancelled: %w", err)
+		if err := form.Run(); err != nil {
+			return fmt.Errorf("email export cancelled: %w", err)
+		}
 	}
 
 	// Export to selected email client

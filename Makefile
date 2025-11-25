@@ -1,4 +1,4 @@
-.PHONY: build install test clean run help release
+.PHONY: build install test clean run help release release-vs-code-extension
 
 # Build variables
 BINARY_NAME=ung
@@ -96,6 +96,9 @@ release:
 	@git tag -a v$(NEW_VERSION) -m "Release v$(NEW_VERSION)"
 	@git push origin main v$(NEW_VERSION)
 	@echo "✓ Version bumped, committed, tagged v$(NEW_VERSION), and pushed. Release workflow triggered."
+
+release-vs-code-extension:
+	cd vscode-ung && npm run compile && vsce package patch && vsce publish
 
 # Help
 help:

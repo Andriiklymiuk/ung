@@ -3,7 +3,8 @@ name: Publish VSCode Extension
 on:
   push:
     tags:
-      - 'vscode-v*'  # Trigger on tags like vscode-v1.0.0
+      - 'v*'         # Trigger on semver tags like v1.0.0, v1.0.1
+      - 'vscode-v*'  # Also trigger on vscode-specific tags like vscode-v1.0.0
 
 jobs:
   publish:

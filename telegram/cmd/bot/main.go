@@ -35,6 +35,10 @@ func main() {
 	helpHandler := handlers.NewHelpHandler(bot)
 	invoiceHandler := handlers.NewInvoiceHandler(bot, apiClient, sessionMgr)
 	clientHandler := handlers.NewClientHandler(bot, apiClient, sessionMgr)
+	companyHandler := handlers.NewCompanyHandler(bot, apiClient, sessionMgr)
+	contractHandler := handlers.NewContractHandler(bot, apiClient, sessionMgr)
+	expenseHandler := handlers.NewExpenseHandler(bot, apiClient, sessionMgr)
+	trackingHandler := handlers.NewTrackingHandler(bot, apiClient, sessionMgr)
 
 	// Start listening for updates
 	u := tgbotapi.NewUpdate(0)
@@ -47,14 +51,14 @@ func main() {
 	for update := range updates {
 		// Handle messages
 		if update.Message != nil {
-			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, sessionMgr); err != nil {
+			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, sessionMgr); err != nil {
 				log.Printf("Error handling message: %v", err)
 			}
 		}
 
 		// Handle callback queries
 		if update.CallbackQuery != nil {
-			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, sessionMgr); err != nil {
+			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, sessionMgr); err != nil {
 				log.Printf("Error handling callback: %v", err)
 			}
 		}
@@ -68,6 +72,10 @@ func handleMessage(
 	helpHandler *handlers.HelpHandler,
 	invoiceHandler *handlers.InvoiceHandler,
 	clientHandler *handlers.ClientHandler,
+	companyHandler *handlers.CompanyHandler,
+	contractHandler *handlers.ContractHandler,
+	expenseHandler *handlers.ExpenseHandler,
+	trackingHandler *handlers.TrackingHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	// Handle commands
@@ -85,6 +93,26 @@ func handleMessage(
 			return clientHandler.HandleCreate(message)
 		case "clients":
 			return clientHandler.HandleList(message)
+		case "company":
+			return companyHandler.HandleCreate(message)
+		case "companies":
+			return companyHandler.HandleList(message)
+		case "contract":
+			return contractHandler.HandleCreate(message)
+		case "contracts":
+			return contractHandler.HandleList(message)
+		case "expense":
+			return expenseHandler.HandleCreate(message)
+		case "expenses":
+			return expenseHandler.HandleList(message)
+		case "track":
+			return trackingHandler.HandleStart(message)
+		case "tracking":
+			return trackingHandler.HandleList(message)
+		case "stop":
+			return trackingHandler.HandleStop(message)
+		case "active":
+			return trackingHandler.HandleActive(message)
 		default:
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Try /help")
 			bot.Send(msg)
@@ -98,10 +126,12 @@ func handleMessage(
 
 	if session != nil {
 		switch models.SessionState(session.State) {
+		// Invoice states
 		case models.StateInvoiceAmount:
 			return invoiceHandler.HandleAmountInput(message)
 		case models.StateInvoiceDescription:
 			return invoiceHandler.HandleDescriptionInput(message)
+		// Client states
 		case models.StateClientCreateName:
 			return clientHandler.HandleNameInput(message)
 		case models.StateClientCreateEmail:
@@ -110,6 +140,29 @@ func handleMessage(
 			return clientHandler.HandleAddressInput(message)
 		case models.StateClientCreateTaxID:
 			return clientHandler.HandleTaxIDInput(message)
+		// Company states
+		case models.StateCompanyCreateName:
+			return companyHandler.HandleNameInput(message)
+		case models.StateCompanyCreateEmail:
+			return companyHandler.HandleEmailInput(message)
+		case models.StateCompanyCreatePhone:
+			return companyHandler.HandlePhoneInput(message)
+		case models.StateCompanyCreateAddress:
+			return companyHandler.HandleAddressInput(message)
+		case models.StateCompanyCreateTaxID:
+			return companyHandler.HandleTaxIDInput(message)
+		// Contract states
+		case models.StateContractName:
+			return contractHandler.HandleNameInput(message)
+		case models.StateContractRate:
+			return contractHandler.HandleRateInput(message)
+		// Expense states
+		case models.StateExpenseDescription:
+			return expenseHandler.HandleDescriptionInput(message)
+		case models.StateExpenseAmount:
+			return expenseHandler.HandleAmountInput(message)
+		case models.StateExpenseVendor:
+			return expenseHandler.HandleVendorInput(message)
 		}
 	}
 
@@ -124,11 +177,15 @@ func handleCallback(
 	bot *tgbotapi.BotAPI,
 	invoiceHandler *handlers.InvoiceHandler,
 	clientHandler *handlers.ClientHandler,
+	contractHandler *handlers.ContractHandler,
+	expenseHandler *handlers.ExpenseHandler,
+	trackingHandler *handlers.TrackingHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	data := callbackQuery.Data
 
 	// Route based on callback data prefix
+	// Invoice callbacks
 	if strings.HasPrefix(data, "invoice_client_") {
 		return invoiceHandler.HandleClientSelected(callbackQuery)
 	}
@@ -169,6 +226,26 @@ func handleCallback(
 		return clientHandler.HandleCreate(msg)
 	}
 
+	// Contract callbacks
+	if strings.HasPrefix(data, "contract_client_") {
+		return contractHandler.HandleClientSelected(callbackQuery)
+	}
+
+	if strings.HasPrefix(data, "contract_type_") {
+		return contractHandler.HandleTypeSelected(callbackQuery)
+	}
+
+	// Expense callbacks
+	if strings.HasPrefix(data, "expense_category_") {
+		return expenseHandler.HandleCategorySelected(callbackQuery)
+	}
+
+	// Tracking callbacks
+	if data == "tracking_stop" {
+		return trackingHandler.HandleStopCallback(callbackQuery)
+	}
+
+	// Auth callback
 	if data == "auth_login" {
 		chatID := callbackQuery.Message.Chat.ID
 		text := "To authenticate, please visit:\n\n" +

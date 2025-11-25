@@ -42,3 +42,6 @@ Thumbs.db
 
 # Generated PDFs (for development)
 *.pdf
+
+ung-docs/node_modules/*
+ung-docs/build/*

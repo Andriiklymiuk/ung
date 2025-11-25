@@ -16,17 +16,23 @@ If it is not installed already, you can install it via your OS's package manager
 
 To load completions in your current shell session:
 
-	source <(ung completion bash)
+```bash
+source <(ung completion bash)
+```
 
 To load completions for every new session, execute once:
 
 #### Linux:
 
-	ung completion bash > /etc/bash_completion.d/ung
+```bash
+ung completion bash > /etc/bash_completion.d/ung
+```
 
 #### macOS:
 
-	ung completion bash > $(brew --prefix)/etc/bash_completion.d/ung
+```bash
+ung completion bash > $(brew --prefix)/etc/bash_completion.d/ung
+```
 
 You will need to start a new shell for this setup to take effect.
 

@@ -360,30 +360,10 @@
     "configuration": {
       "title": "UNG",
       "properties": {
-        "ung.cliPath": {
-          "type": "string",
-          "default": "ung",
-          "description": "Path to the UNG CLI executable"
-        },
-        "ung.defaultCurrency": {
-          "type": "string",
-          "default": "USD",
-          "description": "Default currency for new invoices and contracts"
-        },
         "ung.autoRefresh": {
           "type": "boolean",
           "default": true,
           "description": "Automatically refresh views after operations"
-        },
-        "ung.dateFormat": {
-          "type": "string",
-          "default": "YYYY-MM-DD",
-          "enum": [
-            "YYYY-MM-DD",
-            "MM/DD/YYYY",
-            "DD/MM/YYYY"
-          ],
-          "description": "Date format for display"
         },
         "ung.showStatusBar": {
           "type": "boolean",

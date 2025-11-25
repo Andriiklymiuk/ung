@@ -21,19 +21,10 @@ export interface CliResult<T = any> {
  */
 export class UngCli {
     private outputChannel: vscode.OutputChannel;
-    private cliPath: string;
+    private readonly CLI_COMMAND = 'ung';
 
     constructor(outputChannel: vscode.OutputChannel) {
         this.outputChannel = outputChannel;
-        this.cliPath = this.getCliPath();
-    }
-
-    /**
-     * Get the CLI path from configuration
-     */
-    private getCliPath(): string {
-        const config = vscode.workspace.getConfiguration('ung');
-        return config.get<string>('cliPath', 'ung');
     }
 
     /**
@@ -46,7 +37,7 @@ export class UngCli {
         const parseJson = options?.parseJson ?? false;
         const cwd = options?.cwd ?? undefined;
 
-        const command = `${this.cliPath} ${args.join(' ')}`;
+        const command = `${this.CLI_COMMAND} ${args.join(' ')}`;
         this.outputChannel.appendLine(`> ${command}`);
 
         try {

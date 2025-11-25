@@ -1,29 +1,16 @@
-import { Config } from './config';
-
 /**
  * Formatting utilities
  */
 export class Formatter {
     /**
-     * Format a date according to user preferences
+     * Format a date to YYYY-MM-DD format (matches CLI output)
      */
     static formatDate(date: Date | string): string {
         const dateObj = typeof date === 'string' ? new Date(date) : date;
-        const format = Config.getDateFormat();
-
         const year = dateObj.getFullYear();
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const day = String(dateObj.getDate()).padStart(2, '0');
-
-        switch (format) {
-            case 'MM/DD/YYYY':
-                return `${month}/${day}/${year}`;
-            case 'DD/MM/YYYY':
-                return `${day}/${month}/${year}`;
-            case 'YYYY-MM-DD':
-            default:
-                return `${year}-${month}-${day}`;
-        }
+        return `${year}-${month}-${day}`;
     }
 
     /**

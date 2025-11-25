@@ -130,42 +130,28 @@ No default keyboard shortcuts are set. You can customize them in VSCode:
 
 ## Configuration
 
-Access settings via `Preferences > Settings > Extensions > UNG`
+**Zero-config design!** The extension works out of the box with sensible defaults.
 
-### Available Settings
+Optional settings (via `Preferences > Settings > Extensions > UNG`):
 
 ```json
 {
-  "ung.cliPath": "ung",
-  "ung.defaultCurrency": "USD",
   "ung.autoRefresh": true,
-  "ung.dateFormat": "YYYY-MM-DD",
   "ung.showStatusBar": true
 }
 ```
 
-**ung.cliPath** (string)
-- Path to UNG CLI executable
-- Default: `ung` (assumes it's in PATH)
-- Example: `/usr/local/bin/ung` or `C:\\tools\\ung.exe`
-
-**ung.defaultCurrency** (string)
-- Default currency for new invoices
-- Default: `USD`
-- Options: USD, EUR, GBP, UAH, CAD, AUD
-
 **ung.autoRefresh** (boolean)
 - Auto-refresh views after operations
 - Default: `true`
-
-**ung.dateFormat** (string)
-- Date format for display
-- Default: `YYYY-MM-DD`
-- Options: `YYYY-MM-DD`, `MM/DD/YYYY`, `DD/MM/YYYY`
+- Disable if you prefer manual refresh for performance
 
 **ung.showStatusBar** (boolean)
 - Show active time tracking in status bar
 - Default: `true`
+- Shows elapsed time and project name while tracking
+
+That's it! The CLI handles all other configuration (currency, date formats, etc.).
 
 ## Workflows
 
@@ -207,7 +193,7 @@ Access settings via `Preferences > Settings > Extensions > UNG`
 
 If you see "UNG CLI is not installed":
 1. Verify installation: `ung --version` in terminal
-2. If not in PATH, set full path in settings: `ung.cliPath`
+2. Ensure `ung` is in your system PATH
 3. Restart VSCode after installation
 
 ### Tree Views Not Loading

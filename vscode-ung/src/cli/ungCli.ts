@@ -212,7 +212,7 @@ export class UngCli {
     }
 
     /**
-     * Create a new invoice
+     * Create a new invoice (manual)
      */
     async createInvoice(data: {
         clientName: string;
@@ -228,24 +228,50 @@ export class UngCli {
     }
 
     /**
-     * Generate invoice PDF
+     * Unified invoice action - generate from time, PDF, email
+     */
+    async invoiceAction(options: {
+        client?: string;
+        id?: number;
+        pdf?: boolean;
+        email?: boolean;
+        emailApp?: string;
+        batch?: boolean;
+    }): Promise<CliResult> {
+        const args = ['invoice'];
+        if (options.client) args.push('--client', options.client);
+        if (options.id) args.push('--id', options.id.toString());
+        if (options.pdf) args.push('--pdf');
+        if (options.email) args.push('--email');
+        if (options.emailApp) args.push('--email-app', options.emailApp);
+        if (options.batch) args.push('--batch');
+        return this.exec(args);
+    }
+
+    /**
+     * Generate invoice PDF for existing invoice
      */
     async generateInvoicePDF(id: number): Promise<CliResult> {
-        return this.exec(['invoice', 'pdf', id.toString()]);
+        return this.invoiceAction({ id, pdf: true });
     }
 
     /**
      * Email invoice
      */
-    async emailInvoice(id: number, client: string): Promise<CliResult> {
-        return this.exec(['invoice', 'email', id.toString(), '--client', client]);
+    async emailInvoice(id: number, emailApp: string): Promise<CliResult> {
+        return this.invoiceAction({ id, email: true, emailApp });
     }
 
     /**
      * Generate invoice from time tracking
      */
-    async generateInvoiceFromTime(clientName: string): Promise<CliResult> {
-        return this.exec(['invoice', clientName]);
+    async generateInvoiceFromTime(clientName: string, options?: { pdf?: boolean; email?: boolean; emailApp?: string }): Promise<CliResult> {
+        return this.invoiceAction({
+            client: clientName,
+            pdf: options?.pdf,
+            email: options?.email,
+            emailApp: options?.emailApp
+        });
     }
 
     // ========== Expense Commands ==========

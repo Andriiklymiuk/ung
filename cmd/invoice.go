@@ -20,11 +20,16 @@ import (
 )
 
 var invoiceCmd = &cobra.Command{
-	Use:   "invoice [client-name]",
+	Use:   "invoice",
 	Short: "Manage invoices or generate from time for a client",
-	Long:  "Create, list, and manage invoices. If client name provided, auto-generates invoice from tracked time.",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runInvoiceSimple,
+	Long: `Create, list, and manage invoices.
+
+Examples:
+  ung invoice -c skeep --pdf           Generate invoice from time + PDF
+  ung invoice --client skeep --email   Generate invoice + email (auto-generates PDF)
+  ung invoice --id 5 --pdf             Generate PDF for existing invoice
+  ung invoice --id 5 --email           Email existing invoice`,
+	RunE: runInvoiceMain,
 }
 
 var invoiceNewCmd = &cobra.Command{
@@ -40,27 +45,9 @@ var invoiceListCmd = &cobra.Command{
 	RunE:    runInvoiceList,
 }
 
-var invoicePDFCmd = &cobra.Command{
-	Use:   "pdf [invoice-id]",
-	Short: "Generate PDF for an invoice",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runInvoicePDF,
-}
-
-var invoiceEmailCmd = &cobra.Command{
-	Use:   "email [invoice-id]",
-	Short: "Export invoice to email client",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runInvoiceEmail,
-}
-
-var invoiceBatchEmailCmd = &cobra.Command{
-	Use:   "batch-email",
-	Short: "Export multiple invoices to email",
-	RunE:  runInvoiceBatchEmail,
-}
 
 var (
+	// Flags for invoice new command
 	invoiceCompanyID   int
 	invoiceClientID    int
 	invoiceClientName  string
@@ -68,29 +55,38 @@ var (
 	invoiceCurrency    string
 	invoiceDescription string
 	invoiceDueDate     string
-	invoiceEmailClient string
+
+	// Flags for main invoice command
+	invoiceFlagClient   string // --client, -c
+	invoiceFlagID       int    // --id
+	invoiceFlagPDF      bool   // --pdf
+	invoiceFlagEmail    bool   // --email
+	invoiceFlagEmailApp string // --email-app
+	invoiceFlagBatch    bool   // --batch
 )
 
 func init() {
-	// Add subcommands
+	// Add subcommands (only new and ls remain)
 	invoiceCmd.AddCommand(invoiceNewCmd)
 	invoiceCmd.AddCommand(invoiceListCmd)
-	invoiceCmd.AddCommand(invoicePDFCmd)
-	invoiceCmd.AddCommand(invoiceEmailCmd)
-	invoiceCmd.AddCommand(invoiceBatchEmailCmd)
+
+	// Main invoice command flags
+	invoiceCmd.Flags().StringVarP(&invoiceFlagClient, "client", "c", "", "Client name (generates invoice from tracked time)")
+	invoiceCmd.Flags().IntVar(&invoiceFlagID, "id", 0, "Existing invoice ID")
+	invoiceCmd.Flags().BoolVar(&invoiceFlagPDF, "pdf", false, "Generate PDF")
+	invoiceCmd.Flags().BoolVar(&invoiceFlagEmail, "email", false, "Send email (auto-generates PDF)")
+	invoiceCmd.Flags().StringVar(&invoiceFlagEmailApp, "email-app", "", "Email client (apple, outlook, gmail)")
+	invoiceCmd.Flags().BoolVar(&invoiceFlagBatch, "batch", false, "Batch operation for multiple invoices")
 
 	// New invoice flags
 	invoiceNewCmd.Flags().IntVar(&invoiceCompanyID, "company", 0, "Company ID")
-	invoiceNewCmd.Flags().IntVar(&invoiceClientID, "client", 0, "Client ID")
+	invoiceNewCmd.Flags().IntVar(&invoiceClientID, "client-id", 0, "Client ID")
 	invoiceNewCmd.Flags().StringVar(&invoiceClientName, "client-name", "", "Client name (partial match, min 3 chars)")
 	invoiceNewCmd.Flags().Float64Var(&invoiceAmount, "price", 0, "Invoice amount (required)")
 	invoiceNewCmd.Flags().StringVar(&invoiceCurrency, "currency", "USD", "Currency code")
 	invoiceNewCmd.Flags().StringVar(&invoiceDescription, "description", "", "Invoice description")
 	invoiceNewCmd.Flags().StringVar(&invoiceDueDate, "due", "", "Due date (YYYY-MM-DD)")
 	invoiceNewCmd.MarkFlagRequired("price")
-
-	// Email invoice flags
-	invoiceEmailCmd.Flags().StringVar(&invoiceEmailClient, "client", "", "Email client (apple, outlook, gmail)")
 }
 
 func runInvoiceNew(cmd *cobra.Command, args []string) error {
@@ -255,200 +251,6 @@ func runInvoiceList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runInvoicePDF(cmd *cobra.Command, args []string) error {
-	invoiceID, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("invalid invoice ID: %w", err)
-	}
-
-	// Fetch invoice details
-	var inv models.Invoice
-	var company models.Company
-	var client models.Client
-
-	// Get invoice
-	err = db.DB.QueryRow(`
-		SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date
-		FROM invoices WHERE id = ?
-	`, invoiceID).Scan(
-		&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
-		&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate,
-	)
-	if err != nil {
-		return fmt.Errorf("invoice not found: %w", err)
-	}
-
-	// Get company with all fields
-	err = db.DB.QueryRow(`
-		SELECT id, name, email, phone, address, registration_address, tax_id,
-		       bank_name, bank_account, bank_swift, logo_path
-		FROM companies WHERE id = ?
-	`, inv.CompanyID).Scan(&company.ID, &company.Name, &company.Email, &company.Phone,
-		&company.Address, &company.RegistrationAddress, &company.TaxID,
-		&company.BankName, &company.BankAccount, &company.BankSWIFT, &company.LogoPath)
-	if err != nil {
-		return fmt.Errorf("company not found: %w", err)
-	}
-
-	// Get client
-	err = db.DB.QueryRow(`
-		SELECT c.id, c.name, c.email, c.address, c.tax_id
-		FROM clients c
-		JOIN invoice_recipients ir ON c.id = ir.client_id
-		WHERE ir.invoice_id = ?
-	`, invoiceID).Scan(&client.ID, &client.Name, &client.Email, &client.Address, &client.TaxID)
-	if err != nil {
-		return fmt.Errorf("client not found: %w", err)
-	}
-
-	// Get line items
-	var lineItems []models.InvoiceLineItem
-	rows, err := db.DB.Query(`
-		SELECT id, invoice_id, item_name, description, quantity, rate, amount, created_at
-		FROM invoice_line_items
-		WHERE invoice_id = ?
-		ORDER BY id
-	`, invoiceID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch line items: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var item models.InvoiceLineItem
-		if err := rows.Scan(&item.ID, &item.InvoiceID, &item.ItemName, &item.Description,
-			&item.Quantity, &item.Rate, &item.Amount, &item.CreatedAt); err != nil {
-			return fmt.Errorf("failed to scan line item: %w", err)
-		}
-		lineItems = append(lineItems, item)
-	}
-
-	// If no line items, create a default one from invoice amount
-	if len(lineItems) == 0 {
-		lineItems = []models.InvoiceLineItem{
-			{
-				ItemName:    inv.Description,
-				Description: "",
-				Quantity:    1.0,
-				Rate:        inv.Amount,
-				Amount:      inv.Amount,
-			},
-		}
-	}
-
-	// Generate PDF
-	pdfPath, err := invoice.GeneratePDF(inv, company, client, lineItems)
-	if err != nil {
-		return fmt.Errorf("failed to generate PDF: %w", err)
-	}
-
-	// Update invoice with PDF path
-	_, err = db.DB.Exec("UPDATE invoices SET pdf_path = ? WHERE id = ?", pdfPath, invoiceID)
-	if err != nil {
-		return fmt.Errorf("failed to update invoice: %w", err)
-	}
-
-	fmt.Printf("✓ PDF generated successfully: %s\n", pdfPath)
-	return nil
-}
-
-func runInvoiceEmail(cmd *cobra.Command, args []string) error {
-	invoiceID, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("invalid invoice ID: %w", err)
-	}
-
-	// Fetch invoice details
-	var inv models.Invoice
-	var company models.Company
-
-	// Get invoice
-	err = db.DB.QueryRow(`
-		SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
-		FROM invoices WHERE id = ?
-	`, invoiceID).Scan(
-		&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
-		&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath,
-	)
-	if err != nil {
-		return fmt.Errorf("invoice not found: %w", err)
-	}
-
-	// Get company info
-	err = db.DB.QueryRow(`
-		SELECT id, name FROM companies WHERE id = ?
-	`, inv.CompanyID).Scan(&company.ID, &company.Name)
-	if err != nil {
-		return fmt.Errorf("company not found: %w", err)
-	}
-
-	// Ensure PDF is generated
-	var pdfPath string
-	if inv.PDFPath == "" {
-		fmt.Println("📄 Generating PDF first...")
-		// Call the PDF generation logic
-		if err := runInvoicePDF(cmd, args); err != nil {
-			return fmt.Errorf("failed to generate PDF: %w", err)
-		}
-		// Re-fetch the PDF path
-		err = db.DB.QueryRow("SELECT pdf_path FROM invoices WHERE id = ?", invoiceID).Scan(&pdfPath)
-		if err != nil {
-			return fmt.Errorf("failed to get PDF path: %w", err)
-		}
-	} else {
-		pdfPath = inv.PDFPath
-	}
-
-	// Extract month and year from issued date
-	month := inv.IssuedDate.Format("01")
-	year := inv.IssuedDate.Format("2006")
-
-	// Prepare email details
-	subject := fmt.Sprintf("%s.%s %s", month, year, company.Name)
-	body := fmt.Sprintf("Hi,\n\nHere is the invoice for %s %s.\n\nBest regards,\n%s",
-		inv.IssuedDate.Format("January"), year, company.Name)
-
-	// Determine email client (from flag or interactive prompt)
-	var emailClient string
-
-	if invoiceEmailClient != "" {
-		// Non-interactive mode - use flag value
-		emailClient = invoiceEmailClient
-		if emailClient != "apple" && emailClient != "outlook" && emailClient != "gmail" {
-			return fmt.Errorf("invalid email client: %s (valid: apple, outlook, gmail)", emailClient)
-		}
-	} else {
-		// Interactive mode - prompt for selection
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Select email client").
-					Options(
-						huh.NewOption("Apple Mail", "apple"),
-						huh.NewOption("Outlook", "outlook"),
-						huh.NewOption("Gmail (Browser)", "gmail"),
-					).
-					Value(&emailClient),
-			),
-		)
-
-		if err := form.Run(); err != nil {
-			return fmt.Errorf("email export cancelled: %w", err)
-		}
-	}
-
-	// Export to selected email client
-	switch emailClient {
-	case "apple":
-		return exportToAppleMail(subject, body, pdfPath)
-	case "outlook":
-		return exportToOutlook(subject, body, pdfPath)
-	case "gmail":
-		return exportToGmail(subject, body, pdfPath)
-	default:
-		return fmt.Errorf("unknown email client: %s", emailClient)
-	}
-}
 
 // exportToAppleMail opens Apple Mail with prefilled email and attachment
 func exportToAppleMail(subject, body, attachmentPath string) error {
@@ -535,192 +337,52 @@ func escapeAppleScript(s string) string {
 	return s
 }
 
-func runInvoiceBatchEmail(cmd *cobra.Command, args []string) error {
-	// Prompt for export option
-	var exportOption string
 
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("What invoices would you like to export?").
-				Options(
-					huh.NewOption("Export for latest month", "latest"),
-					huh.NewOption("Select specific month/year", "specific"),
-					huh.NewOption("Export all pending invoices", "all_pending"),
-				).
-				Value(&exportOption),
-		),
-	)
-
-	if err := form.Run(); err != nil {
-		return fmt.Errorf("export cancelled: %w", err)
+// runInvoiceMain handles the main invoice command with flags
+func runInvoiceMain(cmd *cobra.Command, args []string) error {
+	// If --batch flag is set, handle batch operations
+	if invoiceFlagBatch {
+		return runBatchInvoice(cmd)
 	}
 
-	var invoices []models.Invoice
-
-	switch exportOption {
-	case "latest":
-		// Get invoices from the latest month
-		query := `
-			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
-			FROM invoices
-			WHERE strftime('%Y-%m', issued_date) = strftime('%Y-%m', 'now')
-			ORDER BY issued_date DESC
-		`
-		rows, err := db.DB.Query(query)
+	// If --client is provided, generate invoice from tracked time
+	if invoiceFlagClient != "" {
+		invoiceID, err := generateInvoiceFromTime(invoiceFlagClient)
 		if err != nil {
-			return fmt.Errorf("failed to fetch invoices: %w", err)
+			return err
 		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var inv models.Invoice
-			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
-				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
-				return fmt.Errorf("failed to scan invoice: %w", err)
-			}
-			invoices = append(invoices, inv)
-		}
-
-	case "specific":
-		// Prompt for month and year
-		var monthStr, yearStr string
-		monthForm := huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("Month (1-12)").
-					Placeholder("e.g., 10").
-					Value(&monthStr).
-					Validate(func(s string) error {
-						month, err := strconv.Atoi(s)
-						if err != nil || month < 1 || month > 12 {
-							return fmt.Errorf("please enter a valid month (1-12)")
-						}
-						return nil
-					}),
-				huh.NewInput().
-					Title("Year").
-					Placeholder("e.g., 2024").
-					Value(&yearStr).
-					Validate(func(s string) error {
-						year, err := strconv.Atoi(s)
-						if err != nil || year < 2000 {
-							return fmt.Errorf("please enter a valid year")
-						}
-						return nil
-					}),
-			),
-		)
-
-		if err := monthForm.Run(); err != nil {
-			return fmt.Errorf("export cancelled: %w", err)
-		}
-
-		// Pad month to 2 digits
-		month, _ := strconv.Atoi(monthStr)
-		yearMonth := fmt.Sprintf("%s-%02d", yearStr, month)
-
-		query := `
-			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
-			FROM invoices
-			WHERE strftime('%Y-%m', issued_date) = ?
-			ORDER BY issued_date DESC
-		`
-		rows, err := db.DB.Query(query, yearMonth)
-		if err != nil {
-			return fmt.Errorf("failed to fetch invoices: %w", err)
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var inv models.Invoice
-			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
-				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
-				return fmt.Errorf("failed to scan invoice: %w", err)
-			}
-			invoices = append(invoices, inv)
-		}
-
-	case "all_pending":
-		// Get all pending invoices
-		query := `
-			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
-			FROM invoices
-			WHERE status = ?
-			ORDER BY issued_date DESC
-		`
-		rows, err := db.DB.Query(query, models.StatusPending)
-		if err != nil {
-			return fmt.Errorf("failed to fetch invoices: %w", err)
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var inv models.Invoice
-			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
-				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
-				return fmt.Errorf("failed to scan invoice: %w", err)
-			}
-			invoices = append(invoices, inv)
-		}
+		// Use the newly created invoice ID for PDF/email
+		invoiceFlagID = int(invoiceID)
 	}
 
-	if len(invoices) == 0 {
-		fmt.Println("No invoices found matching the criteria.")
-		return nil
-	}
-
-	fmt.Printf("\nFound %d invoice(s) to export:\n", len(invoices))
-	for _, inv := range invoices {
-		fmt.Printf("  - %s (%s) - %.2f %s\n", inv.InvoiceNum, inv.IssuedDate.Format("2006-01-02"), inv.Amount, inv.Currency)
-	}
-	fmt.Println()
-
-	// Confirm export
-	var shouldProceed bool
-	confirmForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Proceed with email export?").
-				Value(&shouldProceed),
-		),
-	)
-
-	if err := confirmForm.Run(); err != nil || !shouldProceed {
-		fmt.Println("Export cancelled.")
-		return nil
-	}
-
-	// Export each invoice
-	for i, inv := range invoices {
-		fmt.Printf("\n[%d/%d] Processing %s...\n", i+1, len(invoices), inv.InvoiceNum)
-
-		// Convert invoice ID to string for runInvoiceEmail
-		idStr := strconv.Itoa(int(inv.ID))
-		if err := runInvoiceEmail(cmd, []string{idStr}); err != nil {
-			fmt.Printf("  ❌ Failed to export %s: %v\n", inv.InvoiceNum, err)
-			continue
-		}
-	}
-
-	fmt.Println("\n✓ Batch export completed!")
-	return nil
-}
-
-// runInvoiceSimple handles the simple case: ung invoice <client-name>
-func runInvoiceSimple(cmd *cobra.Command, args []string) error {
-	// If no arguments and no subcommand, show help
-	if len(args) == 0 {
+	// If no --client and no --id, show help
+	if invoiceFlagClient == "" && invoiceFlagID == 0 {
 		return cmd.Help()
 	}
 
-	// Get client name from argument
-	clientName := args[0]
+	// Handle --pdf flag (or auto-generate for --email)
+	if invoiceFlagPDF || invoiceFlagEmail {
+		if err := generateInvoicePDFByID(invoiceFlagID); err != nil {
+			return fmt.Errorf("failed to generate PDF: %w", err)
+		}
+	}
 
+	// Handle --email flag
+	if invoiceFlagEmail {
+		if err := emailInvoiceByID(invoiceFlagID, invoiceFlagEmailApp); err != nil {
+			return fmt.Errorf("failed to email invoice: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// generateInvoiceFromTime creates an invoice from tracked time for a client
+func generateInvoiceFromTime(clientName string) (int64, error) {
 	// Find client (handles multiple matches with interactive selection)
 	clientID, fullClientName, err := FindClientByName(clientName)
 	if err != nil {
-		return fmt.Errorf("%w. Create client first with: ung client create", err)
+		return 0, fmt.Errorf("%w. Create client first with: ung client create", err)
 	}
 
 	fmt.Printf("📊 Generating invoice from tracked time for %s...\n\n", fullClientName)
@@ -728,11 +390,11 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 	// Get unbilled time sessions for this client
 	groups, err := getUnbilledTimeSessionsForClient(clientID)
 	if err != nil {
-		return fmt.Errorf("failed to get unbilled sessions: %w", err)
+		return 0, fmt.Errorf("failed to get unbilled sessions: %w", err)
 	}
 
 	if len(groups) == 0 {
-		return fmt.Errorf("no unbilled time found for %s. Track time first with: ung track log --client %s --hours <hours>", fullClientName, fullClientName)
+		return 0, fmt.Errorf("no unbilled time found for %s. Track time first with: ung track log --client %s --hours <hours>", fullClientName, fullClientName)
 	}
 
 	// Auto-select the first (and likely only) group for this client
@@ -763,7 +425,7 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 	var companyID uint
 	err = db.DB.QueryRow("SELECT id FROM companies LIMIT 1").Scan(&companyID)
 	if err != nil {
-		return fmt.Errorf("no company found. Create one first with: ung company create")
+		return 0, fmt.Errorf("no company found. Create one first with: ung company create")
 	}
 
 	// Calculate amount based on contract type
@@ -776,13 +438,13 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 	}
 
 	if amount == 0 {
-		return fmt.Errorf("cannot calculate invoice amount (no rate set). Please set a rate on the contract.")
+		return 0, fmt.Errorf("cannot calculate invoice amount (no rate set). Please set a rate on the contract.")
 	}
 
 	// Generate invoice number
 	invoiceNum, err := idgen.GenerateInvoiceNumber(db.GormDB, fullClientName, time.Now())
 	if err != nil {
-		return fmt.Errorf("failed to generate invoice number: %w", err)
+		return 0, fmt.Errorf("failed to generate invoice number: %w", err)
 	}
 
 	// Create invoice - use end of current month for issued date
@@ -796,7 +458,7 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 	`, invoiceNum, companyID, amount, currency, "Time-based services", models.StatusPending, issuedDate, dueDate)
 
 	if err != nil {
-		return fmt.Errorf("failed to create invoice: %w", err)
+		return 0, fmt.Errorf("failed to create invoice: %w", err)
 	}
 
 	invoiceID, _ := result.LastInsertId()
@@ -864,12 +526,358 @@ func runInvoiceSimple(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Amount: %.2f %s\n", amount, currency)
 	fmt.Printf("  Due: %s\n\n", dueDate.Format("2006-01-02"))
 
-	// Auto-generate PDF
-	fmt.Println("Generating PDF...")
-	err = runInvoicePDF(cmd, []string{fmt.Sprintf("%d", invoiceID)})
+	return invoiceID, nil
+}
+
+// generateInvoicePDFByID generates PDF for an invoice by ID
+func generateInvoicePDFByID(invoiceID int) error {
+	// Fetch invoice details
+	var inv models.Invoice
+	var company models.Company
+	var client models.Client
+
+	// Get invoice
+	err := db.DB.QueryRow(`
+		SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date
+		FROM invoices WHERE id = ?
+	`, invoiceID).Scan(
+		&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+		&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate,
+	)
 	if err != nil {
-		fmt.Printf("Warning: Could not generate PDF: %v\n", err)
+		return fmt.Errorf("invoice not found: %w", err)
 	}
 
+	// Get company with all fields
+	err = db.DB.QueryRow(`
+		SELECT id, name, email, phone, address, registration_address, tax_id,
+		       bank_name, bank_account, bank_swift, logo_path
+		FROM companies WHERE id = ?
+	`, inv.CompanyID).Scan(&company.ID, &company.Name, &company.Email, &company.Phone,
+		&company.Address, &company.RegistrationAddress, &company.TaxID,
+		&company.BankName, &company.BankAccount, &company.BankSWIFT, &company.LogoPath)
+	if err != nil {
+		return fmt.Errorf("company not found: %w", err)
+	}
+
+	// Get client
+	err = db.DB.QueryRow(`
+		SELECT c.id, c.name, c.email, c.address, c.tax_id
+		FROM clients c
+		JOIN invoice_recipients ir ON c.id = ir.client_id
+		WHERE ir.invoice_id = ?
+	`, invoiceID).Scan(&client.ID, &client.Name, &client.Email, &client.Address, &client.TaxID)
+	if err != nil {
+		return fmt.Errorf("client not found: %w", err)
+	}
+
+	// Get line items
+	var lineItems []models.InvoiceLineItem
+	rows, err := db.DB.Query(`
+		SELECT id, invoice_id, item_name, description, quantity, rate, amount, created_at
+		FROM invoice_line_items
+		WHERE invoice_id = ?
+		ORDER BY id
+	`, invoiceID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch line items: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item models.InvoiceLineItem
+		if err := rows.Scan(&item.ID, &item.InvoiceID, &item.ItemName, &item.Description,
+			&item.Quantity, &item.Rate, &item.Amount, &item.CreatedAt); err != nil {
+			return fmt.Errorf("failed to scan line item: %w", err)
+		}
+		lineItems = append(lineItems, item)
+	}
+
+	// If no line items, create a default one from invoice amount
+	if len(lineItems) == 0 {
+		lineItems = []models.InvoiceLineItem{
+			{
+				ItemName:    inv.Description,
+				Description: "",
+				Quantity:    1.0,
+				Rate:        inv.Amount,
+				Amount:      inv.Amount,
+			},
+		}
+	}
+
+	// Generate PDF
+	pdfPath, err := invoice.GeneratePDF(inv, company, client, lineItems)
+	if err != nil {
+		return fmt.Errorf("failed to generate PDF: %w", err)
+	}
+
+	// Update invoice with PDF path
+	_, err = db.DB.Exec("UPDATE invoices SET pdf_path = ? WHERE id = ?", pdfPath, invoiceID)
+	if err != nil {
+		return fmt.Errorf("failed to update invoice: %w", err)
+	}
+
+	fmt.Printf("✓ PDF generated successfully: %s\n", pdfPath)
+	return nil
+}
+
+// emailInvoiceByID sends an invoice email by ID
+func emailInvoiceByID(invoiceID int, emailApp string) error {
+	// Fetch invoice details
+	var inv models.Invoice
+	var company models.Company
+
+	// Get invoice
+	err := db.DB.QueryRow(`
+		SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+		FROM invoices WHERE id = ?
+	`, invoiceID).Scan(
+		&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+		&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath,
+	)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	// Get company info
+	err = db.DB.QueryRow(`
+		SELECT id, name FROM companies WHERE id = ?
+	`, inv.CompanyID).Scan(&company.ID, &company.Name)
+	if err != nil {
+		return fmt.Errorf("company not found: %w", err)
+	}
+
+	// Ensure PDF exists
+	pdfPath := inv.PDFPath
+	if pdfPath == "" {
+		return fmt.Errorf("PDF not generated. Run with --pdf flag first")
+	}
+
+	// Extract month and year from issued date
+	month := inv.IssuedDate.Format("01")
+	year := inv.IssuedDate.Format("2006")
+
+	// Prepare email details
+	subject := fmt.Sprintf("%s.%s %s", month, year, company.Name)
+	body := fmt.Sprintf("Hi,\n\nHere is the invoice for %s %s.\n\nBest regards,\n%s",
+		inv.IssuedDate.Format("January"), year, company.Name)
+
+	// Determine email client
+	emailClient := emailApp
+
+	if emailClient == "" {
+		// Interactive mode - prompt for selection
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("Select email client").
+					Options(
+						huh.NewOption("Apple Mail", "apple"),
+						huh.NewOption("Outlook", "outlook"),
+						huh.NewOption("Gmail (Browser)", "gmail"),
+					).
+					Value(&emailClient),
+			),
+		)
+
+		if err := form.Run(); err != nil {
+			return fmt.Errorf("email export cancelled: %w", err)
+		}
+	} else {
+		// Validate provided email client
+		if emailClient != "apple" && emailClient != "outlook" && emailClient != "gmail" {
+			return fmt.Errorf("invalid email client: %s (valid: apple, outlook, gmail)", emailClient)
+		}
+	}
+
+	// Export to selected email client
+	switch emailClient {
+	case "apple":
+		return exportToAppleMail(subject, body, pdfPath)
+	case "outlook":
+		return exportToOutlook(subject, body, pdfPath)
+	case "gmail":
+		return exportToGmail(subject, body, pdfPath)
+	default:
+		return fmt.Errorf("unknown email client: %s", emailClient)
+	}
+}
+
+// runBatchInvoice handles batch invoice operations
+func runBatchInvoice(cmd *cobra.Command) error {
+	// Prompt for export option
+	var exportOption string
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("What invoices would you like to process?").
+				Options(
+					huh.NewOption("Process for latest month", "latest"),
+					huh.NewOption("Select specific month/year", "specific"),
+					huh.NewOption("Process all pending invoices", "all_pending"),
+				).
+				Value(&exportOption),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	var invoices []models.Invoice
+
+	switch exportOption {
+	case "latest":
+		query := `
+			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+			FROM invoices
+			WHERE strftime('%Y-%m', issued_date) = strftime('%Y-%m', 'now')
+			ORDER BY issued_date DESC
+		`
+		rows, err := db.DB.Query(query)
+		if err != nil {
+			return fmt.Errorf("failed to fetch invoices: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var inv models.Invoice
+			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
+				return fmt.Errorf("failed to scan invoice: %w", err)
+			}
+			invoices = append(invoices, inv)
+		}
+
+	case "specific":
+		var monthStr, yearStr string
+		monthForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Month (1-12)").
+					Placeholder("e.g., 10").
+					Value(&monthStr).
+					Validate(func(s string) error {
+						month, err := strconv.Atoi(s)
+						if err != nil || month < 1 || month > 12 {
+							return fmt.Errorf("please enter a valid month (1-12)")
+						}
+						return nil
+					}),
+				huh.NewInput().
+					Title("Year").
+					Placeholder("e.g., 2024").
+					Value(&yearStr).
+					Validate(func(s string) error {
+						year, err := strconv.Atoi(s)
+						if err != nil || year < 2000 {
+							return fmt.Errorf("please enter a valid year")
+						}
+						return nil
+					}),
+			),
+		)
+
+		if err := monthForm.Run(); err != nil {
+			return fmt.Errorf("cancelled: %w", err)
+		}
+
+		month, _ := strconv.Atoi(monthStr)
+		yearMonth := fmt.Sprintf("%s-%02d", yearStr, month)
+
+		query := `
+			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+			FROM invoices
+			WHERE strftime('%Y-%m', issued_date) = ?
+			ORDER BY issued_date DESC
+		`
+		rows, err := db.DB.Query(query, yearMonth)
+		if err != nil {
+			return fmt.Errorf("failed to fetch invoices: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var inv models.Invoice
+			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
+				return fmt.Errorf("failed to scan invoice: %w", err)
+			}
+			invoices = append(invoices, inv)
+		}
+
+	case "all_pending":
+		query := `
+			SELECT id, invoice_num, company_id, amount, currency, description, status, issued_date, due_date, pdf_path
+			FROM invoices
+			WHERE status = ?
+			ORDER BY issued_date DESC
+		`
+		rows, err := db.DB.Query(query, models.StatusPending)
+		if err != nil {
+			return fmt.Errorf("failed to fetch invoices: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var inv models.Invoice
+			if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.CompanyID, &inv.Amount, &inv.Currency,
+				&inv.Description, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.PDFPath); err != nil {
+				return fmt.Errorf("failed to scan invoice: %w", err)
+			}
+			invoices = append(invoices, inv)
+		}
+	}
+
+	if len(invoices) == 0 {
+		fmt.Println("No invoices found matching the criteria.")
+		return nil
+	}
+
+	fmt.Printf("\nFound %d invoice(s):\n", len(invoices))
+	for _, inv := range invoices {
+		fmt.Printf("  - %s (%s) - %.2f %s\n", inv.InvoiceNum, inv.IssuedDate.Format("2006-01-02"), inv.Amount, inv.Currency)
+	}
+	fmt.Println()
+
+	// Confirm
+	var shouldProceed bool
+	confirmForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Proceed?").
+				Value(&shouldProceed),
+		),
+	)
+
+	if err := confirmForm.Run(); err != nil || !shouldProceed {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	// Process each invoice
+	for i, inv := range invoices {
+		fmt.Printf("\n[%d/%d] Processing %s...\n", i+1, len(invoices), inv.InvoiceNum)
+
+		// Generate PDF if --pdf or --email
+		if invoiceFlagPDF || invoiceFlagEmail {
+			if err := generateInvoicePDFByID(int(inv.ID)); err != nil {
+				fmt.Printf("  ❌ Failed to generate PDF for %s: %v\n", inv.InvoiceNum, err)
+				continue
+			}
+		}
+
+		// Email if --email
+		if invoiceFlagEmail {
+			if err := emailInvoiceByID(int(inv.ID), invoiceFlagEmailApp); err != nil {
+				fmt.Printf("  ❌ Failed to email %s: %v\n", inv.InvoiceNum, err)
+				continue
+			}
+		}
+	}
+
+	fmt.Println("\n✓ Batch processing completed!")
 	return nil
 }

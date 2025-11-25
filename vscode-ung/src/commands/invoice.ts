@@ -124,12 +124,43 @@ export class InvoiceCommands {
 
         if (!clientName) return;
 
+        // Ask what actions to take
+        const actions = await vscode.window.showQuickPick([
+            { label: 'Generate Invoice + PDF', value: 'pdf' },
+            { label: 'Generate Invoice + PDF + Email', value: 'email' },
+            { label: 'Generate Invoice Only', value: 'none' }
+        ], {
+            placeHolder: 'Select action'
+        });
+
+        if (!actions) return;
+
+        let emailApp: string | undefined;
+        if (actions.value === 'email') {
+            const emailClients = [
+                { label: 'Apple Mail', value: 'apple' },
+                { label: 'Outlook', value: 'outlook' },
+                { label: 'Gmail (Browser)', value: 'gmail' }
+            ];
+
+            const selected = await vscode.window.showQuickPick(emailClients, {
+                placeHolder: 'Select email client'
+            });
+
+            if (!selected) return;
+            emailApp = selected.value;
+        }
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Generating invoice from time tracking...',
             cancellable: false
         }, async () => {
-            const result = await this.cli.generateInvoiceFromTime(clientName);
+            const result = await this.cli.generateInvoiceFromTime(clientName, {
+                pdf: actions.value === 'pdf' || actions.value === 'email',
+                email: actions.value === 'email',
+                emailApp
+            });
 
             if (result.success) {
                 vscode.window.showInformationMessage('Invoice generated from time tracking!');

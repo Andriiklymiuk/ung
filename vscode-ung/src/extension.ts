@@ -399,6 +399,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 { label: '$(sync) Recurring Invoices', command: 'ung.manageRecurring' },
                 { label: '$(export) Export Data', command: 'ung.exportData' },
                 { label: '$(cloud) Backup & Sync', command: 'ung.syncData' },
+                { label: '$(folder-opened) Import Data', command: 'ung.importData' },
                 { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
             ];
 
@@ -625,6 +626,73 @@ export async function activate(context: vscode.ExtensionContext) {
                     break;
                 }
             }
+        })
+    );
+
+    // Import data command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.importData', async () => {
+            const dataTypes = [
+                { label: '$(person) Clients', value: 'clients', description: 'name, email, address, tax_id' },
+                { label: '$(credit-card) Expenses', value: 'expenses', description: 'date, description, amount, category' },
+                { label: '$(clock) Time Entries', value: 'time', description: 'date, client, project, hours' }
+            ];
+
+            const dataType = await vscode.window.showQuickPick(dataTypes, {
+                placeHolder: 'What data do you want to import?',
+                title: 'Import Data'
+            });
+
+            if (!dataType) return;
+
+            // Show file picker
+            const files = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                filters: { 'CSV Files': ['csv'], 'All Files': ['*'] },
+                title: 'Select CSV file to import'
+            });
+
+            if (!files || files.length === 0) return;
+
+            const filePath = files[0].fsPath;
+
+            // Preview first
+            const action = await vscode.window.showWarningMessage(
+                `Import ${dataType.label} from ${filePath.split('/').pop()}?`,
+                { modal: true },
+                'Preview First',
+                'Import Now'
+            );
+
+            if (!action) return;
+
+            const dryRun = action === 'Preview First';
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: dryRun ? 'Previewing import...' : 'Importing data...'
+            }, async () => {
+                const result = await cli.importData(filePath, dataType.value, dryRun);
+                outputChannel.clear();
+                outputChannel.appendLine(`=== Import ${dryRun ? 'Preview' : 'Results'} ===\n`);
+                outputChannel.appendLine(result.stdout || 'No output');
+                if (result.stderr) {
+                    outputChannel.appendLine('\nErrors:\n' + result.stderr);
+                }
+                outputChannel.show();
+
+                if (result.success && !dryRun) {
+                    vscode.window.showInformationMessage('Import completed!');
+                    // Refresh relevant views
+                    if (dataType.value === 'clients') {
+                        clientProvider.refresh();
+                    } else if (dataType.value === 'expenses') {
+                        expenseProvider.refresh();
+                    } else if (dataType.value === 'time') {
+                        trackingProvider.refresh();
+                    }
+                }
+            });
         })
     );
 

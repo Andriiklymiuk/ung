@@ -572,4 +572,15 @@ export class UngCli {
         if (force) args.push('--force');
         return this.exec(args);
     }
+
+    // ========== Import Commands ==========
+
+    /**
+     * Import data from CSV file
+     */
+    async importData(filePath: string, dataType: string, dryRun?: boolean): Promise<CliResult> {
+        const args = ['import', '--file', filePath, '--type', dataType];
+        if (dryRun) args.push('--dry-run');
+        return this.exec(args);
+    }
 }

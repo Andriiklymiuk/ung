@@ -186,6 +186,9 @@ export class InvoiceCommands {
         const actions = [
             { label: '$(file-pdf) Export to PDF', action: 'pdf' },
             { label: '$(mail) Email Invoice', action: 'email' },
+            { label: '$(check) Mark as Paid', action: 'markPaid' },
+            { label: '$(send) Mark as Sent', action: 'markSent' },
+            { label: '$(list-selection) Change Status...', action: 'changeStatus' },
             { label: '$(close) Close', action: 'close' }
         ];
 
@@ -202,8 +205,112 @@ export class InvoiceCommands {
                 case 'email':
                     await this.emailInvoice(invoiceId);
                     break;
+                case 'markPaid':
+                    await this.markAsPaid(invoiceId);
+                    break;
+                case 'markSent':
+                    await this.markAsSent(invoiceId);
+                    break;
+                case 'changeStatus':
+                    await this.changeInvoiceStatus(invoiceId);
+                    break;
             }
         }
+    }
+
+    /**
+     * Mark invoice as paid
+     */
+    async markAsPaid(invoiceId?: number): Promise<void> {
+        if (!invoiceId) {
+            vscode.window.showErrorMessage('No invoice selected');
+            return;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Marking invoice as paid...',
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.markInvoicePaid(invoiceId);
+
+            if (result.success) {
+                vscode.window.showInformationMessage('Invoice marked as paid!');
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
+            }
+        });
+    }
+
+    /**
+     * Mark invoice as sent
+     */
+    async markAsSent(invoiceId?: number): Promise<void> {
+        if (!invoiceId) {
+            vscode.window.showErrorMessage('No invoice selected');
+            return;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Marking invoice as sent...',
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.markInvoiceSent(invoiceId);
+
+            if (result.success) {
+                vscode.window.showInformationMessage('Invoice marked as sent!');
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
+            }
+        });
+    }
+
+    /**
+     * Change invoice status
+     */
+    async changeInvoiceStatus(invoiceId?: number): Promise<void> {
+        if (!invoiceId) {
+            vscode.window.showErrorMessage('No invoice selected');
+            return;
+        }
+
+        const statuses = [
+            { label: '$(clock) Pending', value: 'pending' as const, description: 'Invoice not yet sent' },
+            { label: '$(send) Sent', value: 'sent' as const, description: 'Invoice has been sent to client' },
+            { label: '$(check) Paid', value: 'paid' as const, description: 'Payment received' },
+            { label: '$(warning) Overdue', value: 'overdue' as const, description: 'Past due date' }
+        ];
+
+        const selected = await vscode.window.showQuickPick(statuses, {
+            placeHolder: 'Select new status',
+            title: 'Change Invoice Status'
+        });
+
+        if (!selected) return;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Updating invoice status to ${selected.value}...`,
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.updateInvoiceStatus(invoiceId, selected.value);
+
+            if (result.success) {
+                vscode.window.showInformationMessage(`Invoice status updated to ${selected.value}!`);
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
+            }
+        });
     }
 
     /**
@@ -295,6 +402,42 @@ export class InvoiceCommands {
     }
 
     /**
+     * Get email client options based on platform
+     */
+    private getEmailClients(): Array<{ label: string; value: string; description?: string }> {
+        const platform = process.platform;
+
+        // Common options for all platforms
+        const common = [
+            { label: '$(globe) Gmail (Browser)', value: 'gmail', description: 'Opens in web browser' },
+            { label: '$(globe) Outlook Web', value: 'outlook-web', description: 'Opens in web browser' }
+        ];
+
+        // Platform-specific options
+        if (platform === 'darwin') {
+            return [
+                { label: '$(mail) Apple Mail', value: 'apple', description: 'Default macOS mail app' },
+                { label: '$(mail) Outlook', value: 'outlook', description: 'Microsoft Outlook app' },
+                ...common
+            ];
+        } else if (platform === 'win32') {
+            return [
+                { label: '$(mail) Windows Mail', value: 'windows-mail', description: 'Default Windows mail app' },
+                { label: '$(mail) Outlook', value: 'outlook', description: 'Microsoft Outlook app' },
+                { label: '$(mail) Thunderbird', value: 'thunderbird', description: 'Mozilla Thunderbird' },
+                ...common
+            ];
+        } else {
+            // Linux
+            return [
+                { label: '$(mail) Thunderbird', value: 'thunderbird', description: 'Mozilla Thunderbird' },
+                { label: '$(mail) Evolution', value: 'evolution', description: 'GNOME Evolution' },
+                ...common
+            ];
+        }
+    }
+
+    /**
      * Email invoice
      */
     async emailInvoice(invoiceId?: number): Promise<void> {
@@ -303,15 +446,12 @@ export class InvoiceCommands {
             return;
         }
 
-        // Ask user to select email client
-        const emailClients = [
-            { label: 'Apple Mail', value: 'apple' },
-            { label: 'Outlook', value: 'outlook' },
-            { label: 'Gmail (Browser)', value: 'gmail' }
-        ];
+        // Get platform-specific email clients
+        const emailClients = this.getEmailClients();
 
         const selected = await vscode.window.showQuickPick(emailClients, {
-            placeHolder: 'Select email client'
+            placeHolder: 'Select email client',
+            title: 'Choose Email Application'
         });
 
         if (!selected) {

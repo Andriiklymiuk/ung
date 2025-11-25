@@ -209,6 +209,9 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('ung.deleteInvoice', (item) => invoiceCommands.deleteInvoice(item?.itemId)),
         vscode.commands.registerCommand('ung.exportInvoice', (item) => invoiceCommands.exportInvoice(item?.itemId)),
         vscode.commands.registerCommand('ung.emailInvoice', (item) => invoiceCommands.emailInvoice(item?.itemId)),
+        vscode.commands.registerCommand('ung.markInvoicePaid', (item) => invoiceCommands.markAsPaid(item?.itemId)),
+        vscode.commands.registerCommand('ung.markInvoiceSent', (item) => invoiceCommands.markAsSent(item?.itemId)),
+        vscode.commands.registerCommand('ung.changeInvoiceStatus', (item) => invoiceCommands.changeInvoiceStatus(item?.itemId)),
         vscode.commands.registerCommand('ung.refreshInvoices', () => invoiceProvider.refresh())
     );
 

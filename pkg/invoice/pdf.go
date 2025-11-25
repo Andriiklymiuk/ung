@@ -8,7 +8,7 @@ import (
 	"github.com/jung-kurt/gofpdf"
 )
 
-// GeneratePDF creates a professional PDF invoice with itemized billing
+// GeneratePDF creates a professional PDF invoice matching Zoho invoice style
 func GeneratePDF(invoice models.Invoice, company models.Company, client models.Client, lineItems []models.InvoiceLineItem) (string, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
@@ -16,170 +16,152 @@ func GeneratePDF(invoice models.Invoice, company models.Company, client models.C
 	// Load configuration for labels
 	cfg, _ := config.Load()
 
-	// Header - Invoice Title
-	pdf.SetFont("Arial", "B", 26)
+	// Set margins
+	leftMargin := 15.0
+	rightMargin := 15.0
+	pageWidth := 210.0
+	contentWidth := pageWidth - leftMargin - rightMargin
+
+	// Header - Company name (large, left) and INVOICE title (right)
+	pdf.SetFont("Arial", "B", 18)
+	pdf.SetTextColor(40, 40, 40)
+	pdf.SetXY(leftMargin, 15)
+	pdf.Cell(contentWidth/2, 10, company.Name)
+
+	// INVOICE title on right
+	pdf.SetFont("Arial", "B", 28)
+	pdf.SetTextColor(80, 80, 80)
+	pdf.SetXY(pageWidth-rightMargin-60, 15)
+	pdf.Cell(60, 10, cfg.Invoice.InvoiceLabel)
+
+	// Company details below name
+	pdf.SetFont("Arial", "", 9)
 	pdf.SetTextColor(60, 60, 60)
-	pdf.Cell(190, 12, cfg.Invoice.InvoiceLabel)
-	pdf.Ln(15)
+	pdf.SetXY(leftMargin, 27)
 
-	// Invoice metadata (number, dates) - Right aligned
-	pdf.SetFont("Arial", "", 10)
-	pdf.SetTextColor(100, 100, 100)
+	// Registration number and Tax ID
+	if company.TaxID != "" {
+		pdf.Cell(contentWidth/2, 4, fmt.Sprintf("Registration number: %s, Tax ID:", company.TaxID))
+		pdf.Ln(4)
+		pdf.SetX(leftMargin)
+		pdf.Cell(contentWidth/2, 4, company.TaxID)
+		pdf.Ln(4)
+	}
 
-	// Invoice Number
-	pdf.CellFormat(140, 5, "", "", 0, "L", false, 0, "")
+	// Bank Details
+	if company.BankAccount != "" {
+		pdf.SetX(leftMargin)
+		pdf.Cell(contentWidth/2, 4, "Bank Details: "+company.BankAccount)
+		pdf.Ln(4)
+	}
+
+	// Address
+	if company.Address != "" {
+		pdf.SetX(leftMargin)
+		pdf.MultiCell(contentWidth/2-10, 4, company.Address, "", "L", false)
+	}
+
+	// Invoice metadata on the right side
+	metaStartY := 55.0
+	metaLabelX := pageWidth - rightMargin - 80
+	metaValueX := pageWidth - rightMargin - 40
+
 	pdf.SetFont("Arial", "B", 10)
-	pdf.Cell(25, 5, "Invoice #:")
+	pdf.SetTextColor(80, 80, 80)
+
+	// Invoice#
+	pdf.SetXY(metaLabelX, metaStartY)
+	pdf.Cell(40, 5, "Invoice#")
 	pdf.SetFont("Arial", "", 10)
-	pdf.Cell(25, 5, invoice.InvoiceNum)
-	pdf.Ln(5)
+	pdf.SetXY(metaValueX, metaStartY)
+	pdf.Cell(40, 5, invoice.InvoiceNum)
 
 	// Invoice Date
-	pdf.CellFormat(140, 5, "", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "B", 10)
-	pdf.Cell(25, 5, "Issue Date:")
+	pdf.SetXY(metaLabelX, metaStartY+6)
+	pdf.Cell(40, 5, "Invoice Date")
 	pdf.SetFont("Arial", "", 10)
-	pdf.Cell(25, 5, invoice.IssuedDate.Format("02 Jan 2006"))
-	pdf.Ln(5)
+	pdf.SetXY(metaValueX, metaStartY+6)
+	pdf.Cell(40, 5, invoice.IssuedDate.Format("02 Jan 2006"))
 
 	// Due Date
-	pdf.CellFormat(140, 5, "", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "B", 10)
-	pdf.Cell(25, 5, "Due Date:")
+	pdf.SetXY(metaLabelX, metaStartY+12)
+	pdf.Cell(40, 5, "Due Date")
 	pdf.SetFont("Arial", "", 10)
-	pdf.Cell(25, 5, invoice.DueDate.Format("02 Jan 2006"))
-	pdf.Ln(12)
+	pdf.SetXY(metaValueX, metaStartY+12)
+	pdf.Cell(40, 5, invoice.DueDate.Format("02 Jan 2006"))
 
-	// Reset color for main content
-	pdf.SetTextColor(0, 0, 0)
-
-	// Two-column layout for company and client info
-	colWidth := 95.0
-
-	// From (Company) - Left column
-	pdf.SetFont("Arial", "B", 12)
-	pdf.Cell(colWidth, 6, cfg.Invoice.FromLabel)
-	pdf.Ln(7)
+	// Bill To section
+	billToY := 75.0
+	pdf.SetXY(leftMargin, billToY)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(80, 80, 80)
+	pdf.Cell(40, 5, cfg.Invoice.BillToLabel)
 
 	pdf.SetFont("Arial", "B", 11)
-	pdf.Cell(colWidth, 5, company.Name)
-	pdf.Ln(5)
+	pdf.SetTextColor(40, 40, 40)
+	pdf.SetXY(leftMargin, billToY+7)
+	pdf.Cell(contentWidth/2, 5, client.Name)
 
-	pdf.SetFont("Arial", "", 10)
-	if company.Email != "" {
-		pdf.Cell(colWidth, 4, company.Email)
-		pdf.Ln(4)
-	}
-	if company.Phone != "" {
-		pdf.Cell(colWidth, 4, company.Phone)
-		pdf.Ln(4)
-	}
-	if company.Address != "" {
-		pdf.MultiCell(colWidth, 4, company.Address, "", "L", false)
-	}
-	if company.RegistrationAddress != "" && company.RegistrationAddress != company.Address {
-		pdf.SetFont("Arial", "I", 9)
-		pdf.Cell(colWidth, 4, "Reg: "+company.RegistrationAddress)
-		pdf.SetFont("Arial", "", 10)
-		pdf.Ln(4)
-	}
-	if company.TaxID != "" {
-		pdf.Cell(colWidth, 4, "Tax ID: "+company.TaxID)
-		pdf.Ln(4)
-	}
+	pdf.SetFont("Arial", "", 9)
+	pdf.SetTextColor(60, 60, 60)
+	currentY := billToY + 13
 
-	// Bank details
-	if company.BankName != "" || company.BankAccount != "" {
-		pdf.Ln(2)
-		pdf.SetFont("Arial", "B", 9)
-		pdf.Cell(colWidth, 4, "Bank Details:")
-		pdf.Ln(4)
-		pdf.SetFont("Arial", "", 9)
-		if company.BankName != "" {
-			pdf.Cell(colWidth, 3, company.BankName)
-			pdf.Ln(3)
-		}
-		if company.BankAccount != "" {
-			pdf.Cell(colWidth, 3, "Account: "+company.BankAccount)
-			pdf.Ln(3)
-		}
-		if company.BankSWIFT != "" {
-			pdf.Cell(colWidth, 3, "SWIFT: "+company.BankSWIFT)
-			pdf.Ln(3)
-		}
-	}
-
-	// Bill To (Client) - Right column (set position back to top-right)
-	pdf.SetXY(105, 40) // Start at top of right column
-
-	pdf.SetFont("Arial", "B", 12)
-	pdf.Cell(colWidth, 6, cfg.Invoice.BillToLabel)
-	pdf.Ln(7)
-
-	pdf.SetX(105)
-	pdf.SetFont("Arial", "B", 11)
-	pdf.Cell(colWidth, 5, client.Name)
-	pdf.Ln(5)
-
-	pdf.SetX(105)
-	pdf.SetFont("Arial", "", 10)
-	if client.Email != "" {
-		pdf.Cell(colWidth, 4, client.Email)
-		pdf.Ln(4)
-		pdf.SetX(105)
-	}
-	if client.Address != "" {
-		currentY := pdf.GetY()
-		pdf.SetXY(105, currentY)
-		pdf.MultiCell(colWidth, 4, client.Address, "", "L", false)
-	}
+	// Client registration/VAT info
 	if client.TaxID != "" {
-		pdf.SetX(105)
-		pdf.Cell(colWidth, 4, "Tax ID: "+client.TaxID)
-		pdf.Ln(4)
+		pdf.SetXY(leftMargin, currentY)
+		pdf.Cell(contentWidth/2, 4, fmt.Sprintf("Registration number: %s, VAT ID:", client.TaxID[:min(len(client.TaxID), 11)]))
+		currentY += 4
+		pdf.SetXY(leftMargin, currentY)
+		pdf.Cell(contentWidth/2, 4, client.TaxID)
+		currentY += 4
 	}
 
-	// Move to after both columns
-	pdf.Ln(100) // Ensure we're below both columns
-
-	// Description section
-	if invoice.Description != "" {
-		pdf.SetFont("Arial", "B", 11)
-		pdf.Cell(190, 6, cfg.Invoice.DescriptionLabel+":")
-		pdf.Ln(6)
-		pdf.SetFont("Arial", "", 10)
-		pdf.MultiCell(190, 5, invoice.Description, "", "L", false)
-		pdf.Ln(4)
+	// Client address
+	if client.Address != "" {
+		pdf.SetXY(leftMargin, currentY)
+		pdf.MultiCell(contentWidth/2-10, 4, client.Address, "", "L", false)
 	}
 
 	// Line Items Table
-	pdf.Ln(6)
-	drawLineItemsTable(pdf, lineItems, invoice.Currency, cfg.Invoice)
+	tableY := 115.0
+	pdf.SetXY(leftMargin, tableY)
 
-	// Notes section
-	pdf.Ln(8)
-	if invoice.Description != "" {
-		pdf.SetFont("Arial", "B", 10)
-		pdf.Cell(190, 5, cfg.Invoice.NotesLabel+":")
-		pdf.Ln(5)
-		pdf.SetFont("Arial", "", 9)
-		pdf.SetTextColor(80, 80, 80)
-		pdf.MultiCell(190, 4, cfg.Invoice.PaymentNote, "", "L", false)
-		pdf.SetTextColor(0, 0, 0)
+	// Ensure line items have proper names
+	for i := range lineItems {
+		if lineItems[i].ItemName == "" {
+			lineItems[i].ItemName = fmt.Sprintf("Software services in %s", invoice.IssuedDate.Format("January"))
+		}
 	}
 
-	// Terms & Conditions
-	pdf.Ln(6)
-	pdf.SetFont("Arial", "B", 10)
-	pdf.Cell(190, 5, cfg.Invoice.TermsLabel+":")
-	pdf.Ln(5)
-	pdf.SetFont("Arial", "", 9)
-	pdf.SetTextColor(80, 80, 80)
-	pdf.MultiCell(190, 4, cfg.Invoice.Terms, "", "L", false)
+	drawLineItemsTable(pdf, lineItems, invoice.Currency, cfg.Invoice, leftMargin, contentWidth)
 
-	// Save PDF to current directory
+	// Notes section
+	notesY := pdf.GetY() + 15
+	pdf.SetXY(leftMargin, notesY)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(200, 100, 50) // Orange-ish color like Zoho
+	pdf.Cell(40, 5, cfg.Invoice.NotesLabel)
+	pdf.SetFont("Arial", "", 9)
+	pdf.SetTextColor(60, 60, 60)
+	pdf.SetXY(leftMargin, notesY+6)
+	pdf.Cell(contentWidth, 4, "It was great doing business with you.")
+
+	// Terms & Conditions
+	termsY := notesY + 25
+	pdf.SetXY(leftMargin, termsY)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(200, 100, 50) // Orange-ish color
+	pdf.Cell(40, 5, cfg.Invoice.TermsLabel)
+	pdf.SetFont("Arial", "", 9)
+	pdf.SetTextColor(60, 60, 60)
+	pdf.SetXY(leftMargin, termsY+6)
+	pdf.Cell(contentWidth, 4, cfg.Invoice.Terms)
+
+	// Save PDF
 	filename := fmt.Sprintf("%s.pdf", invoice.InvoiceNum)
-	pdfPath := filename // Save in current directory
+	pdfPath := filename
 
 	err := pdf.OutputFileAndClose(pdfPath)
 	if err != nil {
@@ -189,69 +171,81 @@ func GeneratePDF(invoice models.Invoice, company models.Company, client models.C
 	return pdfPath, nil
 }
 
-// drawLineItemsTable creates a professional table for invoice line items
-func drawLineItemsTable(pdf *gofpdf.Fpdf, items []models.InvoiceLineItem, currency string, labels config.InvoiceConfig) {
-	// Table header
-	pdf.SetFillColor(240, 240, 240)
-	pdf.SetFont("Arial", "B", 10)
+// drawLineItemsTable creates a table matching Zoho invoice style
+func drawLineItemsTable(pdf *gofpdf.Fpdf, items []models.InvoiceLineItem, currency string, labels config.InvoiceConfig, leftMargin, contentWidth float64) {
+	// Table header with orange background
+	pdf.SetFillColor(232, 119, 34) // Orange like Zoho
+	pdf.SetTextColor(255, 255, 255)
+	pdf.SetFont("Arial", "B", 9)
 
 	// Column widths
-	itemWidth := 70.0
-	qtyWidth := 25.0
-	rateWidth := 40.0
-	amountWidth := 45.0
+	itemWidth := contentWidth * 0.45
+	qtyWidth := contentWidth * 0.15
+	rateWidth := contentWidth * 0.20
+	amountWidth := contentWidth * 0.20
 
 	// Header row
-	pdf.CellFormat(itemWidth, 7, labels.ItemLabel, "1", 0, "L", true, 0, "")
-	pdf.CellFormat(qtyWidth, 7, labels.QuantityLabel, "1", 0, "C", true, 0, "")
-	pdf.CellFormat(rateWidth, 7, labels.RateLabel, "1", 0, "R", true, 0, "")
-	pdf.CellFormat(amountWidth, 7, labels.AmountLabel, "1", 0, "R", true, 0, "")
+	pdf.CellFormat(itemWidth, 8, labels.ItemLabel, "", 0, "L", true, 0, "")
+	pdf.CellFormat(qtyWidth, 8, labels.QuantityLabel, "", 0, "C", true, 0, "")
+	pdf.CellFormat(rateWidth, 8, labels.RateLabel, "", 0, "R", true, 0, "")
+	pdf.CellFormat(amountWidth, 8, labels.AmountLabel, "", 0, "R", true, 0, "")
 	pdf.Ln(-1)
 
 	// Table rows
-	pdf.SetFont("Arial", "", 10)
+	pdf.SetFont("Arial", "", 9)
+	pdf.SetTextColor(60, 60, 60)
 	pdf.SetFillColor(255, 255, 255)
 
 	var total float64
 	for _, item := range items {
-		// Item name (with description if available)
-		itemText := item.ItemName
-		if item.Description != "" {
-			itemText = item.ItemName + "\n" + item.Description
-		}
+		pdf.SetX(leftMargin)
 
-		// Calculate row height based on content
-		lines := pdf.SplitLines([]byte(itemText), itemWidth-2)
-		rowHeight := float64(len(lines)) * 5.0
-		if rowHeight < 7 {
-			rowHeight = 7
-		}
+		// Draw bottom border line
+		y := pdf.GetY()
 
-		currentY := pdf.GetY()
-
-		// Item column
-		pdf.MultiCell(itemWidth, 5, itemText, "1", "L", false)
-
-		// Move back to draw other columns at the same Y position
-		pdf.SetXY(pdf.GetX()+itemWidth, currentY)
-
+		// Item name
+		pdf.CellFormat(itemWidth, 8, item.ItemName, "", 0, "L", false, 0, "")
 		// Quantity
-		pdf.CellFormat(qtyWidth, rowHeight, fmt.Sprintf("%.2f", item.Quantity), "1", 0, "C", false, 0, "")
-
+		pdf.CellFormat(qtyWidth, 8, fmt.Sprintf("%.0f", item.Quantity), "", 0, "C", false, 0, "")
 		// Rate
-		pdf.CellFormat(rateWidth, rowHeight, fmt.Sprintf("%.2f %s", item.Rate, currency), "1", 0, "R", false, 0, "")
-
+		pdf.CellFormat(rateWidth, 8, fmt.Sprintf("%.0f", item.Rate), "", 0, "R", false, 0, "")
 		// Amount
-		pdf.CellFormat(amountWidth, rowHeight, fmt.Sprintf("%.2f %s", item.Amount, currency), "1", 0, "R", false, 0, "")
-
+		pdf.CellFormat(amountWidth, 8, fmt.Sprintf("%.2f", item.Amount), "", 0, "R", false, 0, "")
 		pdf.Ln(-1)
+
+		// Draw separator line
+		pdf.SetDrawColor(220, 220, 220)
+		pdf.Line(leftMargin, pdf.GetY(), leftMargin+contentWidth, pdf.GetY())
+
 		total += item.Amount
+		_ = y // avoid unused warning
 	}
 
-	// Total row
-	pdf.SetFont("Arial", "B", 12)
-	pdf.SetFillColor(230, 230, 230)
-	pdf.CellFormat(itemWidth+qtyWidth+rateWidth, 9, labels.TotalLabel+":", "1", 0, "R", true, 0, "")
-	pdf.CellFormat(amountWidth, 9, fmt.Sprintf("%.2f %s", total, currency), "1", 0, "R", true, 0, "")
+	// Subtotal row
+	pdf.Ln(3)
+	pdf.SetX(leftMargin)
+	pdf.SetFont("Arial", "", 9)
+	pdf.CellFormat(itemWidth+qtyWidth, 7, "", "", 0, "R", false, 0, "")
+	pdf.CellFormat(rateWidth, 7, "Subtotal", "", 0, "R", false, 0, "")
+	pdf.SetFont("Arial", "B", 9)
+	pdf.CellFormat(amountWidth, 7, fmt.Sprintf("%.2f", total), "", 0, "R", false, 0, "")
 	pdf.Ln(-1)
+
+	// Total row with background
+	pdf.Ln(5)
+	pdf.SetX(leftMargin)
+	pdf.SetFillColor(245, 245, 245)
+	pdf.SetFont("Arial", "B", 11)
+	pdf.CellFormat(itemWidth+qtyWidth, 10, "", "", 0, "R", true, 0, "")
+	pdf.CellFormat(rateWidth, 10, labels.TotalLabel, "", 0, "R", true, 0, "")
+	pdf.SetFont("Arial", "B", 12)
+	pdf.CellFormat(amountWidth, 10, fmt.Sprintf("$%.2f", total), "", 0, "R", true, 0, "")
+	pdf.Ln(-1)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

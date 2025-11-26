@@ -35,6 +35,15 @@ func main() {
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret, cfg.UserDataDir)
 
+	// Initialize RevenueCat configuration
+	revenueCatConfig := &middleware.RevenueCatConfig{
+		APIKey:  cfg.RevenueCatAPIKey,
+		Enabled: cfg.RevenueCatEnabled,
+	}
+	if cfg.RevenueCatEnabled {
+		log.Printf("RevenueCat integration enabled")
+	}
+
 	// Initialize controllers
 	authController := controllers.NewAuthController(authService)
 	invoiceController := controllers.NewInvoiceController()
@@ -44,10 +53,15 @@ func main() {
 	expenseController := controllers.NewExpenseController()
 	trackingController := controllers.NewTrackingController()
 	dashboardController := controllers.NewDashboardController()
+	settingsController := controllers.NewSettingsController()
+	rateController := controllers.NewRateController()
+	goalController := controllers.NewGoalController()
+	subscriptionController := middleware.NewSubscriptionController(revenueCatConfig)
 
 	// Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(apiDB, cfg.JWTSecret)
 	tenantMiddleware := middleware.TenantMiddleware()
+	subscriptionMiddleware := middleware.SubscriptionMiddleware(revenueCatConfig)
 
 	// Setup router
 	r := router.SetupRouter(
@@ -59,8 +73,13 @@ func main() {
 		expenseController,
 		trackingController,
 		dashboardController,
+		settingsController,
+		rateController,
+		goalController,
+		subscriptionController,
 		authMiddleware,
 		tenantMiddleware,
+		subscriptionMiddleware,
 	)
 
 	// Start server

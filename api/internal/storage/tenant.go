@@ -19,7 +19,7 @@ type TenantManager struct {
 	cacheMutex  sync.RWMutex
 	localDir    string
 	autoSync    bool
-	syncInt interval time.Duration
+	syncInterval time.Duration
 }
 
 // TenantDB represents a tenant's database connection

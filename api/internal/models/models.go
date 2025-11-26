@@ -219,3 +219,47 @@ type Expense struct {
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 }
+
+// UserSettings represents user preferences for rate calculations
+type UserSettings struct {
+	ID                uint      `gorm:"primaryKey" json:"id"`
+	HoursPerWeek      float64   `gorm:"default:40" json:"hours_per_week"`       // Billable hours per week
+	WeeksPerYear      int       `gorm:"default:48" json:"weeks_per_year"`       // Working weeks per year
+	DefaultTaxPercent float64   `gorm:"default:25" json:"default_tax_percent"`  // Default tax rate
+	DefaultMargin     float64   `gorm:"default:20" json:"default_margin"`       // Default profit margin
+	AnnualExpenses    float64   `gorm:"default:0" json:"annual_expenses"`       // Annual business expenses
+	DefaultCurrency   string    `gorm:"default:USD" json:"default_currency"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// IncomeGoal represents an income goal for a specific period
+type IncomeGoal struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Amount      float64   `gorm:"not null" json:"amount"`
+	Period      string    `gorm:"not null" json:"period"` // monthly, quarterly, yearly
+	Year        int       `gorm:"not null" json:"year"`
+	Month       int       `json:"month"`   // for monthly goals (1-12)
+	Quarter     int       `json:"quarter"` // for quarterly goals (1-4)
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// RevenueCatEntitlement represents a subscription entitlement from RevenueCat
+type RevenueCatEntitlement struct {
+	IsActive          bool       `json:"is_active"`
+	ProductIdentifier string     `json:"product_identifier"`
+	ExpiresDate       *time.Time `json:"expires_date"`
+	PurchaseDate      time.Time  `json:"purchase_date"`
+	WillRenew         bool       `json:"will_renew"`
+}
+
+// SubscriptionInfo represents the user's subscription status
+type SubscriptionInfo struct {
+	UserID       uint                             `json:"user_id"`
+	PlanType     string                           `json:"plan_type"`
+	IsActive     bool                             `json:"is_active"`
+	Entitlements map[string]RevenueCatEntitlement `json:"entitlements"`
+	ExpiresAt    *time.Time                       `json:"expires_at"`
+}

@@ -96,6 +96,6 @@ jobs:
         run: bun run lint
 
       - name: Run VSCode tests
-        run: xvfb-run -a bun test
+        run: xvfb-run -a bun run test:cov
         env:
           DISPLAY: ':99.0'

@@ -775,6 +775,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
     "test": "node ./out/test/runTest.js",
+    "test:cov": "node ./out/test/runTest.js",
     "lint": "biome check ./src",
     "lint:fix": "biome check --write ./src",
     "format": "biome format --write ./src",

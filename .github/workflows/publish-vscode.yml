@@ -31,7 +31,7 @@ jobs:
 
       - name: Run tests (if available)
         working-directory: vscode-ung
-        run: bun test || echo "No tests configured"
+        run: xvfb-run -a bun run test:cov || echo "No tests configured"
         continue-on-error: true
 
       - name: Package extension

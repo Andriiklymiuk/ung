@@ -108,7 +108,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('ung.openDocs', () => {
-            vscode.env.openExternal(vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#readme'));
+            vscode.env.openExternal(vscode.Uri.parse('https://andriiklymiuk.github.io/ung/docs/intro'));
         }),
 
         vscode.commands.registerCommand('ung.openGitHub', () => {

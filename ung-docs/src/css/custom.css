@@ -25,6 +25,26 @@
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
 
+/* Hero section - improved contrast */
+.hero--primary {
+  --ifm-hero-background-color: #1a1a2e;
+  --ifm-hero-text-color: #ffffff;
+}
+
+.hero--primary h1 {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.hero--primary p {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Dark mode hero */
+[data-theme='dark'] .hero--primary {
+  --ifm-hero-background-color: #0d0d1a;
+}
+
 /* CLI command styling */
 .cli-command {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;

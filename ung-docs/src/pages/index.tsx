@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
@@ -7,8 +7,22 @@ import HomepageFeatures from '@site/src/components/HomepageFeatures';
 
 import styles from './index.module.css';
 
+const INSTALL_COMMAND = 'brew install andriiklymiuk/homebrew-ung/ung';
+
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(INSTALL_COMMAND);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
@@ -20,8 +34,16 @@ function HomepageHeader() {
         </p>
         <div className={styles.installCommand}>
           <pre>
-            <code>brew install andriiklymiuk/homebrew-ung/ung</code>
+            <code>{INSTALL_COMMAND}</code>
           </pre>
+          <button
+            className={styles.copyButton}
+            onClick={handleCopy}
+            title="Copy to clipboard"
+            aria-label="Copy install command to clipboard"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
         </div>
         <div className={styles.buttons}>
           <Link

@@ -18,7 +18,7 @@
 
 .heroTagline {
   font-size: 1.1rem;
-  color: var(--ifm-color-emphasis-700);
+  color: rgba(255, 255, 255, 0.75);
   margin-bottom: 2rem;
   max-width: 600px;
   margin-left: auto;
@@ -26,7 +26,7 @@
 }
 
 [data-theme='dark'] .heroTagline {
-  color: var(--ifm-color-emphasis-500);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .buttons {
@@ -39,25 +39,51 @@
 
 .installCommand {
   margin: 2rem auto;
-  max-width: 500px;
+  max-width: 550px;
+  position: relative;
 }
 
 .installCommand pre {
-  background: var(--ifm-color-emphasis-100);
+  background: rgba(0, 0, 0, 0.4);
   border-radius: 8px;
-  padding: 1rem 1.5rem;
+  padding: 1rem 3.5rem 1rem 1.5rem;
   font-size: 1rem;
   text-align: left;
   overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 [data-theme='dark'] .installCommand pre {
-  background: var(--ifm-color-emphasis-200);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .installCommand code {
-  color: var(--ifm-color-primary);
+  color: #f39c5a;
   font-weight: 500;
+}
+
+.copyButton {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.copyButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.copyButton:active {
+  transform: translateY(-50%) scale(0.95);
 }
 
 @media screen and (max-width: 996px) {

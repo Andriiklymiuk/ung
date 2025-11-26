@@ -95,10 +95,7 @@ const sidebars = {
         {
           type: 'category',
           label: 'version',
-          items: [
-            'cli/ung_version',
-            'cli/ung_version_bump',
-          ],
+          items: ['cli/ung_version', 'cli/ung_version_bump'],
         },
         'cli/ung_upgrade',
         'cli/ung_doctor',

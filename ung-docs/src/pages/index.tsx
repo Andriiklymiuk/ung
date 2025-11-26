@@ -1,16 +1,16 @@
-import React, {useState} from 'react';
-import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import Layout from '@theme/Layout';
 import HomepageFeatures from '@site/src/components/HomepageFeatures';
+import Layout from '@theme/Layout';
+import clsx from 'clsx';
+import { useState } from 'react';
 
 import styles from './index.module.css';
 
 const INSTALL_COMMAND = 'brew install andriiklymiuk/homebrew-ung/ung';
 
 function HomepageHeader() {
-  const {siteConfig} = useDocusaurusContext();
+  const { siteConfig } = useDocusaurusContext();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -52,7 +52,11 @@ function HomepageHeader() {
             <code>{INSTALL_COMMAND}</code>
           </pre>
           <button
-            className={clsx(styles.copyButton, copied && styles.copyButtonCopied)}
+            type="button"
+            className={clsx(
+              styles.copyButton,
+              copied && styles.copyButtonCopied
+            )}
             onClick={handleCopy}
             title="Copy to clipboard"
             aria-label="Copy install command to clipboard"
@@ -63,12 +67,14 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/intro">
+            to="/docs/intro"
+          >
             Get Started
           </Link>
           <Link
             className="button button--outline button--lg"
-            href="https://marketplace.visualstudio.com/items?itemName=andriiklymiuk.ung">
+            href="https://marketplace.visualstudio.com/items?itemName=andriiklymiuk.ung"
+          >
             VS Code Extension
           </Link>
         </div>
@@ -78,11 +84,12 @@ function HomepageHeader() {
 }
 
 export default function Home(): JSX.Element {
-  const {siteConfig} = useDocusaurusContext();
+  const { siteConfig } = useDocusaurusContext();
   return (
     <Layout
       title={`${siteConfig.title} - Billing & Tracking CLI`}
-      description="Universal Next-Gen CLI for freelancers: time tracking, invoice generation, contract management, expense tracking. Privacy-first, all data stored locally.">
+      description="Universal Next-Gen CLI for freelancers: time tracking, invoice generation, contract management, expense tracking. Privacy-first, all data stored locally."
+    >
       <HomepageHeader />
       <main>
         <HomepageFeatures />

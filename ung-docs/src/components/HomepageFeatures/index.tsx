@@ -1,5 +1,5 @@
-import React from 'react';
 import clsx from 'clsx';
+import type React from 'react';
 import styles from './styles.module.css';
 
 type FeatureItem = {
@@ -14,8 +14,8 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/features/clock.svg').default,
     description: (
       <>
-        Track billable hours with automatic contract rate calculation.
-        Start, stop, and log time entries per client.
+        Track billable hours with automatic contract rate calculation. Start,
+        stop, and log time entries per client.
       </>
     ),
   },
@@ -34,8 +34,8 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/features/contract.svg').default,
     description: (
       <>
-        Create and store contracts with hourly or fixed rates.
-        Generate PDF contracts for clients.
+        Create and store contracts with hourly or fixed rates. Generate PDF
+        contracts for clients.
       </>
     ),
   },
@@ -44,8 +44,8 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/features/expense.svg').default,
     description: (
       <>
-        Log business expenses by category. Generate expense reports
-        for tax time or client billing.
+        Log business expenses by category. Generate expense reports for tax time
+        or client billing.
       </>
     ),
   },
@@ -54,8 +54,8 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/features/privacy.svg').default,
     description: (
       <>
-        All data stored locally in SQLite. No cloud, no subscriptions,
-        no data sharing. Your business data stays yours.
+        All data stored locally in SQLite. No cloud, no subscriptions, no data
+        sharing. Your business data stays yours.
       </>
     ),
   },
@@ -64,14 +64,14 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/features/platform.svg').default,
     description: (
       <>
-        Native Go binary with instant startup. Works on macOS, Linux,
-        and Windows. Also available as VSCode extension.
+        Native Go binary with instant startup. Works on macOS, Linux, and
+        Windows. Also available as VSCode extension.
       </>
     ),
   },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({ title, Svg, description }: FeatureItem) {
   return (
     <div className={clsx('col col--4')}>
       <div className="text--center">
@@ -90,8 +90,8 @@ export default function HomepageFeatures(): JSX.Element {
     <section className={styles.features}>
       <div className="container">
         <div className="row">
-          {FeatureList.map((props, idx) => (
-            <Feature key={idx} {...props} />
+          {FeatureList.map((props) => (
+            <Feature key={props.title} {...props} />
           ))}
         </div>
       </div>

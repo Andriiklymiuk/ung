@@ -51,15 +51,43 @@ var trackLogCmd = &cobra.Command{
 	RunE:  runTrackLog,
 }
 
+var trackEditCmd = &cobra.Command{
+	Use:   "edit <id>",
+	Short: "Edit a tracking session",
+	Long: `Edit an existing tracking session.
+
+Examples:
+  ung track edit 5                        Interactive edit
+  ung track edit 5 --hours 3.5            Update hours
+  ung track edit 5 --project "New task"   Update project name
+  ung track edit 5 --notes "Updated"      Update notes`,
+	Args: cobra.ExactArgs(1),
+	RunE: runTrackEdit,
+}
+
+var trackDeleteCmd = &cobra.Command{
+	Use:   "delete <id>",
+	Short: "Delete a tracking session",
+	Long: `Delete a tracking session (soft delete).
+
+Examples:
+  ung track delete 5      Delete session #5`,
+	Args: cobra.ExactArgs(1),
+	RunE: runTrackDelete,
+}
+
 var (
-	trackClientID   int
-	trackClientName string
-	trackContractID int
-	trackProject    string
-	trackBillable   bool
-	trackNotes      string
-	trackHours      float64
-	trackUnbilled   bool
+	trackClientID    int
+	trackClientName  string
+	trackContractID  int
+	trackProject     string
+	trackBillable    bool
+	trackNotes       string
+	trackHours       float64
+	trackUnbilled    bool
+	trackEditHours   float64
+	trackEditProject string
+	trackEditNotes   string
 )
 
 func init() {
@@ -69,6 +97,8 @@ func init() {
 	trackCmd.AddCommand(trackNowCmd)
 	trackCmd.AddCommand(trackLogCmd)
 	trackCmd.AddCommand(trackListCmd)
+	trackCmd.AddCommand(trackEditCmd)
+	trackCmd.AddCommand(trackDeleteCmd)
 
 	// Start flags
 	trackStartCmd.Flags().IntVar(&trackClientID, "client", 0, "Client ID")
@@ -85,6 +115,11 @@ func init() {
 
 	// List flags
 	trackListCmd.Flags().BoolVar(&trackUnbilled, "unbilled", false, "Show only unbilled sessions")
+
+	// Edit flags
+	trackEditCmd.Flags().Float64Var(&trackEditHours, "hours", 0, "New hours value")
+	trackEditCmd.Flags().StringVar(&trackEditProject, "project", "", "New project name")
+	trackEditCmd.Flags().StringVar(&trackEditNotes, "notes", "", "New notes")
 }
 
 func runTrackStart(cmd *cobra.Command, args []string) error {
@@ -468,5 +503,213 @@ func runTrackLog(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Project: %s\n", trackProject)
 	}
 
+	return nil
+}
+
+// runTrackEdit edits an existing tracking session
+func runTrackEdit(cmd *cobra.Command, args []string) error {
+	sessionID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid session ID: %s", args[0])
+	}
+
+	// Get current session details
+	var projectName, notes string
+	var hours *float64
+	var clientName *string
+	var duration int
+
+	err = db.DB.QueryRow(`
+		SELECT ts.project_name, ts.notes, ts.hours, ts.duration, c.name
+		FROM tracking_sessions ts
+		LEFT JOIN clients c ON ts.client_id = c.id
+		WHERE ts.id = ? AND ts.deleted_at IS NULL
+	`, sessionID).Scan(&projectName, &notes, &hours, &duration, &clientName)
+	if err != nil {
+		return fmt.Errorf("session not found: %w", err)
+	}
+
+	currentHours := 0.0
+	if hours != nil {
+		currentHours = *hours
+	} else if duration > 0 {
+		currentHours = float64(duration) / 3600.0
+	}
+
+	fmt.Printf("📝 Editing Tracking Session #%d\n\n", sessionID)
+	fmt.Printf("Current values:\n")
+	if clientName != nil {
+		fmt.Printf("  Client:  %s\n", *clientName)
+	}
+	fmt.Printf("  Project: %s\n", projectName)
+	fmt.Printf("  Hours:   %.2f\n", currentHours)
+	fmt.Printf("  Notes:   %s\n\n", notes)
+
+	// Check if any flags were provided
+	hasFlags := trackEditHours > 0 || trackEditProject != "" || trackEditNotes != ""
+
+	if hasFlags {
+		// Non-interactive mode - use provided flags
+		if trackEditHours > 0 {
+			durationSecs := int(trackEditHours * 3600)
+			_, err = db.DB.Exec("UPDATE tracking_sessions SET hours = ?, duration = ? WHERE id = ?",
+				trackEditHours, durationSecs, sessionID)
+			if err != nil {
+				return fmt.Errorf("failed to update hours: %w", err)
+			}
+			fmt.Printf("✓ Hours updated: %.2f → %.2f\n", currentHours, trackEditHours)
+		}
+
+		if trackEditProject != "" {
+			_, err = db.DB.Exec("UPDATE tracking_sessions SET project_name = ? WHERE id = ?",
+				trackEditProject, sessionID)
+			if err != nil {
+				return fmt.Errorf("failed to update project: %w", err)
+			}
+			fmt.Printf("✓ Project updated: %s → %s\n", projectName, trackEditProject)
+		}
+
+		if trackEditNotes != "" {
+			_, err = db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?",
+				trackEditNotes, sessionID)
+			if err != nil {
+				return fmt.Errorf("failed to update notes: %w", err)
+			}
+			fmt.Printf("✓ Notes updated\n")
+		}
+	} else {
+		// Interactive mode
+		var newHoursStr string
+		var newProject string
+		var newNotes string
+
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Hours").
+					Description(fmt.Sprintf("Current: %.2f", currentHours)).
+					Placeholder(fmt.Sprintf("%.2f", currentHours)).
+					Value(&newHoursStr),
+				huh.NewInput().
+					Title("Project Name").
+					Description(fmt.Sprintf("Current: %s", projectName)).
+					Placeholder(projectName).
+					Value(&newProject),
+				huh.NewText().
+					Title("Notes").
+					Description(fmt.Sprintf("Current: %s", notes)).
+					Placeholder(notes).
+					Value(&newNotes),
+			),
+		)
+
+		if err := form.Run(); err != nil {
+			return fmt.Errorf("cancelled: %w", err)
+		}
+
+		// Apply changes
+		if newHoursStr != "" {
+			newHours, err := strconv.ParseFloat(newHoursStr, 64)
+			if err != nil {
+				return fmt.Errorf("invalid hours: %w", err)
+			}
+			durationSecs := int(newHours * 3600)
+			_, err = db.DB.Exec("UPDATE tracking_sessions SET hours = ?, duration = ? WHERE id = ?",
+				newHours, durationSecs, sessionID)
+			if err != nil {
+				return fmt.Errorf("failed to update hours: %w", err)
+			}
+			fmt.Printf("✓ Hours updated: %.2f → %.2f\n", currentHours, newHours)
+		}
+
+		if newProject != "" {
+			_, err = db.DB.Exec("UPDATE tracking_sessions SET project_name = ? WHERE id = ?",
+				newProject, sessionID)
+			if err != nil {
+				return fmt.Errorf("failed to update project: %w", err)
+			}
+			fmt.Printf("✓ Project updated: %s → %s\n", projectName, newProject)
+		}
+
+		if newNotes != "" {
+			_, err = db.DB.Exec("UPDATE tracking_sessions SET notes = ? WHERE id = ?",
+				newNotes, sessionID)
+			if err != nil {
+				return fmt.Errorf("failed to update notes: %w", err)
+			}
+			fmt.Printf("✓ Notes updated\n")
+		}
+	}
+
+	return nil
+}
+
+// runTrackDelete soft-deletes a tracking session
+func runTrackDelete(cmd *cobra.Command, args []string) error {
+	sessionID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid session ID: %s", args[0])
+	}
+
+	// Get session details for confirmation
+	var projectName string
+	var hours *float64
+	var duration int
+	var clientName *string
+	var startTime time.Time
+
+	err = db.DB.QueryRow(`
+		SELECT ts.project_name, ts.hours, ts.duration, ts.start_time, c.name
+		FROM tracking_sessions ts
+		LEFT JOIN clients c ON ts.client_id = c.id
+		WHERE ts.id = ? AND ts.deleted_at IS NULL
+	`, sessionID).Scan(&projectName, &hours, &duration, &startTime, &clientName)
+	if err != nil {
+		return fmt.Errorf("session not found or already deleted: %w", err)
+	}
+
+	currentHours := 0.0
+	if hours != nil {
+		currentHours = *hours
+	} else if duration > 0 {
+		currentHours = float64(duration) / 3600.0
+	}
+
+	fmt.Println("⚠️  DELETE SESSION WARNING")
+	fmt.Println("==========================")
+	fmt.Printf("\nSession:  #%d\n", sessionID)
+	fmt.Printf("Date:     %s\n", startTime.Format("2006-01-02"))
+	if clientName != nil {
+		fmt.Printf("Client:   %s\n", *clientName)
+	}
+	fmt.Printf("Project:  %s\n", projectName)
+	fmt.Printf("Hours:    %.2f\n\n", currentHours)
+
+	// Confirmation
+	var confirm bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Are you sure you want to delete this session?").
+				Description("This is a soft delete and can be recovered.").
+				Affirmative("Yes, delete it").
+				Negative("Cancel").
+				Value(&confirm),
+		),
+	)
+
+	if err := form.Run(); err != nil || !confirm {
+		fmt.Println("\n✅ Deletion cancelled. Session is safe.")
+		return nil
+	}
+
+	// Soft delete (set deleted_at)
+	_, err = db.DB.Exec("UPDATE tracking_sessions SET deleted_at = ? WHERE id = ?",
+		time.Now(), sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to delete session: %w", err)
+	}
+
+	fmt.Printf("\n✓ Session #%d deleted successfully\n", sessionID)
 	return nil
 }

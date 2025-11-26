@@ -189,7 +189,9 @@ export class InvoiceCommands {
             { label: '$(check) Mark as Paid', action: 'markPaid' },
             { label: '$(send) Mark as Sent', action: 'markSent' },
             { label: '$(list-selection) Change Status...', action: 'changeStatus' },
+            { label: '$(edit) Edit Invoice', action: 'edit' },
             { label: '$(copy) Duplicate Invoice', action: 'duplicate' },
+            { label: '$(trash) Delete Invoice', action: 'delete' },
             { label: '$(close) Close', action: 'close' }
         ];
 
@@ -215,8 +217,14 @@ export class InvoiceCommands {
                 case 'changeStatus':
                     await this.changeInvoiceStatus(invoiceId);
                     break;
+                case 'edit':
+                    await this.editInvoice(invoiceId);
+                    break;
                 case 'duplicate':
                     await this.duplicateInvoice(invoiceId);
+                    break;
+                case 'delete':
+                    await this.deleteInvoice(invoiceId);
                     break;
             }
         }
@@ -443,9 +451,95 @@ export class InvoiceCommands {
             return;
         }
 
-        vscode.window.showInformationMessage(
-            'Invoice editing will be available in a future version.'
-        );
+        // Get invoice details first
+        const invoicesResult = await this.cli.listInvoices();
+        if (!invoicesResult.success || !invoicesResult.stdout) {
+            vscode.window.showErrorMessage('Failed to fetch invoice details');
+            return;
+        }
+
+        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+        const invoice = invoices.find(inv => inv.id === invoiceId);
+
+        if (!invoice) {
+            vscode.window.showErrorMessage('Invoice not found');
+            return;
+        }
+
+        // Ask what to edit
+        const editOptions = [
+            { label: '$(symbol-number) Amount', value: 'amount', description: `Current: ${invoice.amount}` },
+            { label: '$(calendar) Due Date', value: 'dueDate', description: `Current: ${invoice.date}` },
+            { label: '$(edit) Description', value: 'description' }
+        ];
+
+        const selected = await vscode.window.showQuickPick(editOptions, {
+            placeHolder: 'What would you like to edit?',
+            title: `Edit Invoice ${invoice.invoiceNum}`
+        });
+
+        if (!selected) return;
+
+        const editData: { amount?: number; dueDate?: string; description?: string } = {};
+
+        switch (selected.value) {
+            case 'amount': {
+                const currentAmount = invoice.amount.replace(/[^0-9.]/g, '');
+                const newAmount = await vscode.window.showInputBox({
+                    prompt: 'New invoice amount',
+                    value: currentAmount,
+                    validateInput: value => {
+                        if (!value) return 'Amount is required';
+                        if (isNaN(Number(value))) return 'Must be a valid number';
+                        if (Number(value) <= 0) return 'Amount must be greater than 0';
+                        return null;
+                    }
+                });
+                if (!newAmount) return;
+                editData.amount = Number(newAmount);
+                break;
+            }
+            case 'dueDate': {
+                const newDate = await vscode.window.showInputBox({
+                    prompt: 'New due date (YYYY-MM-DD)',
+                    placeHolder: '2025-01-15',
+                    validateInput: value => {
+                        if (!value) return 'Date is required';
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Format must be YYYY-MM-DD';
+                        return null;
+                    }
+                });
+                if (!newDate) return;
+                editData.dueDate = newDate;
+                break;
+            }
+            case 'description': {
+                const newDesc = await vscode.window.showInputBox({
+                    prompt: 'New description',
+                    placeHolder: 'Invoice description'
+                });
+                if (!newDesc) return;
+                editData.description = newDesc;
+                break;
+            }
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Updating invoice...',
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.editInvoice(invoiceId, editData);
+
+            if (result.success) {
+                vscode.window.showInformationMessage('Invoice updated successfully!');
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
+            }
+        });
     }
 
     /**
@@ -457,15 +551,43 @@ export class InvoiceCommands {
             return;
         }
 
+        // Get invoice details for confirmation
+        const invoicesResult = await this.cli.listInvoices();
+        if (!invoicesResult.success || !invoicesResult.stdout) {
+            vscode.window.showErrorMessage('Failed to fetch invoice details');
+            return;
+        }
+
+        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+        const invoice = invoices.find(inv => inv.id === invoiceId);
+
         const confirm = await vscode.window.showWarningMessage(
-            `Are you sure you want to delete this invoice?`,
+            invoice
+                ? `Delete invoice ${invoice.invoiceNum} (${invoice.amount})? This cannot be undone!`
+                : `Delete invoice #${invoiceId}? This cannot be undone!`,
             { modal: true },
-            'Yes', 'No'
+            'Yes, Delete',
+            'Cancel'
         );
 
-        if (confirm !== 'Yes') return;
+        if (confirm !== 'Yes, Delete') return;
 
-        vscode.window.showInformationMessage('Invoice deletion will be available in a future version.');
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Deleting invoice...',
+            cancellable: false
+        }, async () => {
+            const result = await this.cli.deleteInvoice(invoiceId);
+
+            if (result.success) {
+                vscode.window.showInformationMessage('Invoice deleted successfully!');
+                if (this.refreshCallback) {
+                    this.refreshCallback();
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to delete invoice: ${result.error}`);
+            }
+        });
     }
 
     /**

@@ -668,4 +668,57 @@ export class UngCli {
     async getDashboard(): Promise<CliResult> {
         return this.exec(['dashboard']);
     }
+
+    // ========== Invoice Edit/Delete Commands ==========
+
+    /**
+     * Edit an invoice
+     */
+    async editInvoice(id: number, data: {
+        amount?: number;
+        dueDate?: string;
+        description?: string;
+    }): Promise<CliResult> {
+        const args = ['invoice', 'edit', id.toString()];
+        if (data.amount !== undefined) args.push('--amount', data.amount.toString());
+        if (data.dueDate) args.push('--due', data.dueDate);
+        if (data.description) args.push('--description', `"${data.description}"`);
+        return this.exec(args);
+    }
+
+    /**
+     * Delete an invoice (requires confirmation in terminal)
+     * For VS Code, we handle confirmation separately
+     */
+    async deleteInvoice(id: number): Promise<CliResult> {
+        // Note: CLI requires interactive confirmation
+        // For VS Code, we'll handle confirmation via VS Code dialog
+        return this.exec(['invoice', 'delete', id.toString()]);
+    }
+
+    // ========== Tracking Edit/Delete Commands ==========
+
+    /**
+     * Edit a tracking session
+     */
+    async editTrackingSession(id: number, data: {
+        hours?: number;
+        project?: string;
+        notes?: string;
+    }): Promise<CliResult> {
+        const args = ['track', 'edit', id.toString()];
+        if (data.hours !== undefined) args.push('--hours', data.hours.toString());
+        if (data.project) args.push('--project', `"${data.project}"`);
+        if (data.notes) args.push('--notes', `"${data.notes}"`);
+        return this.exec(args);
+    }
+
+    /**
+     * Delete a tracking session (soft delete)
+     */
+    async deleteTrackingSession(id: number): Promise<CliResult> {
+        // Note: CLI requires interactive confirmation
+        // For VS Code, we'll handle confirmation via VS Code dialog
+        return this.exec(['track', 'delete', id.toString()]);
+    }
 }

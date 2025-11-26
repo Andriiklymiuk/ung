@@ -98,7 +98,37 @@ Examples:
 	RunE: runInvoiceMark,
 }
 
+var invoiceEditCmd = &cobra.Command{
+	Use:   "edit <id>",
+	Short: "Edit an invoice",
+	Long: `Edit an existing invoice's details.
+
+Examples:
+  ung invoice edit 5                          Interactive edit
+  ung invoice edit 5 --amount 1500            Update amount
+  ung invoice edit 5 --due 2025-01-15         Update due date
+  ung invoice edit 5 --description "Updated"  Update description`,
+	Args: cobra.ExactArgs(1),
+	RunE: runInvoiceEdit,
+}
+
+var invoiceDeleteCmd = &cobra.Command{
+	Use:   "delete <id>",
+	Short: "Delete an invoice",
+	Long: `Delete an invoice permanently.
+
+⚠️  This action cannot be undone!
+
+Examples:
+  ung invoice delete 5      Delete invoice #5`,
+	Args: cobra.ExactArgs(1),
+	RunE: runInvoiceDelete,
+}
+
 var invoiceMarkStatus string
+var invoiceEditAmount float64
+var invoiceEditDueDate string
+var invoiceEditDescription string
 
 
 var (
@@ -127,10 +157,17 @@ func init() {
 	invoiceCmd.AddCommand(invoiceGenerateAllCmd)
 	invoiceCmd.AddCommand(invoiceSendAllCmd)
 	invoiceCmd.AddCommand(invoiceMarkCmd)
+	invoiceCmd.AddCommand(invoiceEditCmd)
+	invoiceCmd.AddCommand(invoiceDeleteCmd)
 
 	// Mark command flags
 	invoiceMarkCmd.Flags().StringVar(&invoiceMarkStatus, "status", "", "New status (pending, sent, paid, overdue)")
 	invoiceMarkCmd.MarkFlagRequired("status")
+
+	// Edit command flags
+	invoiceEditCmd.Flags().Float64Var(&invoiceEditAmount, "amount", 0, "New invoice amount")
+	invoiceEditCmd.Flags().StringVar(&invoiceEditDueDate, "due", "", "New due date (YYYY-MM-DD)")
+	invoiceEditCmd.Flags().StringVar(&invoiceEditDescription, "description", "", "New description")
 
 	// Main invoice command flags
 	invoiceCmd.Flags().StringVarP(&invoiceFlagClient, "client", "c", "", "Client name (generates invoice from tracked time)")
@@ -1185,5 +1222,185 @@ func runInvoiceMark(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("✓ Invoice %s status updated: %s → %s\n", invoiceNum, currentStatus, newStatus)
+	return nil
+}
+
+// runInvoiceEdit edits an existing invoice
+func runInvoiceEdit(cmd *cobra.Command, args []string) error {
+	invoiceID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid invoice ID: %s", args[0])
+	}
+
+	// Get current invoice details
+	var inv models.Invoice
+	err = db.DB.QueryRow(`
+		SELECT id, invoice_num, amount, currency, description, due_date
+		FROM invoices WHERE id = ?
+	`, invoiceID).Scan(&inv.ID, &inv.InvoiceNum, &inv.Amount, &inv.Currency, &inv.Description, &inv.DueDate)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	fmt.Printf("📝 Editing Invoice %s (ID: %d)\n\n", inv.InvoiceNum, inv.ID)
+	fmt.Printf("Current values:\n")
+	fmt.Printf("  Amount:      %.2f %s\n", inv.Amount, inv.Currency)
+	fmt.Printf("  Description: %s\n", inv.Description)
+	fmt.Printf("  Due Date:    %s\n\n", inv.DueDate.Format("2006-01-02"))
+
+	// Check if any flags were provided
+	hasFlags := invoiceEditAmount > 0 || invoiceEditDueDate != "" || invoiceEditDescription != ""
+
+	if hasFlags {
+		// Non-interactive mode - use provided flags
+		if invoiceEditAmount > 0 {
+			_, err = db.DB.Exec("UPDATE invoices SET amount = ? WHERE id = ?", invoiceEditAmount, invoiceID)
+			if err != nil {
+				return fmt.Errorf("failed to update amount: %w", err)
+			}
+			fmt.Printf("✓ Amount updated: %.2f → %.2f\n", inv.Amount, invoiceEditAmount)
+		}
+
+		if invoiceEditDueDate != "" {
+			newDue, err := time.Parse("2006-01-02", invoiceEditDueDate)
+			if err != nil {
+				return fmt.Errorf("invalid due date format (use YYYY-MM-DD): %w", err)
+			}
+			_, err = db.DB.Exec("UPDATE invoices SET due_date = ? WHERE id = ?", newDue, invoiceID)
+			if err != nil {
+				return fmt.Errorf("failed to update due date: %w", err)
+			}
+			fmt.Printf("✓ Due date updated: %s → %s\n", inv.DueDate.Format("2006-01-02"), invoiceEditDueDate)
+		}
+
+		if invoiceEditDescription != "" {
+			_, err = db.DB.Exec("UPDATE invoices SET description = ? WHERE id = ?", invoiceEditDescription, invoiceID)
+			if err != nil {
+				return fmt.Errorf("failed to update description: %w", err)
+			}
+			fmt.Printf("✓ Description updated\n")
+		}
+	} else {
+		// Interactive mode
+		var newAmountStr string
+		var newDueDateStr string
+		var newDescription string
+
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Amount").
+					Description(fmt.Sprintf("Current: %.2f %s", inv.Amount, inv.Currency)).
+					Placeholder(fmt.Sprintf("%.2f", inv.Amount)).
+					Value(&newAmountStr),
+				huh.NewInput().
+					Title("Due Date (YYYY-MM-DD)").
+					Description(fmt.Sprintf("Current: %s", inv.DueDate.Format("2006-01-02"))).
+					Placeholder(inv.DueDate.Format("2006-01-02")).
+					Value(&newDueDateStr),
+				huh.NewInput().
+					Title("Description").
+					Description(fmt.Sprintf("Current: %s", inv.Description)).
+					Placeholder(inv.Description).
+					Value(&newDescription),
+			),
+		)
+
+		if err := form.Run(); err != nil {
+			return fmt.Errorf("cancelled: %w", err)
+		}
+
+		// Apply changes
+		if newAmountStr != "" {
+			newAmount, err := strconv.ParseFloat(newAmountStr, 64)
+			if err != nil {
+				return fmt.Errorf("invalid amount: %w", err)
+			}
+			_, err = db.DB.Exec("UPDATE invoices SET amount = ? WHERE id = ?", newAmount, invoiceID)
+			if err != nil {
+				return fmt.Errorf("failed to update amount: %w", err)
+			}
+			fmt.Printf("✓ Amount updated: %.2f → %.2f\n", inv.Amount, newAmount)
+		}
+
+		if newDueDateStr != "" {
+			newDue, err := time.Parse("2006-01-02", newDueDateStr)
+			if err != nil {
+				return fmt.Errorf("invalid due date format: %w", err)
+			}
+			_, err = db.DB.Exec("UPDATE invoices SET due_date = ? WHERE id = ?", newDue, invoiceID)
+			if err != nil {
+				return fmt.Errorf("failed to update due date: %w", err)
+			}
+			fmt.Printf("✓ Due date updated: %s → %s\n", inv.DueDate.Format("2006-01-02"), newDueDateStr)
+		}
+
+		if newDescription != "" {
+			_, err = db.DB.Exec("UPDATE invoices SET description = ? WHERE id = ?", newDescription, invoiceID)
+			if err != nil {
+				return fmt.Errorf("failed to update description: %w", err)
+			}
+			fmt.Printf("✓ Description updated\n")
+		}
+	}
+
+	return nil
+}
+
+// runInvoiceDelete deletes an invoice
+func runInvoiceDelete(cmd *cobra.Command, args []string) error {
+	invoiceID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid invoice ID: %s", args[0])
+	}
+
+	// Get invoice details for confirmation
+	var invoiceNum string
+	var amount float64
+	var currency string
+	var status string
+	err = db.DB.QueryRow(`
+		SELECT invoice_num, amount, currency, status
+		FROM invoices WHERE id = ?
+	`, invoiceID).Scan(&invoiceNum, &amount, &currency, &status)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	fmt.Println("⚠️  DELETE INVOICE WARNING")
+	fmt.Println("==========================")
+	fmt.Printf("\nInvoice:  %s (ID: %d)\n", invoiceNum, invoiceID)
+	fmt.Printf("Amount:   %.2f %s\n", amount, currency)
+	fmt.Printf("Status:   %s\n\n", status)
+
+	// Confirmation
+	var confirm bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Are you sure you want to delete this invoice?").
+				Description("This action cannot be undone!").
+				Affirmative("Yes, delete it").
+				Negative("Cancel").
+				Value(&confirm),
+		),
+	)
+
+	if err := form.Run(); err != nil || !confirm {
+		fmt.Println("\n✅ Deletion cancelled. Invoice is safe.")
+		return nil
+	}
+
+	// Delete related records first
+	db.DB.Exec("DELETE FROM invoice_line_items WHERE invoice_id = ?", invoiceID)
+	db.DB.Exec("DELETE FROM invoice_recipients WHERE invoice_id = ?", invoiceID)
+
+	// Delete invoice
+	_, err = db.DB.Exec("DELETE FROM invoices WHERE id = ?", invoiceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete invoice: %w", err)
+	}
+
+	fmt.Printf("\n✓ Invoice %s deleted successfully\n", invoiceNum)
 	return nil
 }

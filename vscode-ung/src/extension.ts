@@ -186,6 +186,35 @@ export async function activate(context: vscode.ExtensionContext) {
     const isInstalled = await cli.isInstalled();
     vscode.commands.executeCommand('setContext', 'ung.cliInstalled', isInstalled);
 
+    // Register Getting Started provider (always, to avoid "No view is registered" error)
+    // It will only be visible when ung.cliInstalled is true due to the "when" clause in package.json
+    const gettingStartedProvider = new GettingStartedProvider(
+        async (): Promise<boolean> => {
+            if (!isInstalled) return false;
+            const result = await cli.exec(['company', 'list']);
+            return !!(result.success && result.stdout && !result.stdout.includes('No company'));
+        },
+        async (): Promise<boolean> => {
+            if (!isInstalled) return false;
+            const result = await cli.exec(['client', 'list']);
+            return !!(result.success && result.stdout && result.stdout.split('\n').length > 2);
+        },
+        async (): Promise<boolean> => {
+            if (!isInstalled) return false;
+            const result = await cli.exec(['contract', 'list']);
+            return !!(result.success && result.stdout && result.stdout.split('\n').length > 2);
+        }
+    );
+    const gettingStartedTree = vscode.window.createTreeView('ungGettingStarted', {
+        treeDataProvider: gettingStartedProvider
+    });
+    context.subscriptions.push(gettingStartedTree);
+
+    // Register refresh command for Getting Started (always available)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.refreshGettingStarted', () => gettingStartedProvider.refresh())
+    );
+
     if (!isInstalled) {
         // Show friendly welcome message for new users
         const action = await vscode.window.showInformationMessage(
@@ -226,21 +255,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const trackingProvider = new TrackingProvider(cli);
     const dashboardProvider = new DashboardProvider(cli);
 
-    // Initialize Getting Started provider with data checks
-    const gettingStartedProvider = new GettingStartedProvider(
-        async (): Promise<boolean> => {
-            const result = await cli.exec(['company', 'list']);
-            return !!(result.success && result.stdout && !result.stdout.includes('No company'));
-        },
-        async (): Promise<boolean> => {
-            const result = await cli.exec(['client', 'list']);
-            return !!(result.success && result.stdout && result.stdout.split('\n').length > 2);
-        },
-        async (): Promise<boolean> => {
-            const result = await cli.exec(['contract', 'list']);
-            return !!(result.success && result.stdout && result.stdout.split('\n').length > 2);
-        }
-    );
+    // Refresh Getting Started provider now that CLI is installed
     await gettingStartedProvider.refresh();
 
     // Register tree views
@@ -262,11 +277,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const dashboardTree = vscode.window.createTreeView('ungDashboard', {
         treeDataProvider: dashboardProvider
     });
-    const gettingStartedTree = vscode.window.createTreeView('ungGettingStarted', {
-        treeDataProvider: gettingStartedProvider
-    });
 
-    context.subscriptions.push(invoicesTree, contractsTree, clientsTree, expensesTree, trackingTree, dashboardTree, gettingStartedTree);
+    context.subscriptions.push(invoicesTree, contractsTree, clientsTree, expensesTree, trackingTree, dashboardTree);
 
     // Initialize command handlers
     const companyCommands = new CompanyCommands(cli);
@@ -343,11 +355,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // Dashboard commands
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.refreshDashboard', () => dashboardProvider.refresh())
-    );
-
-    // Getting Started commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand('ung.refreshGettingStarted', () => gettingStartedProvider.refresh())
     );
 
     // Export wizard command

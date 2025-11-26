@@ -37,18 +37,45 @@ var expenseReportCmd = &cobra.Command{
 	RunE:  runExpenseReport,
 }
 
+var expenseDeleteCmd = &cobra.Command{
+	Use:   "delete [id]",
+	Short: "Delete an expense",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runExpenseDelete,
+}
+
 func init() {
 	rootCmd.AddCommand(expenseCmd)
 	expenseCmd.AddCommand(expenseAddCmd)
 	expenseCmd.AddCommand(expenseListCmd)
 	expenseCmd.AddCommand(expenseReportCmd)
+	expenseCmd.AddCommand(expenseDeleteCmd)
+
+	// Flags for non-interactive expense add
+	expenseAddCmd.Flags().StringP("description", "d", "", "Expense description")
+	expenseAddCmd.Flags().StringP("amount", "a", "", "Expense amount")
+	expenseAddCmd.Flags().StringP("category", "c", "", "Category (software, hardware, travel, meals, office_supplies, utilities, marketing, other)")
+	expenseAddCmd.Flags().StringP("vendor", "v", "", "Vendor name")
+	expenseAddCmd.Flags().String("date", "", "Date (YYYY-MM-DD, defaults to today)")
+	expenseAddCmd.Flags().StringP("notes", "n", "", "Additional notes")
 }
 
 func runExpenseAdd(cmd *cobra.Command, args []string) error {
-	fmt.Println("💸 Add Business Expense\n")
+	// Check if flags are provided for non-interactive mode
+	description, _ := cmd.Flags().GetString("description")
+	amountStr, _ := cmd.Flags().GetString("amount")
+	category, _ := cmd.Flags().GetString("category")
+	vendor, _ := cmd.Flags().GetString("vendor")
+	dateStr, _ := cmd.Flags().GetString("date")
+	notes, _ := cmd.Flags().GetString("notes")
 
-	var description, vendor, notes, dateStr, amountStr string
-	var category string
+	// If required flags are provided, use non-interactive mode
+	if description != "" && amountStr != "" && category != "" {
+		return addExpenseNonInteractive(description, amountStr, category, vendor, dateStr, notes)
+	}
+
+	// Interactive mode
+	fmt.Println("💸 Add Business Expense\n")
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -112,8 +139,15 @@ func runExpenseAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("form cancelled: %w", err)
 	}
 
+	return addExpenseNonInteractive(description, amountStr, category, vendor, dateStr, notes)
+}
+
+func addExpenseNonInteractive(description, amountStr, category, vendor, dateStr, notes string) error {
 	// Parse amount
-	amount, _ := strconv.ParseFloat(amountStr, 64)
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		return fmt.Errorf("invalid amount: %w", err)
+	}
 
 	// Parse date
 	var expenseDate time.Time
@@ -148,12 +182,38 @@ func runExpenseAdd(cmd *cobra.Command, args []string) error {
 
 	id, _ := result.LastInsertId()
 
-	fmt.Printf("\n✓ Expense added successfully (ID: %d)\n", id)
+	fmt.Printf("✓ Expense added successfully (ID: %d)\n", id)
 	fmt.Printf("  Description: %s\n", description)
 	fmt.Printf("  Amount: $%.2f\n", amount)
 	fmt.Printf("  Category: %s\n", category)
 	fmt.Printf("  Date: %s\n", expenseDate.Format("2006-01-02"))
 
+	return nil
+}
+
+func runExpenseDelete(cmd *cobra.Command, args []string) error {
+	id, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid expense ID: %w", err)
+	}
+
+	// Check if expense exists
+	var exists bool
+	err = db.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM expenses WHERE id = ?)", id).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check expense: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("expense with ID %d not found", id)
+	}
+
+	// Delete the expense
+	_, err = db.DB.Exec("DELETE FROM expenses WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete expense: %w", err)
+	}
+
+	fmt.Printf("✓ Expense %d deleted successfully\n", id)
 	return nil
 }
 

@@ -1,126 +1,130 @@
 import * as vscode from 'vscode';
-import { UngCli } from '../cli/ungCli';
+import type { UngCli } from '../cli/ungCli';
 
 /**
  * Invoice detail webview panel
  */
 export class InvoicePanel {
-    public static currentPanel: InvoicePanel | undefined;
-    private readonly panel: vscode.WebviewPanel;
-    private disposables: vscode.Disposable[] = [];
+  public static currentPanel: InvoicePanel | undefined;
+  private readonly panel: vscode.WebviewPanel;
+  private disposables: vscode.Disposable[] = [];
 
-    private constructor(
-        panel: vscode.WebviewPanel,
-        private cli: UngCli,
-        private invoiceId: number
-    ) {
-        this.panel = panel;
+  private constructor(
+    panel: vscode.WebviewPanel,
+    private cli: UngCli,
+    private invoiceId: number
+  ) {
+    this.panel = panel;
 
-        // Set the webview's HTML content
-        this.update();
+    // Set the webview's HTML content
+    this.update();
 
-        // Handle messages from the webview
-        this.panel.webview.onDidReceiveMessage(
-            message => {
-                switch (message.command) {
-                    case 'export':
-                        this.exportPDF();
-                        break;
-                    case 'email':
-                        this.emailInvoice();
-                        break;
-                }
-            },
-            null,
-            this.disposables
-        );
-
-        // Handle panel disposed
-        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    }
-
-    /**
-     * Create or show invoice panel
-     */
-    public static createOrShow(cli: UngCli, invoiceId: number) {
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
-
-        // If we already have a panel, show it
-        if (InvoicePanel.currentPanel) {
-            InvoicePanel.currentPanel.panel.reveal(column);
-            InvoicePanel.currentPanel.invoiceId = invoiceId;
-            InvoicePanel.currentPanel.update();
-            return;
+    // Handle messages from the webview
+    this.panel.webview.onDidReceiveMessage(
+      (message) => {
+        switch (message.command) {
+          case 'export':
+            this.exportPDF();
+            break;
+          case 'email':
+            this.emailInvoice();
+            break;
         }
+      },
+      null,
+      this.disposables
+    );
 
-        // Otherwise, create a new panel
-        const panel = vscode.window.createWebviewPanel(
-            'ungInvoice',
-            `Invoice ${invoiceId}`,
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true
-            }
-        );
+    // Handle panel disposed
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+  }
 
-        InvoicePanel.currentPanel = new InvoicePanel(panel, cli, invoiceId);
+  /**
+   * Create or show invoice panel
+   */
+  public static createOrShow(cli: UngCli, invoiceId: number) {
+    const column = vscode.window.activeTextEditor
+      ? vscode.window.activeTextEditor.viewColumn
+      : undefined;
+
+    // If we already have a panel, show it
+    if (InvoicePanel.currentPanel) {
+      InvoicePanel.currentPanel.panel.reveal(column);
+      InvoicePanel.currentPanel.invoiceId = invoiceId;
+      InvoicePanel.currentPanel.update();
+      return;
     }
 
-    /**
-     * Update webview content
-     */
-    private async update() {
-        this.panel.title = `Invoice ${this.invoiceId}`;
-        this.panel.webview.html = await this.getHtmlForWebview();
+    // Otherwise, create a new panel
+    const panel = vscode.window.createWebviewPanel(
+      'ungInvoice',
+      `Invoice ${invoiceId}`,
+      column || vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      }
+    );
+
+    InvoicePanel.currentPanel = new InvoicePanel(panel, cli, invoiceId);
+  }
+
+  /**
+   * Update webview content
+   */
+  private async update() {
+    this.panel.title = `Invoice ${this.invoiceId}`;
+    this.panel.webview.html = await this.getHtmlForWebview();
+  }
+
+  /**
+   * Export invoice to PDF
+   */
+  private async exportPDF() {
+    const result = await this.cli.generateInvoicePDF(this.invoiceId);
+    if (result.success) {
+      vscode.window.showInformationMessage(
+        'Invoice PDF generated successfully!'
+      );
+    } else {
+      vscode.window.showErrorMessage(`Failed to generate PDF: ${result.error}`);
+    }
+  }
+
+  /**
+   * Email invoice
+   */
+  private async emailInvoice() {
+    // Ask user to select email client
+    const emailClients = [
+      { label: 'Apple Mail', value: 'apple' },
+      { label: 'Outlook', value: 'outlook' },
+      { label: 'Gmail (Browser)', value: 'gmail' },
+    ];
+
+    const selected = await vscode.window.showQuickPick(emailClients, {
+      placeHolder: 'Select email client',
+    });
+
+    if (!selected) {
+      return;
     }
 
-    /**
-     * Export invoice to PDF
-     */
-    private async exportPDF() {
-        const result = await this.cli.generateInvoicePDF(this.invoiceId);
-        if (result.success) {
-            vscode.window.showInformationMessage('Invoice PDF generated successfully!');
-        } else {
-            vscode.window.showErrorMessage(`Failed to generate PDF: ${result.error}`);
-        }
+    const result = await this.cli.emailInvoice(this.invoiceId, selected.value);
+    if (result.success) {
+      vscode.window.showInformationMessage('Invoice email prepared!');
+    } else {
+      vscode.window.showErrorMessage(
+        `Failed to email invoice: ${result.error}`
+      );
     }
+  }
 
-    /**
-     * Email invoice
-     */
-    private async emailInvoice() {
-        // Ask user to select email client
-        const emailClients = [
-            { label: 'Apple Mail', value: 'apple' },
-            { label: 'Outlook', value: 'outlook' },
-            { label: 'Gmail (Browser)', value: 'gmail' }
-        ];
-
-        const selected = await vscode.window.showQuickPick(emailClients, {
-            placeHolder: 'Select email client'
-        });
-
-        if (!selected) {
-            return;
-        }
-
-        const result = await this.cli.emailInvoice(this.invoiceId, selected.value);
-        if (result.success) {
-            vscode.window.showInformationMessage('Invoice email prepared!');
-        } else {
-            vscode.window.showErrorMessage(`Failed to email invoice: ${result.error}`);
-        }
-    }
-
-    /**
-     * Get HTML content for webview
-     */
-    private async getHtmlForWebview(): Promise<string> {
-        return `<!DOCTYPE html>
+  /**
+   * Get HTML content for webview
+   */
+  private async getHtmlForWebview(): Promise<string> {
+    return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
@@ -426,21 +430,21 @@ export class InvoicePanel {
             </script>
         </body>
         </html>`;
+  }
+
+  /**
+   * Dispose resources
+   */
+  public dispose() {
+    InvoicePanel.currentPanel = undefined;
+
+    this.panel.dispose();
+
+    while (this.disposables.length) {
+      const disposable = this.disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
     }
-
-    /**
-     * Dispose resources
-     */
-    public dispose() {
-        InvoicePanel.currentPanel = undefined;
-
-        this.panel.dispose();
-
-        while (this.disposables.length) {
-            const disposable = this.disposables.pop();
-            if (disposable) {
-                disposable.dispose();
-            }
-        }
-    }
+  }
 }

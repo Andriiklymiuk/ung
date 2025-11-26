@@ -1,17 +1,17 @@
-import { CliResult } from '../cli/ungCli';
-import { ErrorHandler, UngError, ErrorType } from './errors';
+import type { CliResult } from '../cli/ungCli';
+import { ErrorHandler, ErrorType, UngError } from './errors';
 
 /**
  * Command queue item
  */
 interface QueuedCommand<T = any> {
-    id: string;
-    execute: () => Promise<CliResult<T>>;
-    resolve: (result: CliResult<T>) => void;
-    reject: (error: Error) => void;
-    timeout?: number;
-    retries: number;
-    maxRetries: number;
+  id: string;
+  execute: () => Promise<CliResult<T>>;
+  resolve: (result: CliResult<T>) => void;
+  reject: (error: Error) => void;
+  timeout?: number;
+  retries: number;
+  maxRetries: number;
 }
 
 /**
@@ -19,161 +19,171 @@ interface QueuedCommand<T = any> {
  * Prevents concurrent CLI calls and provides retry logic
  */
 export class CommandQueue {
-    private queue: QueuedCommand[] = [];
-    private processing: boolean = false;
-    private currentCommand: QueuedCommand | null = null;
-    private readonly DEFAULT_TIMEOUT = 30000; // 30 seconds
-    private readonly DEFAULT_MAX_RETRIES = 2;
+  private queue: QueuedCommand[] = [];
+  private processing: boolean = false;
+  private currentCommand: QueuedCommand | null = null;
+  private readonly DEFAULT_TIMEOUT = 30000; // 30 seconds
+  private readonly DEFAULT_MAX_RETRIES = 2;
 
-    /**
-     * Add command to queue
-     */
-    async enqueue<T = any>(
-        execute: () => Promise<CliResult<T>>,
-        options?: {
-            timeout?: number;
-            maxRetries?: number;
-            priority?: boolean;
-        }
-    ): Promise<CliResult<T>> {
-        return new Promise((resolve, reject) => {
-            const command: QueuedCommand<T> = {
-                id: this.generateId(),
-                execute,
-                resolve,
-                reject,
-                timeout: options?.timeout || this.DEFAULT_TIMEOUT,
-                retries: 0,
-                maxRetries: options?.maxRetries ?? this.DEFAULT_MAX_RETRIES
-            };
+  /**
+   * Add command to queue
+   */
+  async enqueue<T = any>(
+    execute: () => Promise<CliResult<T>>,
+    options?: {
+      timeout?: number;
+      maxRetries?: number;
+      priority?: boolean;
+    }
+  ): Promise<CliResult<T>> {
+    return new Promise((resolve, reject) => {
+      const command: QueuedCommand<T> = {
+        id: this.generateId(),
+        execute,
+        resolve,
+        reject,
+        timeout: options?.timeout || this.DEFAULT_TIMEOUT,
+        retries: 0,
+        maxRetries: options?.maxRetries ?? this.DEFAULT_MAX_RETRIES,
+      };
 
-            if (options?.priority) {
-                this.queue.unshift(command);
-            } else {
-                this.queue.push(command);
-            }
+      if (options?.priority) {
+        this.queue.unshift(command);
+      } else {
+        this.queue.push(command);
+      }
 
-            this.processQueue();
-        });
+      this.processQueue();
+    });
+  }
+
+  /**
+   * Process the command queue
+   */
+  private async processQueue(): Promise<void> {
+    if (this.processing || this.queue.length === 0) {
+      return;
     }
 
-    /**
-     * Process the command queue
-     */
-    private async processQueue(): Promise<void> {
-        if (this.processing || this.queue.length === 0) {
-            return;
+    this.processing = true;
+
+    while (this.queue.length > 0) {
+      const command = this.queue.shift()!;
+      this.currentCommand = command;
+
+      try {
+        const result = await this.executeWithTimeout(command);
+        command.resolve(result);
+      } catch (error) {
+        if (command.retries < command.maxRetries && this.shouldRetry(error)) {
+          // Retry the command
+          command.retries++;
+          ErrorHandler.logWarning(
+            `Retrying command (attempt ${command.retries + 1}/${command.maxRetries + 1})`
+          );
+          this.queue.unshift(command);
+        } else {
+          command.reject(error as Error);
         }
+      }
 
-        this.processing = true;
-
-        while (this.queue.length > 0) {
-            const command = this.queue.shift()!;
-            this.currentCommand = command;
-
-            try {
-                const result = await this.executeWithTimeout(command);
-                command.resolve(result);
-            } catch (error) {
-                if (command.retries < command.maxRetries && this.shouldRetry(error)) {
-                    // Retry the command
-                    command.retries++;
-                    ErrorHandler.logWarning(
-                        `Retrying command (attempt ${command.retries + 1}/${command.maxRetries + 1})`
-                    );
-                    this.queue.unshift(command);
-                } else {
-                    command.reject(error as Error);
-                }
-            }
-
-            this.currentCommand = null;
-        }
-
-        this.processing = false;
+      this.currentCommand = null;
     }
 
-    /**
-     * Execute command with timeout
-     */
-    private executeWithTimeout<T>(command: QueuedCommand<T>): Promise<CliResult<T>> {
-        return new Promise(async (resolve, reject) => {
-            let timeoutId: NodeJS.Timeout | undefined;
+    this.processing = false;
+  }
 
-            if (command.timeout) {
-                timeoutId = setTimeout(() => {
-                    reject(new UngError(
-                        ErrorType.TIMEOUT,
-                        `Command timed out after ${command.timeout}ms`
-                    ));
-                }, command.timeout);
-            }
+  /**
+   * Execute command with timeout
+   */
+  private executeWithTimeout<T>(
+    command: QueuedCommand<T>
+  ): Promise<CliResult<T>> {
+    return new Promise(async (resolve, reject) => {
+      let timeoutId: NodeJS.Timeout | undefined;
 
-            try {
-                const result = await command.execute();
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                }
-                resolve(result);
-            } catch (error) {
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                }
-                reject(error);
-            }
-        });
-    }
+      if (command.timeout) {
+        timeoutId = setTimeout(() => {
+          reject(
+            new UngError(
+              ErrorType.TIMEOUT,
+              `Command timed out after ${command.timeout}ms`
+            )
+          );
+        }, command.timeout);
+      }
 
-    /**
-     * Check if error is retryable
-     */
-    private shouldRetry(error: any): boolean {
-        if (error instanceof UngError) {
-            // Don't retry validation errors or not found errors
-            if (error.type === ErrorType.VALIDATION_ERROR || error.type === ErrorType.NOT_FOUND) {
-                return false;
-            }
-            // Retry timeouts and network errors
-            if (error.type === ErrorType.TIMEOUT || error.type === ErrorType.NETWORK_ERROR) {
-                return true;
-            }
+      try {
+        const result = await command.execute();
+        if (timeoutId) {
+          clearTimeout(timeoutId);
         }
+        resolve(result);
+      } catch (error) {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        reject(error);
+      }
+    });
+  }
 
-        // Don't retry by default
+  /**
+   * Check if error is retryable
+   */
+  private shouldRetry(error: any): boolean {
+    if (error instanceof UngError) {
+      // Don't retry validation errors or not found errors
+      if (
+        error.type === ErrorType.VALIDATION_ERROR ||
+        error.type === ErrorType.NOT_FOUND
+      ) {
         return false;
+      }
+      // Retry timeouts and network errors
+      if (
+        error.type === ErrorType.TIMEOUT ||
+        error.type === ErrorType.NETWORK_ERROR
+      ) {
+        return true;
+      }
     }
 
-    /**
-     * Generate unique command ID
-     */
-    private generateId(): string {
-        return `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
+    // Don't retry by default
+    return false;
+  }
 
-    /**
-     * Get queue status
-     */
-    getStatus(): {
-        queueLength: number;
-        processing: boolean;
-        currentCommand: string | null;
-    } {
-        return {
-            queueLength: this.queue.length,
-            processing: this.processing,
-            currentCommand: this.currentCommand?.id || null
-        };
-    }
+  /**
+   * Generate unique command ID
+   */
+  private generateId(): string {
+    return `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
 
-    /**
-     * Clear the queue
-     */
-    clear(): void {
-        this.queue.forEach(command => {
-            command.reject(new UngError(ErrorType.UNKNOWN, 'Queue was cleared'));
-        });
-        this.queue = [];
-    }
+  /**
+   * Get queue status
+   */
+  getStatus(): {
+    queueLength: number;
+    processing: boolean;
+    currentCommand: string | null;
+  } {
+    return {
+      queueLength: this.queue.length,
+      processing: this.processing,
+      currentCommand: this.currentCommand?.id || null,
+    };
+  }
+
+  /**
+   * Clear the queue
+   */
+  clear(): void {
+    this.queue.forEach((command) => {
+      command.reject(new UngError(ErrorType.UNKNOWN, 'Queue was cleared'));
+    });
+    this.queue = [];
+  }
 }
 
 /**

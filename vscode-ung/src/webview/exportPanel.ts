@@ -1,97 +1,102 @@
 import * as vscode from 'vscode';
-import { UngCli } from '../cli/ungCli';
+import type { UngCli } from '../cli/ungCli';
 
 /**
  * Export wizard webview panel
  */
 export class ExportPanel {
-    public static currentPanel: ExportPanel | undefined;
-    private readonly panel: vscode.WebviewPanel;
-    private disposables: vscode.Disposable[] = [];
+  public static currentPanel: ExportPanel | undefined;
+  private readonly panel: vscode.WebviewPanel;
+  private disposables: vscode.Disposable[] = [];
 
-    private cli: UngCli;
+  private cli: UngCli;
 
-    private constructor(panel: vscode.WebviewPanel, cli: UngCli) {
-        this.cli = cli;
-        this.panel = panel;
+  private constructor(panel: vscode.WebviewPanel, cli: UngCli) {
+    this.cli = cli;
+    this.panel = panel;
 
-        // Set the webview's HTML content
-        this.update();
+    // Set the webview's HTML content
+    this.update();
 
-        // Handle messages from the webview
-        this.panel.webview.onDidReceiveMessage(
-            message => {
-                switch (message.command) {
-                    case 'export':
-                        this.performExport(message.options);
-                        break;
-                }
-            },
-            null,
-            this.disposables
-        );
-
-        // Handle panel disposed
-        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    }
-
-    /**
-     * Create or show export panel
-     */
-    public static createOrShow(cli: UngCli) {
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
-
-        // If we already have a panel, show it
-        if (ExportPanel.currentPanel) {
-            ExportPanel.currentPanel.panel.reveal(column);
-            return;
+    // Handle messages from the webview
+    this.panel.webview.onDidReceiveMessage(
+      (message) => {
+        switch (message.command) {
+          case 'export':
+            this.performExport(message.options);
+            break;
         }
+      },
+      null,
+      this.disposables
+    );
 
-        // Otherwise, create a new panel
-        const panel = vscode.window.createWebviewPanel(
-            'ungExport',
-            'Export Wizard',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true
-            }
-        );
+    // Handle panel disposed
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+  }
 
-        ExportPanel.currentPanel = new ExportPanel(panel, cli);
+  /**
+   * Create or show export panel
+   */
+  public static createOrShow(cli: UngCli) {
+    const column = vscode.window.activeTextEditor
+      ? vscode.window.activeTextEditor.viewColumn
+      : undefined;
+
+    // If we already have a panel, show it
+    if (ExportPanel.currentPanel) {
+      ExportPanel.currentPanel.panel.reveal(column);
+      return;
     }
 
-    /**
-     * Update webview content
-     */
-    private update() {
-        this.panel.webview.html = this.getHtmlForWebview();
-    }
+    // Otherwise, create a new panel
+    const panel = vscode.window.createWebviewPanel(
+      'ungExport',
+      'Export Wizard',
+      column || vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      }
+    );
 
-    /**
-     * Get CLI instance for export operations
-     */
-    protected getCli(): UngCli {
-        return this.cli;
-    }
+    ExportPanel.currentPanel = new ExportPanel(panel, cli);
+  }
 
-    /**
-     * Perform export based on selected options
-     */
-    private async performExport(options: { format: string; type: string; dateFrom: string; dateTo: string }) {
-        // CLI is available via this.getCli() for future implementation
-        vscode.window.showInformationMessage(
-            `Export functionality will be implemented in a future version. Options: ${JSON.stringify(options)}`
-        );
-    }
+  /**
+   * Update webview content
+   */
+  private update() {
+    this.panel.webview.html = this.getHtmlForWebview();
+  }
 
-    /**
-     * Get HTML content for webview
-     */
-    private getHtmlForWebview(): string {
-        return `<!DOCTYPE html>
+  /**
+   * Get CLI instance for export operations
+   */
+  protected getCli(): UngCli {
+    return this.cli;
+  }
+
+  /**
+   * Perform export based on selected options
+   */
+  private async performExport(options: {
+    format: string;
+    type: string;
+    dateFrom: string;
+    dateTo: string;
+  }) {
+    // CLI is available via this.getCli() for future implementation
+    vscode.window.showInformationMessage(
+      `Export functionality will be implemented in a future version. Options: ${JSON.stringify(options)}`
+    );
+  }
+
+  /**
+   * Get HTML content for webview
+   */
+  private getHtmlForWebview(): string {
+    return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
@@ -205,21 +210,21 @@ export class ExportPanel {
             </script>
         </body>
         </html>`;
+  }
+
+  /**
+   * Dispose resources
+   */
+  public dispose() {
+    ExportPanel.currentPanel = undefined;
+
+    this.panel.dispose();
+
+    while (this.disposables.length) {
+      const disposable = this.disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
     }
-
-    /**
-     * Dispose resources
-     */
-    public dispose() {
-        ExportPanel.currentPanel = undefined;
-
-        this.panel.dispose();
-
-        while (this.disposables.length) {
-            const disposable = this.disposables.pop();
-            if (disposable) {
-                disposable.dispose();
-            }
-        }
-    }
+  }
 }

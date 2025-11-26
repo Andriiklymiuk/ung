@@ -1,951 +1,1145 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
-import * as os from 'os';
-import * as path from 'path';
-import { UngCli } from '../cli/ungCli';
+import type { UngCli } from '../cli/ungCli';
 
 /**
  * Invoice command handlers
  */
 export class InvoiceCommands {
-    constructor(private cli: UngCli, private refreshCallback?: () => void) {}
+  constructor(
+    private cli: UngCli,
+    private refreshCallback?: () => void
+  ) {}
 
-    /**
-     * Create a new invoice
-     */
-    async createInvoice(): Promise<void> {
-        // Get contracts to select from (they have client, rate, and currency info)
-        const contractResult = await this.cli.listContracts();
-        if (!contractResult.success) {
-            vscode.window.showErrorMessage('Failed to fetch contracts');
-            return;
-        }
+  /**
+   * Create a new invoice
+   */
+  async createInvoice(): Promise<void> {
+    // Get contracts to select from (they have client, rate, and currency info)
+    const contractResult = await this.cli.listContracts();
+    if (!contractResult.success) {
+      vscode.window.showErrorMessage('Failed to fetch contracts');
+      return;
+    }
 
-        // Parse contracts from CLI output
-        const contracts = this.parseContractsFromOutput(contractResult.stdout || '');
-        if (contracts.length === 0) {
-            vscode.window.showErrorMessage('No contracts found. Create one first with "ung contract add"');
-            return;
-        }
+    // Parse contracts from CLI output
+    const contracts = this.parseContractsFromOutput(
+      contractResult.stdout || ''
+    );
+    if (contracts.length === 0) {
+      vscode.window.showErrorMessage(
+        'No contracts found. Create one first with "ung contract add"'
+      );
+      return;
+    }
 
-        // Show contract dropdown with client name and rate info
-        const contractItems = contracts.map(c => ({
-            label: c.client,
-            description: `${c.type} - ${c.ratePrice}`,
-            detail: c.name,
-            contract: c
-        }));
+    // Show contract dropdown with client name and rate info
+    const contractItems = contracts.map((c) => ({
+      label: c.client,
+      description: `${c.type} - ${c.ratePrice}`,
+      detail: c.name,
+      contract: c,
+    }));
 
-        const selectedContract = await vscode.window.showQuickPick(contractItems, {
-            placeHolder: 'Select a contract',
-            matchOnDescription: true,
-            matchOnDetail: true
+    const selectedContract = await vscode.window.showQuickPick(contractItems, {
+      placeHolder: 'Select a contract',
+      matchOnDescription: true,
+      matchOnDetail: true,
+    });
+
+    if (!selectedContract) return;
+
+    const contract = selectedContract.contract;
+
+    // Parse currency and amount from ratePrice (e.g., "4500.00 USD" or "29.00 USD/hr")
+    let currency = 'USD';
+    const rateMatch = contract.ratePrice.match(/^([\d.]+)\s*(\w+)/);
+    if (rateMatch) {
+      currency = rateMatch[2].replace('/hr', '');
+    }
+
+    let amount: number;
+
+    if (contract.type === 'fixed_price') {
+      // Use the fixed price directly, just confirm
+      amount = parseFloat(rateMatch?.[1] || '0');
+
+      const confirmAmount = await vscode.window.showInputBox({
+        prompt: `Invoice amount for ${contract.client}`,
+        value: amount.toString(),
+        placeHolder: 'e.g., 4500.00',
+        validateInput: (value) => {
+          if (!value) return 'Amount is required';
+          if (Number.isNaN(Number(value))) return 'Must be a valid number';
+          if (Number(value) <= 0) return 'Amount must be greater than 0';
+          return null;
+        },
+      });
+
+      if (!confirmAmount) return;
+      amount = Number(confirmAmount);
+    } else {
+      // Hourly contract - ask for amount
+      const amountStr = await vscode.window.showInputBox({
+        prompt: `Invoice amount for ${contract.client} (rate: ${contract.ratePrice})`,
+        placeHolder: 'e.g., 1500.00',
+        validateInput: (value) => {
+          if (!value) return 'Amount is required';
+          if (Number.isNaN(Number(value))) return 'Must be a valid number';
+          if (Number(value) <= 0) return 'Amount must be greater than 0';
+          return null;
+        },
+      });
+
+      if (!amountStr) return;
+      amount = Number(amountStr);
+    }
+
+    // Show progress
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Creating invoice...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.createInvoice({
+          clientName: contract.client,
+          amount,
+          currency,
         });
 
-        if (!selectedContract) return;
-
-        const contract = selectedContract.contract;
-
-        // Parse currency and amount from ratePrice (e.g., "4500.00 USD" or "29.00 USD/hr")
-        let currency = 'USD';
-        const rateMatch = contract.ratePrice.match(/^([\d.]+)\s*(\w+)/);
-        if (rateMatch) {
-            currency = rateMatch[2].replace('/hr', '');
-        }
-
-        let amount: number;
-
-        if (contract.type === 'fixed_price') {
-            // Use the fixed price directly, just confirm
-            amount = parseFloat(rateMatch?.[1] || '0');
-
-            const confirmAmount = await vscode.window.showInputBox({
-                prompt: `Invoice amount for ${contract.client}`,
-                value: amount.toString(),
-                placeHolder: 'e.g., 4500.00',
-                validateInput: (value) => {
-                    if (!value) return 'Amount is required';
-                    if (isNaN(Number(value))) return 'Must be a valid number';
-                    if (Number(value) <= 0) return 'Amount must be greater than 0';
-                    return null;
-                }
-            });
-
-            if (!confirmAmount) return;
-            amount = Number(confirmAmount);
+        if (result.success) {
+          vscode.window.showInformationMessage('Invoice created successfully!');
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
         } else {
-            // Hourly contract - ask for amount
-            const amountStr = await vscode.window.showInputBox({
-                prompt: `Invoice amount for ${contract.client} (rate: ${contract.ratePrice})`,
-                placeHolder: 'e.g., 1500.00',
-                validateInput: (value) => {
-                    if (!value) return 'Amount is required';
-                    if (isNaN(Number(value))) return 'Must be a valid number';
-                    if (Number(value) <= 0) return 'Amount must be greater than 0';
-                    return null;
-                }
-            });
-
-            if (!amountStr) return;
-            amount = Number(amountStr);
+          vscode.window.showErrorMessage(
+            `Failed to create invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
 
-        // Show progress
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Creating invoice...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.createInvoice({
-                clientName: contract.client,
-                amount,
-                currency
-            });
+  /**
+   * Generate invoice from time tracking
+   */
+  async generateFromTime(): Promise<void> {
+    const clientName = await vscode.window.showInputBox({
+      prompt: 'Client Name',
+      placeHolder: 'e.g., acme',
+      validateInput: (value) => (value ? null : 'Client name is required'),
+    });
 
-            if (result.success) {
-                vscode.window.showInformationMessage('Invoice created successfully!');
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to create invoice: ${result.error}`);
-            }
-        });
+    if (!clientName) return;
+
+    // Ask what actions to take
+    const actions = await vscode.window.showQuickPick(
+      [
+        { label: 'Generate Invoice + PDF', value: 'pdf' },
+        { label: 'Generate Invoice + PDF + Email', value: 'email' },
+        { label: 'Generate Invoice Only', value: 'none' },
+      ],
+      {
+        placeHolder: 'Select action',
+      }
+    );
+
+    if (!actions) return;
+
+    let emailApp: string | undefined;
+    if (actions.value === 'email') {
+      const emailClients = [
+        { label: 'Apple Mail', value: 'apple' },
+        { label: 'Outlook', value: 'outlook' },
+        { label: 'Gmail (Browser)', value: 'gmail' },
+      ];
+
+      const selected = await vscode.window.showQuickPick(emailClients, {
+        placeHolder: 'Select email client',
+      });
+
+      if (!selected) return;
+      emailApp = selected.value;
     }
 
-    /**
-     * Generate invoice from time tracking
-     */
-    async generateFromTime(): Promise<void> {
-        const clientName = await vscode.window.showInputBox({
-            prompt: 'Client Name',
-            placeHolder: 'e.g., acme',
-            validateInput: (value) => value ? null : 'Client name is required'
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Generating invoice from time tracking...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.generateInvoiceFromTime(clientName, {
+          pdf: actions.value === 'pdf' || actions.value === 'email',
+          email: actions.value === 'email',
+          emailApp,
         });
 
-        if (!clientName) return;
-
-        // Ask what actions to take
-        const actions = await vscode.window.showQuickPick([
-            { label: 'Generate Invoice + PDF', value: 'pdf' },
-            { label: 'Generate Invoice + PDF + Email', value: 'email' },
-            { label: 'Generate Invoice Only', value: 'none' }
-        ], {
-            placeHolder: 'Select action'
-        });
-
-        if (!actions) return;
-
-        let emailApp: string | undefined;
-        if (actions.value === 'email') {
-            const emailClients = [
-                { label: 'Apple Mail', value: 'apple' },
-                { label: 'Outlook', value: 'outlook' },
-                { label: 'Gmail (Browser)', value: 'gmail' }
-            ];
-
-            const selected = await vscode.window.showQuickPick(emailClients, {
-                placeHolder: 'Select email client'
-            });
-
-            if (!selected) return;
-            emailApp = selected.value;
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            'Invoice generated from time tracking!'
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to generate invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
 
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Generating invoice from time tracking...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.generateInvoiceFromTime(clientName, {
-                pdf: actions.value === 'pdf' || actions.value === 'email',
-                email: actions.value === 'email',
-                emailApp
-            });
-
-            if (result.success) {
-                vscode.window.showInformationMessage('Invoice generated from time tracking!');
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to generate invoice: ${result.error}`);
-            }
-        });
+  /**
+   * View invoice details - shows action menu like contracts
+   */
+  async viewInvoice(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * View invoice details - shows action menu like contracts
-     */
-    async viewInvoice(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
-        }
+    // Show action menu like contracts
+    const actions = [
+      { label: '$(file-pdf) Export to PDF', action: 'pdf' },
+      { label: '$(mail) Email Invoice', action: 'email' },
+      { label: '$(check) Mark as Paid', action: 'markPaid' },
+      { label: '$(send) Mark as Sent', action: 'markSent' },
+      { label: '$(list-selection) Change Status...', action: 'changeStatus' },
+      { label: '$(edit) Edit Invoice', action: 'edit' },
+      { label: '$(copy) Duplicate Invoice', action: 'duplicate' },
+      { label: '$(trash) Delete Invoice', action: 'delete' },
+      { label: '$(close) Close', action: 'close' },
+    ];
 
-        // Show action menu like contracts
-        const actions = [
-            { label: '$(file-pdf) Export to PDF', action: 'pdf' },
-            { label: '$(mail) Email Invoice', action: 'email' },
-            { label: '$(check) Mark as Paid', action: 'markPaid' },
-            { label: '$(send) Mark as Sent', action: 'markSent' },
-            { label: '$(list-selection) Change Status...', action: 'changeStatus' },
-            { label: '$(edit) Edit Invoice', action: 'edit' },
-            { label: '$(copy) Duplicate Invoice', action: 'duplicate' },
-            { label: '$(trash) Delete Invoice', action: 'delete' },
-            { label: '$(close) Close', action: 'close' }
-        ];
+    const selected = await vscode.window.showQuickPick(actions, {
+      placeHolder: `Invoice ${invoiceId}`,
+      title: 'Invoice Actions',
+    });
 
-        const selected = await vscode.window.showQuickPick(actions, {
-            placeHolder: `Invoice ${invoiceId}`,
-            title: 'Invoice Actions'
-        });
+    if (selected) {
+      switch (selected.action) {
+        case 'pdf':
+          await this.exportInvoice(invoiceId);
+          break;
+        case 'email':
+          await this.emailInvoice(invoiceId);
+          break;
+        case 'markPaid':
+          await this.markAsPaid(invoiceId);
+          break;
+        case 'markSent':
+          await this.markAsSent(invoiceId);
+          break;
+        case 'changeStatus':
+          await this.changeInvoiceStatus(invoiceId);
+          break;
+        case 'edit':
+          await this.editInvoice(invoiceId);
+          break;
+        case 'duplicate':
+          await this.duplicateInvoice(invoiceId);
+          break;
+        case 'delete':
+          await this.deleteInvoice(invoiceId);
+          break;
+      }
+    }
+  }
 
-        if (selected) {
-            switch (selected.action) {
-                case 'pdf':
-                    await this.exportInvoice(invoiceId);
-                    break;
-                case 'email':
-                    await this.emailInvoice(invoiceId);
-                    break;
-                case 'markPaid':
-                    await this.markAsPaid(invoiceId);
-                    break;
-                case 'markSent':
-                    await this.markAsSent(invoiceId);
-                    break;
-                case 'changeStatus':
-                    await this.changeInvoiceStatus(invoiceId);
-                    break;
-                case 'edit':
-                    await this.editInvoice(invoiceId);
-                    break;
-                case 'duplicate':
-                    await this.duplicateInvoice(invoiceId);
-                    break;
-                case 'delete':
-                    await this.deleteInvoice(invoiceId);
-                    break;
-            }
-        }
+  /**
+   * Duplicate an existing invoice
+   */
+  async duplicateInvoice(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      // Show invoice list to select
+      const result = await this.cli.listInvoices();
+      if (!result.success || !result.stdout) {
+        vscode.window.showErrorMessage('Failed to fetch invoices');
+        return;
+      }
+
+      const invoices = this.parseInvoicesFromOutput(result.stdout);
+      if (invoices.length === 0) {
+        vscode.window.showInformationMessage('No invoices found to duplicate');
+        return;
+      }
+
+      const selected = await vscode.window.showQuickPick(
+        invoices.map((inv) => ({
+          label: inv.invoiceNum,
+          description: `${inv.client} - ${inv.amount}`,
+          detail: inv.status,
+          id: inv.id,
+        })),
+        { placeHolder: 'Select an invoice to duplicate' }
+      );
+
+      if (!selected) return;
+      invoiceId = selected.id;
     }
 
-    /**
-     * Duplicate an existing invoice
-     */
-    async duplicateInvoice(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            // Show invoice list to select
-            const result = await this.cli.listInvoices();
-            if (!result.success || !result.stdout) {
-                vscode.window.showErrorMessage('Failed to fetch invoices');
-                return;
-            }
-
-            const invoices = this.parseInvoicesFromOutput(result.stdout);
-            if (invoices.length === 0) {
-                vscode.window.showInformationMessage('No invoices found to duplicate');
-                return;
-            }
-
-            const selected = await vscode.window.showQuickPick(
-                invoices.map(inv => ({
-                    label: inv.invoiceNum,
-                    description: `${inv.client} - ${inv.amount}`,
-                    detail: inv.status,
-                    id: inv.id
-                })),
-                { placeHolder: 'Select an invoice to duplicate' }
-            );
-
-            if (!selected) return;
-            invoiceId = selected.id;
-        }
-
-        // Get invoice details
-        const invoicesResult = await this.cli.listInvoices();
-        if (!invoicesResult.success || !invoicesResult.stdout) {
-            vscode.window.showErrorMessage('Failed to fetch invoice details');
-            return;
-        }
-
-        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
-        const originalInvoice = invoices.find(inv => inv.id === invoiceId);
-
-        if (!originalInvoice) {
-            vscode.window.showErrorMessage('Invoice not found');
-            return;
-        }
-
-        // Ask for new amount (default to original)
-        const amountStr = await vscode.window.showInputBox({
-            prompt: `Amount for new invoice (original: ${originalInvoice.amount})`,
-            value: originalInvoice.amount.replace(/[^0-9.]/g, ''),
-            validateInput: value => {
-                if (!value) return 'Amount is required';
-                if (isNaN(Number(value))) return 'Must be a valid number';
-                if (Number(value) <= 0) return 'Amount must be greater than 0';
-                return null;
-            }
-        });
-
-        if (!amountStr) return;
-
-        // Parse currency from original
-        const currencyMatch = originalInvoice.amount.match(/(USD|EUR|GBP|CHF|PLN)/);
-        const currency = currencyMatch ? currencyMatch[1] : 'USD';
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Creating duplicate invoice...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.createInvoice({
-                clientName: originalInvoice.client,
-                amount: Number(amountStr),
-                currency
-            });
-
-            if (result.success) {
-                vscode.window.showInformationMessage(`Invoice duplicated! New invoice created for ${originalInvoice.client}`);
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to duplicate invoice: ${result.error}`);
-            }
-        });
+    // Get invoice details
+    const invoicesResult = await this.cli.listInvoices();
+    if (!invoicesResult.success || !invoicesResult.stdout) {
+      vscode.window.showErrorMessage('Failed to fetch invoice details');
+      return;
     }
 
-    /**
-     * Parse invoices from CLI output
-     */
-    private parseInvoicesFromOutput(output: string): Array<{
-        id: number;
-        invoiceNum: string;
-        client: string;
-        date: string;
-        amount: string;
-        status: string;
-    }> {
-        const lines = output.trim().split('\n');
-        if (lines.length < 2) return [];
+    const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+    const originalInvoice = invoices.find((inv) => inv.id === invoiceId);
 
-        return lines.slice(1).map(line => {
-            const parts = line.split(/\s{2,}/).filter(p => p.trim());
-            const id = parseInt(parts[0], 10);
-            if (isNaN(id)) return null;
-
-            return {
-                id,
-                invoiceNum: parts[1] || '',
-                client: parts[2] || 'Unknown',
-                date: parts[3] || '',
-                amount: parts[4] || '',
-                status: parts[5] || ''
-            };
-        }).filter((inv): inv is NonNullable<typeof inv> => inv !== null);
+    if (!originalInvoice) {
+      vscode.window.showErrorMessage('Invoice not found');
+      return;
     }
 
-    /**
-     * Mark invoice as paid
-     */
-    async markAsPaid(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
-        }
+    // Ask for new amount (default to original)
+    const amountStr = await vscode.window.showInputBox({
+      prompt: `Amount for new invoice (original: ${originalInvoice.amount})`,
+      value: originalInvoice.amount.replace(/[^0-9.]/g, ''),
+      validateInput: (value) => {
+        if (!value) return 'Amount is required';
+        if (Number.isNaN(Number(value))) return 'Must be a valid number';
+        if (Number(value) <= 0) return 'Amount must be greater than 0';
+        return null;
+      },
+    });
 
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Marking invoice as paid...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.markInvoicePaid(invoiceId);
+    if (!amountStr) return;
 
-            if (result.success) {
-                vscode.window.showInformationMessage('Invoice marked as paid!');
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
-            }
+    // Parse currency from original
+    const currencyMatch = originalInvoice.amount.match(/(USD|EUR|GBP|CHF|PLN)/);
+    const currency = currencyMatch ? currencyMatch[1] : 'USD';
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Creating duplicate invoice...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.createInvoice({
+          clientName: originalInvoice.client,
+          amount: Number(amountStr),
+          currency,
         });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Invoice duplicated! New invoice created for ${originalInvoice.client}`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to duplicate invoice: ${result.error}`
+          );
+        }
+      }
+    );
+  }
+
+  /**
+   * Parse invoices from CLI output
+   */
+  private parseInvoicesFromOutput(output: string): Array<{
+    id: number;
+    invoiceNum: string;
+    client: string;
+    date: string;
+    amount: string;
+    status: string;
+  }> {
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    return lines
+      .slice(1)
+      .map((line) => {
+        const parts = line.split(/\s{2,}/).filter((p) => p.trim());
+        const id = parseInt(parts[0], 10);
+        if (Number.isNaN(id)) return null;
+
+        return {
+          id,
+          invoiceNum: parts[1] || '',
+          client: parts[2] || 'Unknown',
+          date: parts[3] || '',
+          amount: parts[4] || '',
+          status: parts[5] || '',
+        };
+      })
+      .filter((inv): inv is NonNullable<typeof inv> => inv !== null);
+  }
+
+  /**
+   * Mark invoice as paid
+   */
+  async markAsPaid(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * Mark invoice as sent
-     */
-    async markAsSent(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Marking invoice as paid...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.markInvoicePaid(invoiceId);
+
+        if (result.success) {
+          vscode.window.showInformationMessage('Invoice marked as paid!');
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to update invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
 
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Marking invoice as sent...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.markInvoiceSent(invoiceId);
-
-            if (result.success) {
-                vscode.window.showInformationMessage('Invoice marked as sent!');
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
-            }
-        });
+  /**
+   * Mark invoice as sent
+   */
+  async markAsSent(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * Change invoice status
-     */
-    async changeInvoiceStatus(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Marking invoice as sent...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.markInvoiceSent(invoiceId);
+
+        if (result.success) {
+          vscode.window.showInformationMessage('Invoice marked as sent!');
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to update invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
 
-        const statuses = [
-            { label: '$(clock) Pending', value: 'pending' as const, description: 'Invoice not yet sent' },
-            { label: '$(send) Sent', value: 'sent' as const, description: 'Invoice has been sent to client' },
-            { label: '$(check) Paid', value: 'paid' as const, description: 'Payment received' },
-            { label: '$(warning) Overdue', value: 'overdue' as const, description: 'Past due date' }
-        ];
-
-        const selected = await vscode.window.showQuickPick(statuses, {
-            placeHolder: 'Select new status',
-            title: 'Change Invoice Status'
-        });
-
-        if (!selected) return;
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: `Updating invoice status to ${selected.value}...`,
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.updateInvoiceStatus(invoiceId, selected.value);
-
-            if (result.success) {
-                vscode.window.showInformationMessage(`Invoice status updated to ${selected.value}!`);
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
-            }
-        });
+  /**
+   * Change invoice status
+   */
+  async changeInvoiceStatus(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * Edit an invoice
-     */
-    async editInvoice(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
-        }
+    const statuses = [
+      {
+        label: '$(clock) Pending',
+        value: 'pending' as const,
+        description: 'Invoice not yet sent',
+      },
+      {
+        label: '$(send) Sent',
+        value: 'sent' as const,
+        description: 'Invoice has been sent to client',
+      },
+      {
+        label: '$(check) Paid',
+        value: 'paid' as const,
+        description: 'Payment received',
+      },
+      {
+        label: '$(warning) Overdue',
+        value: 'overdue' as const,
+        description: 'Past due date',
+      },
+    ];
 
-        // Get invoice details first
-        const invoicesResult = await this.cli.listInvoices();
-        if (!invoicesResult.success || !invoicesResult.stdout) {
-            vscode.window.showErrorMessage('Failed to fetch invoice details');
-            return;
-        }
+    const selected = await vscode.window.showQuickPick(statuses, {
+      placeHolder: 'Select new status',
+      title: 'Change Invoice Status',
+    });
 
-        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
-        const invoice = invoices.find(inv => inv.id === invoiceId);
+    if (!selected) return;
 
-        if (!invoice) {
-            vscode.window.showErrorMessage('Invoice not found');
-            return;
-        }
-
-        // Ask what to edit
-        const editOptions = [
-            { label: '$(symbol-number) Amount', value: 'amount', description: `Current: ${invoice.amount}` },
-            { label: '$(calendar) Due Date', value: 'dueDate', description: `Current: ${invoice.date}` },
-            { label: '$(edit) Description', value: 'description' }
-        ];
-
-        const selected = await vscode.window.showQuickPick(editOptions, {
-            placeHolder: 'What would you like to edit?',
-            title: `Edit Invoice ${invoice.invoiceNum}`
-        });
-
-        if (!selected) return;
-
-        const editData: { amount?: number; dueDate?: string; description?: string } = {};
-
-        switch (selected.value) {
-            case 'amount': {
-                const currentAmount = invoice.amount.replace(/[^0-9.]/g, '');
-                const newAmount = await vscode.window.showInputBox({
-                    prompt: 'New invoice amount',
-                    value: currentAmount,
-                    validateInput: value => {
-                        if (!value) return 'Amount is required';
-                        if (isNaN(Number(value))) return 'Must be a valid number';
-                        if (Number(value) <= 0) return 'Amount must be greater than 0';
-                        return null;
-                    }
-                });
-                if (!newAmount) return;
-                editData.amount = Number(newAmount);
-                break;
-            }
-            case 'dueDate': {
-                const newDate = await vscode.window.showInputBox({
-                    prompt: 'New due date (YYYY-MM-DD)',
-                    placeHolder: '2025-01-15',
-                    validateInput: value => {
-                        if (!value) return 'Date is required';
-                        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Format must be YYYY-MM-DD';
-                        return null;
-                    }
-                });
-                if (!newDate) return;
-                editData.dueDate = newDate;
-                break;
-            }
-            case 'description': {
-                const newDesc = await vscode.window.showInputBox({
-                    prompt: 'New description',
-                    placeHolder: 'Invoice description'
-                });
-                if (!newDesc) return;
-                editData.description = newDesc;
-                break;
-            }
-        }
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Updating invoice...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.editInvoice(invoiceId, editData);
-
-            if (result.success) {
-                vscode.window.showInformationMessage('Invoice updated successfully!');
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to update invoice: ${result.error}`);
-            }
-        });
-    }
-
-    /**
-     * Delete an invoice
-     */
-    async deleteInvoice(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
-        }
-
-        // Get invoice details for confirmation
-        const invoicesResult = await this.cli.listInvoices();
-        if (!invoicesResult.success || !invoicesResult.stdout) {
-            vscode.window.showErrorMessage('Failed to fetch invoice details');
-            return;
-        }
-
-        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
-        const invoice = invoices.find(inv => inv.id === invoiceId);
-
-        const confirm = await vscode.window.showWarningMessage(
-            invoice
-                ? `Delete invoice ${invoice.invoiceNum} (${invoice.amount})? This cannot be undone!`
-                : `Delete invoice #${invoiceId}? This cannot be undone!`,
-            { modal: true },
-            'Yes, Delete',
-            'Cancel'
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Updating invoice status to ${selected.value}...`,
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.updateInvoiceStatus(
+          invoiceId,
+          selected.value
         );
 
-        if (confirm !== 'Yes, Delete') return;
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Deleting invoice...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.deleteInvoice(invoiceId);
-
-            if (result.success) {
-                vscode.window.showInformationMessage('Invoice deleted successfully!');
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to delete invoice: ${result.error}`);
-            }
-        });
-    }
-
-    /**
-     * Export invoice to PDF
-     */
-    async exportInvoice(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
-        }
-
-        let pdfPath: string | undefined;
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Generating invoice PDF...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.generateInvoicePDF(invoiceId);
-
-            if (result.success) {
-                pdfPath = this.parsePDFPath(result.stdout || '');
-            } else {
-                vscode.window.showErrorMessage(`Failed to generate PDF: ${result.error}`);
-            }
-        });
-
-        if (pdfPath) {
-            // Auto-open the PDF
-            await vscode.env.openExternal(vscode.Uri.file(pdfPath));
-
-            // Also show notification with buttons
-            const action = await vscode.window.showInformationMessage(
-                `Invoice PDF: ${pdfPath}`,
-                'Open Again',
-                'Show in Finder'
-            );
-
-            if (action === 'Open Again') {
-                await vscode.env.openExternal(vscode.Uri.file(pdfPath));
-            } else if (action === 'Show in Finder') {
-                await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(pdfPath));
-            }
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Invoice status updated to ${selected.value}!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
         } else {
-            // Fallback if path parsing fails
-            const invoicesDir = path.join(os.homedir(), '.ung', 'invoices');
-            const action = await vscode.window.showInformationMessage(
-                'Invoice PDF generated!',
-                'Open Invoices Folder'
-            );
-            if (action === 'Open Invoices Folder') {
-                await vscode.env.openExternal(vscode.Uri.file(invoicesDir));
-            }
+          vscode.window.showErrorMessage(
+            `Failed to update invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
+
+  /**
+   * Edit an invoice
+   */
+  async editInvoice(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * Get email client options based on platform
-     */
-    private getEmailClients(): Array<{ label: string; value: string; description?: string }> {
-        const platform = process.platform;
+    // Get invoice details first
+    const invoicesResult = await this.cli.listInvoices();
+    if (!invoicesResult.success || !invoicesResult.stdout) {
+      vscode.window.showErrorMessage('Failed to fetch invoice details');
+      return;
+    }
 
-        // Common options for all platforms
-        const common = [
-            { label: '$(globe) Gmail (Browser)', value: 'gmail', description: 'Opens in web browser' },
-            { label: '$(globe) Outlook Web', value: 'outlook-web', description: 'Opens in web browser' }
-        ];
+    const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+    const invoice = invoices.find((inv) => inv.id === invoiceId);
 
-        // Platform-specific options
-        if (platform === 'darwin') {
-            return [
-                { label: '$(mail) Apple Mail', value: 'apple', description: 'Default macOS mail app' },
-                { label: '$(mail) Outlook', value: 'outlook', description: 'Microsoft Outlook app' },
-                ...common
-            ];
-        } else if (platform === 'win32') {
-            return [
-                { label: '$(mail) Windows Mail', value: 'windows-mail', description: 'Default Windows mail app' },
-                { label: '$(mail) Outlook', value: 'outlook', description: 'Microsoft Outlook app' },
-                { label: '$(mail) Thunderbird', value: 'thunderbird', description: 'Mozilla Thunderbird' },
-                ...common
-            ];
+    if (!invoice) {
+      vscode.window.showErrorMessage('Invoice not found');
+      return;
+    }
+
+    // Ask what to edit
+    const editOptions = [
+      {
+        label: '$(symbol-number) Amount',
+        value: 'amount',
+        description: `Current: ${invoice.amount}`,
+      },
+      {
+        label: '$(calendar) Due Date',
+        value: 'dueDate',
+        description: `Current: ${invoice.date}`,
+      },
+      { label: '$(edit) Description', value: 'description' },
+    ];
+
+    const selected = await vscode.window.showQuickPick(editOptions, {
+      placeHolder: 'What would you like to edit?',
+      title: `Edit Invoice ${invoice.invoiceNum}`,
+    });
+
+    if (!selected) return;
+
+    const editData: {
+      amount?: number;
+      dueDate?: string;
+      description?: string;
+    } = {};
+
+    switch (selected.value) {
+      case 'amount': {
+        const currentAmount = invoice.amount.replace(/[^0-9.]/g, '');
+        const newAmount = await vscode.window.showInputBox({
+          prompt: 'New invoice amount',
+          value: currentAmount,
+          validateInput: (value) => {
+            if (!value) return 'Amount is required';
+            if (Number.isNaN(Number(value))) return 'Must be a valid number';
+            if (Number(value) <= 0) return 'Amount must be greater than 0';
+            return null;
+          },
+        });
+        if (!newAmount) return;
+        editData.amount = Number(newAmount);
+        break;
+      }
+      case 'dueDate': {
+        const newDate = await vscode.window.showInputBox({
+          prompt: 'New due date (YYYY-MM-DD)',
+          placeHolder: '2025-01-15',
+          validateInput: (value) => {
+            if (!value) return 'Date is required';
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
+              return 'Format must be YYYY-MM-DD';
+            return null;
+          },
+        });
+        if (!newDate) return;
+        editData.dueDate = newDate;
+        break;
+      }
+      case 'description': {
+        const newDesc = await vscode.window.showInputBox({
+          prompt: 'New description',
+          placeHolder: 'Invoice description',
+        });
+        if (!newDesc) return;
+        editData.description = newDesc;
+        break;
+      }
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Updating invoice...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.editInvoice(invoiceId, editData);
+
+        if (result.success) {
+          vscode.window.showInformationMessage('Invoice updated successfully!');
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
         } else {
-            // Linux
-            return [
-                { label: '$(mail) Thunderbird', value: 'thunderbird', description: 'Mozilla Thunderbird' },
-                { label: '$(mail) Evolution', value: 'evolution', description: 'GNOME Evolution' },
-                ...common
-            ];
+          vscode.window.showErrorMessage(
+            `Failed to update invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
+
+  /**
+   * Delete an invoice
+   */
+  async deleteInvoice(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * Email invoice
-     */
-    async emailInvoice(invoiceId?: number): Promise<void> {
-        if (!invoiceId) {
-            vscode.window.showErrorMessage('No invoice selected');
-            return;
-        }
-
-        // Get platform-specific email clients
-        const emailClients = this.getEmailClients();
-
-        const selected = await vscode.window.showQuickPick(emailClients, {
-            placeHolder: 'Select email client',
-            title: 'Choose Email Application'
-        });
-
-        if (!selected) {
-            return;
-        }
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Preparing invoice email...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.emailInvoice(invoiceId, selected.value);
-
-            if (result.success) {
-                vscode.window.showInformationMessage('Invoice email prepared!');
-            } else {
-                vscode.window.showErrorMessage(`Failed to email invoice: ${result.error}`);
-            }
-        });
+    // Get invoice details for confirmation
+    const invoicesResult = await this.cli.listInvoices();
+    if (!invoicesResult.success || !invoicesResult.stdout) {
+      vscode.window.showErrorMessage('Failed to fetch invoice details');
+      return;
     }
 
-    /**
-     * Open invoice PDF in external viewer
-     */
-    async openInvoicePDF(invoiceNum?: string): Promise<void> {
-        if (!invoiceNum) {
-            invoiceNum = await vscode.window.showInputBox({
-                prompt: 'Enter invoice number',
-                placeHolder: 'INV-001'
-            });
+    const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+    const invoice = invoices.find((inv) => inv.id === invoiceId);
+
+    const confirm = await vscode.window.showWarningMessage(
+      invoice
+        ? `Delete invoice ${invoice.invoiceNum} (${invoice.amount})? This cannot be undone!`
+        : `Delete invoice #${invoiceId}? This cannot be undone!`,
+      { modal: true },
+      'Yes, Delete',
+      'Cancel'
+    );
+
+    if (confirm !== 'Yes, Delete') return;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Deleting invoice...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.deleteInvoice(invoiceId);
+
+        if (result.success) {
+          vscode.window.showInformationMessage('Invoice deleted successfully!');
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to delete invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
 
-        if (!invoiceNum) {
-            return;
-        }
-
-        try {
-            // First, look up the invoice ID from the invoice number
-            const listResult = await this.cli.listInvoices();
-            if (!listResult.success || !listResult.stdout) {
-                vscode.window.showErrorMessage('Failed to fetch invoices');
-                return;
-            }
-
-            const invoices = this.parseInvoicesFromOutput(listResult.stdout);
-            const invoice = invoices.find(inv => inv.invoiceNum === invoiceNum);
-
-            if (!invoice) {
-                vscode.window.showErrorMessage(`Invoice ${invoiceNum} not found`);
-                return;
-            }
-
-            // Generate and open PDF using the invoice ID
-            await this.exportInvoice(invoice.id);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to open PDF: ${error}`);
-        }
+  /**
+   * Export invoice to PDF
+   */
+  async exportInvoice(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * Parse PDF path from CLI output
-     */
-    private parsePDFPath(output: string): string | undefined {
-        // Match: "✓ PDF generated successfully: /path/to/file.pdf" or "PDF saved to: /path/to/file.pdf"
-        const match = output.match(/PDF (?:generated successfully|saved to):\s*(.+\.pdf)/i);
-        return match ? match[1].trim() : undefined;
-    }
+    let pdfPath: string | undefined;
 
-    /**
-     * Generate invoices for all clients with unbilled time
-     */
-    async generateAllInvoices(): Promise<void> {
-        // First, show what will be generated
-        const unbilledResult = await this.cli.getUnbilledTimeSummary();
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Generating invoice PDF...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.generateInvoicePDF(invoiceId);
 
-        if (!unbilledResult.success) {
-            vscode.window.showErrorMessage('Failed to fetch unbilled time data');
-            return;
+        if (result.success) {
+          pdfPath = this.parsePDFPath(result.stdout || '');
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to generate PDF: ${result.error}`
+          );
         }
+      }
+    );
 
-        // Parse unbilled time to show preview
-        const output = unbilledResult.stdout || '';
-        if (output.includes('No unbilled time') || output.trim().split('\n').length < 2) {
-            vscode.window.showInformationMessage('No unbilled time found for any client.');
-            return;
-        }
+    if (pdfPath) {
+      // Auto-open the PDF
+      await vscode.env.openExternal(vscode.Uri.file(pdfPath));
 
-        // Ask what actions to take
-        const actions = await vscode.window.showQuickPick([
-            { label: '$(file-text) Generate Invoices Only', value: 'generate', description: 'Create invoices without PDFs' },
-            { label: '$(file-pdf) Generate Invoices + PDFs', value: 'pdf', description: 'Create invoices and generate PDFs' },
-            { label: '$(mail) Generate + PDF + Email', value: 'email', description: 'Create invoices, generate PDFs, and prepare emails' }
-        ], {
-            placeHolder: 'Select what to do for all clients with unbilled time',
-            title: 'Bulk Invoice Generation'
-        });
+      // Also show notification with buttons
+      const action = await vscode.window.showInformationMessage(
+        `Invoice PDF: ${pdfPath}`,
+        'Open Again',
+        'Show in Finder'
+      );
 
-        if (!actions) return;
-
-        let emailApp: string | undefined;
-        if (actions.value === 'email') {
-            const emailClients = this.getEmailClients();
-            const selected = await vscode.window.showQuickPick(emailClients, {
-                placeHolder: 'Select email client',
-                title: 'Choose Email Application'
-            });
-
-            if (!selected) return;
-            emailApp = selected.value;
-        }
-
-        // Confirm
-        const confirm = await vscode.window.showWarningMessage(
-            'Generate invoices for ALL clients with unbilled time?',
-            { modal: true },
-            'Yes, Generate All',
-            'Cancel'
+      if (action === 'Open Again') {
+        await vscode.env.openExternal(vscode.Uri.file(pdfPath));
+      } else if (action === 'Show in Finder') {
+        await vscode.commands.executeCommand(
+          'revealFileInOS',
+          vscode.Uri.file(pdfPath)
         );
+      }
+    } else {
+      // Fallback if path parsing fails
+      const invoicesDir = path.join(os.homedir(), '.ung', 'invoices');
+      const action = await vscode.window.showInformationMessage(
+        'Invoice PDF generated!',
+        'Open Invoices Folder'
+      );
+      if (action === 'Open Invoices Folder') {
+        await vscode.env.openExternal(vscode.Uri.file(invoicesDir));
+      }
+    }
+  }
 
-        if (confirm !== 'Yes, Generate All') return;
+  /**
+   * Get email client options based on platform
+   */
+  private getEmailClients(): Array<{
+    label: string;
+    value: string;
+    description?: string;
+  }> {
+    const platform = process.platform;
 
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Generating invoices for all clients...',
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.generateAllInvoices({
-                pdf: actions.value === 'pdf' || actions.value === 'email',
-                email: actions.value === 'email',
-                emailApp
-            });
+    // Common options for all platforms
+    const common = [
+      {
+        label: '$(globe) Gmail (Browser)',
+        value: 'gmail',
+        description: 'Opens in web browser',
+      },
+      {
+        label: '$(globe) Outlook Web',
+        value: 'outlook-web',
+        description: 'Opens in web browser',
+      },
+    ];
 
-            if (result.success) {
-                vscode.window.showInformationMessage('All invoices generated successfully!');
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to generate invoices: ${result.error}`);
-            }
-        });
+    // Platform-specific options
+    if (platform === 'darwin') {
+      return [
+        {
+          label: '$(mail) Apple Mail',
+          value: 'apple',
+          description: 'Default macOS mail app',
+        },
+        {
+          label: '$(mail) Outlook',
+          value: 'outlook',
+          description: 'Microsoft Outlook app',
+        },
+        ...common,
+      ];
+    } else if (platform === 'win32') {
+      return [
+        {
+          label: '$(mail) Windows Mail',
+          value: 'windows-mail',
+          description: 'Default Windows mail app',
+        },
+        {
+          label: '$(mail) Outlook',
+          value: 'outlook',
+          description: 'Microsoft Outlook app',
+        },
+        {
+          label: '$(mail) Thunderbird',
+          value: 'thunderbird',
+          description: 'Mozilla Thunderbird',
+        },
+        ...common,
+      ];
+    } else {
+      // Linux
+      return [
+        {
+          label: '$(mail) Thunderbird',
+          value: 'thunderbird',
+          description: 'Mozilla Thunderbird',
+        },
+        {
+          label: '$(mail) Evolution',
+          value: 'evolution',
+          description: 'GNOME Evolution',
+        },
+        ...common,
+      ];
+    }
+  }
+
+  /**
+   * Email invoice
+   */
+  async emailInvoice(invoiceId?: number): Promise<void> {
+    if (!invoiceId) {
+      vscode.window.showErrorMessage('No invoice selected');
+      return;
     }
 
-    /**
-     * Send emails for all pending invoices
-     */
-    async sendAllInvoices(): Promise<void> {
-        // Get list of pending invoices first
-        const invoicesResult = await this.cli.listInvoices();
-        if (!invoicesResult.success || !invoicesResult.stdout) {
-            vscode.window.showErrorMessage('Failed to fetch invoices');
-            return;
-        }
+    // Get platform-specific email clients
+    const emailClients = this.getEmailClients();
 
-        const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
-        const pendingInvoices = invoices.filter(inv =>
-            inv.status.toLowerCase().includes('pending') ||
-            inv.status.toLowerCase().includes('draft')
-        );
+    const selected = await vscode.window.showQuickPick(emailClients, {
+      placeHolder: 'Select email client',
+      title: 'Choose Email Application',
+    });
 
-        if (pendingInvoices.length === 0) {
-            vscode.window.showInformationMessage('No pending invoices found to send.');
-            return;
-        }
-
-        // Show preview of what will be sent
-        const previewItems = pendingInvoices.map(inv => `${inv.invoiceNum}: ${inv.client} - ${inv.amount}`);
-
-        const confirm = await vscode.window.showQuickPick([
-            { label: '$(check) Send All', description: `Send ${pendingInvoices.length} invoices` },
-            { label: '$(close) Cancel', description: 'Do not send' }
-        ], {
-            placeHolder: `${pendingInvoices.length} pending invoices: ${previewItems.slice(0, 3).join(', ')}${pendingInvoices.length > 3 ? '...' : ''}`,
-            title: 'Send All Pending Invoices'
-        });
-
-        if (!confirm || confirm.label.includes('Cancel')) return;
-
-        // Select email client
-        const emailClients = this.getEmailClients();
-        const selectedClient = await vscode.window.showQuickPick(emailClients, {
-            placeHolder: 'Select email client',
-            title: 'Choose Email Application'
-        });
-
-        if (!selectedClient) return;
-
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: `Sending ${pendingInvoices.length} invoices...`,
-            cancellable: false
-        }, async () => {
-            const result = await this.cli.sendAllInvoices(selectedClient.value);
-
-            if (result.success) {
-                vscode.window.showInformationMessage(`${pendingInvoices.length} invoice emails prepared!`);
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-            } else {
-                vscode.window.showErrorMessage(`Failed to send invoices: ${result.error}`);
-            }
-        });
+    if (!selected) {
+      return;
     }
 
-    /**
-     * Parse contracts from CLI output (tabular format)
-     */
-    private parseContractsFromOutput(output: string): Array<{
-        id: number;
-        contractNum: string;
-        name: string;
-        client: string;
-        type: string;
-        ratePrice: string;
-        active: boolean;
-    }> {
-        const lines = output.trim().split('\n');
-        if (lines.length < 2) return [];
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Preparing invoice email...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.emailInvoice(invoiceId, selected.value);
 
-        // Skip header line
-        const dataLines = lines.slice(1);
-        const contracts: Array<{
-            id: number;
-            contractNum: string;
-            name: string;
-            client: string;
-            type: string;
-            ratePrice: string;
-            active: boolean;
-        }> = [];
-
-        for (const line of dataLines) {
-            // Parse: ID  CONTRACT#  NAME  CLIENT  TYPE  RATE/PRICE  ACTIVE
-            const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(p => p);
-            if (parts.length >= 6) {
-                const id = parseInt(parts[0], 10);
-                if (!isNaN(id)) {
-                    contracts.push({
-                        id,
-                        contractNum: parts[1],
-                        name: parts[2],
-                        client: parts[3],
-                        type: parts[4],
-                        ratePrice: parts[5],
-                        active: parts[6] === '✓'
-                    });
-                }
-            }
+        if (result.success) {
+          vscode.window.showInformationMessage('Invoice email prepared!');
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to email invoice: ${result.error}`
+          );
         }
+      }
+    );
+  }
 
-        return contracts;
+  /**
+   * Open invoice PDF in external viewer
+   */
+  async openInvoicePDF(invoiceNum?: string): Promise<void> {
+    if (!invoiceNum) {
+      invoiceNum = await vscode.window.showInputBox({
+        prompt: 'Enter invoice number',
+        placeHolder: 'INV-001',
+      });
     }
+
+    if (!invoiceNum) {
+      return;
+    }
+
+    try {
+      // First, look up the invoice ID from the invoice number
+      const listResult = await this.cli.listInvoices();
+      if (!listResult.success || !listResult.stdout) {
+        vscode.window.showErrorMessage('Failed to fetch invoices');
+        return;
+      }
+
+      const invoices = this.parseInvoicesFromOutput(listResult.stdout);
+      const invoice = invoices.find((inv) => inv.invoiceNum === invoiceNum);
+
+      if (!invoice) {
+        vscode.window.showErrorMessage(`Invoice ${invoiceNum} not found`);
+        return;
+      }
+
+      // Generate and open PDF using the invoice ID
+      await this.exportInvoice(invoice.id);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to open PDF: ${error}`);
+    }
+  }
+
+  /**
+   * Parse PDF path from CLI output
+   */
+  private parsePDFPath(output: string): string | undefined {
+    // Match: "✓ PDF generated successfully: /path/to/file.pdf" or "PDF saved to: /path/to/file.pdf"
+    const match = output.match(
+      /PDF (?:generated successfully|saved to):\s*(.+\.pdf)/i
+    );
+    return match ? match[1].trim() : undefined;
+  }
+
+  /**
+   * Generate invoices for all clients with unbilled time
+   */
+  async generateAllInvoices(): Promise<void> {
+    // First, show what will be generated
+    const unbilledResult = await this.cli.getUnbilledTimeSummary();
+
+    if (!unbilledResult.success) {
+      vscode.window.showErrorMessage('Failed to fetch unbilled time data');
+      return;
+    }
+
+    // Parse unbilled time to show preview
+    const output = unbilledResult.stdout || '';
+    if (
+      output.includes('No unbilled time') ||
+      output.trim().split('\n').length < 2
+    ) {
+      vscode.window.showInformationMessage(
+        'No unbilled time found for any client.'
+      );
+      return;
+    }
+
+    // Ask what actions to take
+    const actions = await vscode.window.showQuickPick(
+      [
+        {
+          label: '$(file-text) Generate Invoices Only',
+          value: 'generate',
+          description: 'Create invoices without PDFs',
+        },
+        {
+          label: '$(file-pdf) Generate Invoices + PDFs',
+          value: 'pdf',
+          description: 'Create invoices and generate PDFs',
+        },
+        {
+          label: '$(mail) Generate + PDF + Email',
+          value: 'email',
+          description: 'Create invoices, generate PDFs, and prepare emails',
+        },
+      ],
+      {
+        placeHolder: 'Select what to do for all clients with unbilled time',
+        title: 'Bulk Invoice Generation',
+      }
+    );
+
+    if (!actions) return;
+
+    let emailApp: string | undefined;
+    if (actions.value === 'email') {
+      const emailClients = this.getEmailClients();
+      const selected = await vscode.window.showQuickPick(emailClients, {
+        placeHolder: 'Select email client',
+        title: 'Choose Email Application',
+      });
+
+      if (!selected) return;
+      emailApp = selected.value;
+    }
+
+    // Confirm
+    const confirm = await vscode.window.showWarningMessage(
+      'Generate invoices for ALL clients with unbilled time?',
+      { modal: true },
+      'Yes, Generate All',
+      'Cancel'
+    );
+
+    if (confirm !== 'Yes, Generate All') return;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Generating invoices for all clients...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.generateAllInvoices({
+          pdf: actions.value === 'pdf' || actions.value === 'email',
+          email: actions.value === 'email',
+          emailApp,
+        });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            'All invoices generated successfully!'
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to generate invoices: ${result.error}`
+          );
+        }
+      }
+    );
+  }
+
+  /**
+   * Send emails for all pending invoices
+   */
+  async sendAllInvoices(): Promise<void> {
+    // Get list of pending invoices first
+    const invoicesResult = await this.cli.listInvoices();
+    if (!invoicesResult.success || !invoicesResult.stdout) {
+      vscode.window.showErrorMessage('Failed to fetch invoices');
+      return;
+    }
+
+    const invoices = this.parseInvoicesFromOutput(invoicesResult.stdout);
+    const pendingInvoices = invoices.filter(
+      (inv) =>
+        inv.status.toLowerCase().includes('pending') ||
+        inv.status.toLowerCase().includes('draft')
+    );
+
+    if (pendingInvoices.length === 0) {
+      vscode.window.showInformationMessage(
+        'No pending invoices found to send.'
+      );
+      return;
+    }
+
+    // Show preview of what will be sent
+    const previewItems = pendingInvoices.map(
+      (inv) => `${inv.invoiceNum}: ${inv.client} - ${inv.amount}`
+    );
+
+    const confirm = await vscode.window.showQuickPick(
+      [
+        {
+          label: '$(check) Send All',
+          description: `Send ${pendingInvoices.length} invoices`,
+        },
+        { label: '$(close) Cancel', description: 'Do not send' },
+      ],
+      {
+        placeHolder: `${pendingInvoices.length} pending invoices: ${previewItems.slice(0, 3).join(', ')}${pendingInvoices.length > 3 ? '...' : ''}`,
+        title: 'Send All Pending Invoices',
+      }
+    );
+
+    if (!confirm || confirm.label.includes('Cancel')) return;
+
+    // Select email client
+    const emailClients = this.getEmailClients();
+    const selectedClient = await vscode.window.showQuickPick(emailClients, {
+      placeHolder: 'Select email client',
+      title: 'Choose Email Application',
+    });
+
+    if (!selectedClient) return;
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Sending ${pendingInvoices.length} invoices...`,
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.sendAllInvoices(selectedClient.value);
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `${pendingInvoices.length} invoice emails prepared!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to send invoices: ${result.error}`
+          );
+        }
+      }
+    );
+  }
+
+  /**
+   * Parse contracts from CLI output (tabular format)
+   */
+  private parseContractsFromOutput(output: string): Array<{
+    id: number;
+    contractNum: string;
+    name: string;
+    client: string;
+    type: string;
+    ratePrice: string;
+    active: boolean;
+  }> {
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    // Skip header line
+    const dataLines = lines.slice(1);
+    const contracts: Array<{
+      id: number;
+      contractNum: string;
+      name: string;
+      client: string;
+      type: string;
+      ratePrice: string;
+      active: boolean;
+    }> = [];
+
+    for (const line of dataLines) {
+      // Parse: ID  CONTRACT#  NAME  CLIENT  TYPE  RATE/PRICE  ACTIVE
+      const parts = line
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 6) {
+        const id = parseInt(parts[0], 10);
+        if (!Number.isNaN(id)) {
+          contracts.push({
+            id,
+            contractNum: parts[1],
+            name: parts[2],
+            client: parts[3],
+            type: parts[4],
+            ratePrice: parts[5],
+            active: parts[6] === '✓',
+          });
+        }
+      }
+    }
+
+    return contracts;
+  }
 }

@@ -378,7 +378,7 @@ func drawWatermark(pdf *gofpdf.Fpdf, status models.InvoiceStatus, cfg config.PDF
 	pdf.SetAlpha(1.0, "Normal")
 }
 
-// drawStatusBadge draws a colored status badge
+// drawStatusBadge draws a colored status badge (only for paid and overdue)
 func drawStatusBadge(pdf *gofpdf.Fpdf, status models.InvoiceStatus, cfg config.PDFConfig) {
 	var text string
 	var r, g, b int
@@ -390,12 +390,9 @@ func drawStatusBadge(pdf *gofpdf.Fpdf, status models.InvoiceStatus, cfg config.P
 	case models.StatusOverdue:
 		text = cfg.OverdueLabel
 		r, g, b = 220, 20, 60 // Crimson
-	case models.StatusSent:
-		text = "SENT"
-		r, g, b = 70, 130, 180 // Steel Blue
 	default:
-		text = "PENDING"
-		r, g, b = 255, 165, 0 // Orange
+		// Don't show status badge for pending or sent invoices
+		return
 	}
 
 	pdf.SetFillColor(r, g, b)
@@ -555,7 +552,7 @@ func drawTaxBreakdown(pdf *gofpdf.Fpdf, totals InvoiceTotals, currency string, c
 	pdf.Ln(-1)
 }
 
-// drawBalanceDue draws the highlighted balance due section
+// drawBalanceDue draws the total section without colored background
 func drawBalanceDue(pdf *gofpdf.Fpdf, total float64, currency string, status models.InvoiceStatus, cfg config.PDFConfig, leftMargin, contentWidth float64) {
 	pdf.Ln(5)
 	pdf.SetX(leftMargin)
@@ -564,39 +561,24 @@ func drawBalanceDue(pdf *gofpdf.Fpdf, total float64, currency string, status mod
 	amountWidth := contentWidth * 0.20
 	labelWidth := contentWidth - rateWidth - amountWidth
 
-	// Different styling based on status
-	var bgR, bgG, bgB int
-	var textR, textG, textB int
+	// Draw a simple line separator
+	pdf.SetDrawColor(200, 200, 200)
+	pdf.Line(leftMargin+labelWidth, pdf.GetY(), leftMargin+contentWidth, pdf.GetY())
+	pdf.Ln(3)
+	pdf.SetX(leftMargin)
 
-	switch status {
-	case models.StatusPaid:
-		bgR, bgG, bgB = 34, 139, 34 // Green
-		textR, textG, textB = 255, 255, 255
-	case models.StatusOverdue:
-		bgR, bgG, bgB = 220, 20, 60 // Red
-		textR, textG, textB = 255, 255, 255
-	default:
-		bgR, bgG, bgB = cfg.PrimaryColor.R, cfg.PrimaryColor.G, cfg.PrimaryColor.B
-		textR, textG, textB = 255, 255, 255
-	}
-
-	pdf.SetFillColor(bgR, bgG, bgB)
-	pdf.SetTextColor(textR, textG, textB)
+	// Use dark text on white background for cleaner look
+	pdf.SetTextColor(cfg.TextColor.R, cfg.TextColor.G, cfg.TextColor.B)
 	pdf.SetFont("Arial", "B", 12)
 
-	label := cfg.BalanceDueLabel
-	if status == models.StatusPaid {
-		label = cfg.PaidLabel
-	}
+	// Always use "Total" label
+	label := "Total"
 
-	pdf.CellFormat(labelWidth, 12, "", "", 0, "R", true, 0, "")
-	pdf.CellFormat(rateWidth, 12, label, "", 0, "R", true, 0, "")
+	pdf.CellFormat(labelWidth, 10, "", "", 0, "R", false, 0, "")
+	pdf.CellFormat(rateWidth, 10, label, "", 0, "R", false, 0, "")
 	pdf.SetFont("Arial", "B", 14)
-	pdf.CellFormat(amountWidth, 12, FormatCurrency(total, currency), "", 0, "R", true, 0, "")
+	pdf.CellFormat(amountWidth, 10, FormatCurrency(total, currency), "", 0, "R", false, 0, "")
 	pdf.Ln(-1)
-
-	// Reset colors
-	pdf.SetTextColor(cfg.TextColor.R, cfg.TextColor.G, cfg.TextColor.B)
 }
 
 func min(a, b int) int {

@@ -41,6 +41,12 @@ export class ClientItem extends vscode.TreeItem {
           'person',
           new vscode.ThemeColor('charts.blue')
         );
+        // Add click command to view client details
+        this.command = {
+          command: 'ung.viewClient',
+          title: 'View Client',
+          arguments: [itemId],
+        };
         break;
     }
   }
@@ -142,15 +148,18 @@ export class ClientProvider implements vscode.TreeDataProvider<ClientItem> {
     };
     items.push(addClientItem);
 
-    // Separator-like header
+    // Separator-like header with better formatting
     const clientsHeader = new ClientItem(
       'header',
       -2,
-      'All Clients',
+      '── Clients ──',
       '',
       vscode.TreeItemCollapsibleState.None
     );
-    clientsHeader.iconPath = new vscode.ThemeIcon('list-flat');
+    clientsHeader.iconPath = new vscode.ThemeIcon(
+      'account',
+      new vscode.ThemeColor('charts.gray')
+    );
     items.push(clientsHeader);
 
     // Add all clients

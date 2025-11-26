@@ -318,6 +318,92 @@ export class ClientCommands {
   }
 
   /**
+   * View a client with action menu
+   */
+  async viewClient(clientId?: number): Promise<void> {
+    if (!clientId) {
+      // Let user select a client first
+      const result = await this.cli.listClients();
+      if (!result.success || !result.stdout) {
+        vscode.window.showErrorMessage('Failed to fetch clients');
+        return;
+      }
+
+      const clients = this.parseClientList(result.stdout);
+      if (clients.length === 0) {
+        vscode.window.showInformationMessage(
+          'No clients found. Create one first.'
+        );
+        return;
+      }
+
+      const selected = await vscode.window.showQuickPick(
+        clients.map((c) => ({
+          label: c.name,
+          description: c.email,
+          detail: c.address || undefined,
+          id: c.id,
+        })),
+        { placeHolder: 'Select a client' }
+      );
+
+      if (!selected) return;
+      clientId = selected.id;
+    }
+
+    // Get client details
+    const result = await this.cli.listClients();
+    if (!result.success || !result.stdout) {
+      vscode.window.showErrorMessage('Failed to fetch client data');
+      return;
+    }
+
+    const clients = this.parseClientList(result.stdout);
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) {
+      vscode.window.showErrorMessage('Client not found');
+      return;
+    }
+
+    // Show action menu
+    const actions = [
+      { label: '$(edit) Edit Client', action: 'edit' },
+      { label: '$(file-pdf) View Contracts', action: 'contracts' },
+      { label: '$(file-text) View Invoices', action: 'invoices' },
+      { label: '$(trash) Delete Client', action: 'delete' },
+      { label: '$(close) Close', action: 'close' },
+    ];
+
+    const selected = await vscode.window.showQuickPick(actions, {
+      placeHolder: `${client.name} • ${client.email}`,
+      title: 'Client Actions',
+    });
+
+    if (selected) {
+      switch (selected.action) {
+        case 'edit':
+          await this.editClient(clientId);
+          break;
+        case 'contracts':
+          // Open contracts filtered by client (show info message for now)
+          vscode.window.showInformationMessage(
+            `Contracts for ${client.name} - Use the Contracts panel to view.`
+          );
+          break;
+        case 'invoices':
+          // Open invoices filtered by client (show info message for now)
+          vscode.window.showInformationMessage(
+            `Invoices for ${client.name} - Use the Invoices panel to view.`
+          );
+          break;
+        case 'delete':
+          await this.deleteClient(clientId);
+          break;
+      }
+    }
+  }
+
+  /**
    * List clients with quick pick
    */
   async listClients(): Promise<void> {

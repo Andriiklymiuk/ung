@@ -13,7 +13,7 @@ import (
 
 // These variables are set at build time using ldflags
 var (
-	Version   = "1.0.19"
+	Version   = "1.0.30"
 	GitCommit = "dev"
 	BuildDate = "unknown"
 )
@@ -40,9 +40,9 @@ This command will:
 2. Increment the version number
 3. Create a new git tag
 4. Display the new version`,
-	Args: cobra.ExactArgs(1),
+	Args:      cobra.ExactArgs(1),
 	ValidArgs: []string{"patch", "minor", "major"},
-	Run: runVersionBump,
+	Run:       runVersionBump,
 }
 
 func init() {

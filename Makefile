@@ -91,7 +91,8 @@ release:
 	$(eval NEW_VERSION := $(or $(v),$(MAJOR).$(MINOR).$(NEW_PATCH)))
 	@echo "Releasing v$(NEW_VERSION)... (previous: $(LAST_TAG))"
 	@sed -i.bak 's/Version   = "[^"]*"/Version   = "$(NEW_VERSION)"/' cmd/version.go && rm -f cmd/version.go.bak
-	@git add cmd/version.go
+	@sed -i.bak 's/"version": "[^"]*"/"version": "$(NEW_VERSION)"/' vscode-ung/package.json && rm -f vscode-ung/package.json.bak
+	@git add cmd/version.go vscode-ung/package.json
 	@git commit -m "chore: bump version to $(NEW_VERSION)"
 	@git tag -a v$(NEW_VERSION) -m "Release v$(NEW_VERSION)"
 	@git push origin main v$(NEW_VERSION)

@@ -1,182 +1,195 @@
 import * as vscode from 'vscode';
 
 export class PomodoroPanel {
-    public static currentPanel: PomodoroPanel | undefined;
-    private readonly _panel: vscode.WebviewPanel;
-    private _disposables: vscode.Disposable[] = [];
-    private _timer: NodeJS.Timeout | undefined;
-    private _statusBarItem: vscode.StatusBarItem;
+  public static currentPanel: PomodoroPanel | undefined;
+  private readonly _panel: vscode.WebviewPanel;
+  private _disposables: vscode.Disposable[] = [];
+  private _timer: NodeJS.Timeout | undefined;
+  private _statusBarItem: vscode.StatusBarItem;
 
-    // Timer state
-    private _isRunning = false;
-    private _isBreak = false;
-    private _secondsRemaining = 0;
-    private _workMinutes = 25;
-    private _breakMinutes = 5;
-    private _sessionsCompleted = 0;
+  // Timer state
+  private _isRunning = false;
+  private _isBreak = false;
+  private _secondsRemaining = 0;
+  private _workMinutes = 25;
+  private _breakMinutes = 5;
+  private _sessionsCompleted = 0;
 
-    private constructor(panel: vscode.WebviewPanel, _extensionUri: vscode.Uri, statusBarItem: vscode.StatusBarItem) {
-        this._panel = panel;
-        this._statusBarItem = statusBarItem;
+  private constructor(
+    panel: vscode.WebviewPanel,
+    _extensionUri: vscode.Uri,
+    statusBarItem: vscode.StatusBarItem
+  ) {
+    this._panel = panel;
+    this._statusBarItem = statusBarItem;
 
-        this._panel.webview.html = this._getHtmlForWebview();
+    this._panel.webview.html = this._getHtmlForWebview();
 
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-        this._panel.webview.onDidReceiveMessage(
-            message => {
-                switch (message.command) {
-                    case 'start':
-                        this._startTimer(message.workMinutes, message.breakMinutes);
-                        break;
-                    case 'pause':
-                        this._pauseTimer();
-                        break;
-                    case 'resume':
-                        this._resumeTimer();
-                        break;
-                    case 'stop':
-                        this._stopTimer();
-                        break;
-                    case 'skip':
-                        this._skipToNext();
-                        break;
-                }
-            },
-            null,
-            this._disposables
-        );
-    }
-
-    public static createOrShow(extensionUri: vscode.Uri, statusBarItem: vscode.StatusBarItem) {
-        const column = vscode.ViewColumn.Beside;
-
-        if (PomodoroPanel.currentPanel) {
-            PomodoroPanel.currentPanel._panel.reveal(column);
-            return;
+    this._panel.webview.onDidReceiveMessage(
+      (message) => {
+        switch (message.command) {
+          case 'start':
+            this._startTimer(message.workMinutes, message.breakMinutes);
+            break;
+          case 'pause':
+            this._pauseTimer();
+            break;
+          case 'resume':
+            this._resumeTimer();
+            break;
+          case 'stop':
+            this._stopTimer();
+            break;
+          case 'skip':
+            this._skipToNext();
+            break;
         }
+      },
+      null,
+      this._disposables
+    );
+  }
 
-        const panel = vscode.window.createWebviewPanel(
-            'ungPomodoro',
-            '🍅 Pomodoro Timer',
-            column,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true
-            }
-        );
+  public static createOrShow(
+    extensionUri: vscode.Uri,
+    statusBarItem: vscode.StatusBarItem
+  ) {
+    const column = vscode.ViewColumn.Beside;
 
-        PomodoroPanel.currentPanel = new PomodoroPanel(panel, extensionUri, statusBarItem);
+    if (PomodoroPanel.currentPanel) {
+      PomodoroPanel.currentPanel._panel.reveal(column);
+      return;
     }
 
-    private _startTimer(workMinutes: number, breakMinutes: number) {
-        this._workMinutes = workMinutes;
-        this._breakMinutes = breakMinutes;
-        this._secondsRemaining = workMinutes * 60;
-        this._isRunning = true;
-        this._isBreak = false;
+    const panel = vscode.window.createWebviewPanel(
+      'ungPomodoro',
+      '🍅 Pomodoro Timer',
+      column,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      }
+    );
 
-        this._tick();
-        this._timer = setInterval(() => this._tick(), 1000);
-        this._updateStatusBar();
+    PomodoroPanel.currentPanel = new PomodoroPanel(
+      panel,
+      extensionUri,
+      statusBarItem
+    );
+  }
+
+  private _startTimer(workMinutes: number, breakMinutes: number) {
+    this._workMinutes = workMinutes;
+    this._breakMinutes = breakMinutes;
+    this._secondsRemaining = workMinutes * 60;
+    this._isRunning = true;
+    this._isBreak = false;
+
+    this._tick();
+    this._timer = setInterval(() => this._tick(), 1000);
+    this._updateStatusBar();
+  }
+
+  private _tick() {
+    if (!this._isRunning) return;
+
+    this._secondsRemaining--;
+    this._updateWebview();
+    this._updateStatusBar();
+
+    if (this._secondsRemaining <= 0) {
+      this._onTimerComplete();
     }
+  }
 
-    private _tick() {
-        if (!this._isRunning) return;
-
-        this._secondsRemaining--;
-        this._updateWebview();
-        this._updateStatusBar();
-
-        if (this._secondsRemaining <= 0) {
-            this._onTimerComplete();
-        }
+  private _onTimerComplete() {
+    if (this._isBreak) {
+      // Break finished, start new work session
+      this._isBreak = false;
+      this._secondsRemaining = this._workMinutes * 60;
+      vscode.window.showInformationMessage('🍅 Break over! Time to focus.');
+      this._playSound();
+    } else {
+      // Work session finished
+      this._sessionsCompleted++;
+      this._isBreak = true;
+      this._secondsRemaining = this._breakMinutes * 60;
+      vscode.window.showInformationMessage(
+        `🎉 Pomodoro #${this._sessionsCompleted} complete! Take a break.`
+      );
+      this._playSound();
     }
+    this._updateWebview();
+  }
 
-    private _onTimerComplete() {
-        if (this._isBreak) {
-            // Break finished, start new work session
-            this._isBreak = false;
-            this._secondsRemaining = this._workMinutes * 60;
-            vscode.window.showInformationMessage('🍅 Break over! Time to focus.');
-            this._playSound();
-        } else {
-            // Work session finished
-            this._sessionsCompleted++;
-            this._isBreak = true;
-            this._secondsRemaining = this._breakMinutes * 60;
-            vscode.window.showInformationMessage(`🎉 Pomodoro #${this._sessionsCompleted} complete! Take a break.`);
-            this._playSound();
-        }
-        this._updateWebview();
+  private _pauseTimer() {
+    this._isRunning = false;
+    if (this._timer) {
+      clearInterval(this._timer);
+      this._timer = undefined;
     }
+    this._updateStatusBar();
+  }
 
-    private _pauseTimer() {
-        this._isRunning = false;
-        if (this._timer) {
-            clearInterval(this._timer);
-            this._timer = undefined;
-        }
-        this._updateStatusBar();
+  private _resumeTimer() {
+    this._isRunning = true;
+    this._timer = setInterval(() => this._tick(), 1000);
+    this._updateStatusBar();
+  }
+
+  private _stopTimer() {
+    this._isRunning = false;
+    this._isBreak = false;
+    this._secondsRemaining = 0;
+    if (this._timer) {
+      clearInterval(this._timer);
+      this._timer = undefined;
     }
+    this._updateWebview();
+    this._updateStatusBar();
+  }
 
-    private _resumeTimer() {
-        this._isRunning = true;
-        this._timer = setInterval(() => this._tick(), 1000);
-        this._updateStatusBar();
+  private _skipToNext() {
+    this._secondsRemaining = 0;
+    this._onTimerComplete();
+  }
+
+  private _playSound() {
+    // Use VS Code's built-in notification sound
+    vscode.commands.executeCommand('editor.action.playSound', 'terminalBell');
+  }
+
+  private _updateStatusBar() {
+    if (this._isRunning || this._secondsRemaining > 0) {
+      const minutes = Math.floor(this._secondsRemaining / 60);
+      const seconds = this._secondsRemaining % 60;
+      const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      const icon = this._isBreak ? '☕' : '🍅';
+      const status = this._isRunning ? '' : ' (paused)';
+      this._statusBarItem.text = `${icon} ${timeStr}${status}`;
+      this._statusBarItem.tooltip = this._isBreak ? 'Break time' : 'Focus time';
+      this._statusBarItem.show();
+    } else {
+      this._statusBarItem.hide();
     }
+  }
 
-    private _stopTimer() {
-        this._isRunning = false;
-        this._isBreak = false;
-        this._secondsRemaining = 0;
-        if (this._timer) {
-            clearInterval(this._timer);
-            this._timer = undefined;
-        }
-        this._updateWebview();
-        this._updateStatusBar();
-    }
+  private _updateWebview() {
+    this._panel.webview.postMessage({
+      type: 'update',
+      secondsRemaining: this._secondsRemaining,
+      isRunning: this._isRunning,
+      isBreak: this._isBreak,
+      sessionsCompleted: this._sessionsCompleted,
+      workMinutes: this._workMinutes,
+      breakMinutes: this._breakMinutes,
+    });
+  }
 
-    private _skipToNext() {
-        this._secondsRemaining = 0;
-        this._onTimerComplete();
-    }
-
-    private _playSound() {
-        // Use VS Code's built-in notification sound
-        vscode.commands.executeCommand('editor.action.playSound', 'terminalBell');
-    }
-
-    private _updateStatusBar() {
-        if (this._isRunning || this._secondsRemaining > 0) {
-            const minutes = Math.floor(this._secondsRemaining / 60);
-            const seconds = this._secondsRemaining % 60;
-            const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            const icon = this._isBreak ? '☕' : '🍅';
-            const status = this._isRunning ? '' : ' (paused)';
-            this._statusBarItem.text = `${icon} ${timeStr}${status}`;
-            this._statusBarItem.tooltip = this._isBreak ? 'Break time' : 'Focus time';
-            this._statusBarItem.show();
-        } else {
-            this._statusBarItem.hide();
-        }
-    }
-
-    private _updateWebview() {
-        this._panel.webview.postMessage({
-            type: 'update',
-            secondsRemaining: this._secondsRemaining,
-            isRunning: this._isRunning,
-            isBreak: this._isBreak,
-            sessionsCompleted: this._sessionsCompleted,
-            workMinutes: this._workMinutes,
-            breakMinutes: this._breakMinutes
-        });
-    }
-
-    private _getHtmlForWebview() {
-        return `<!DOCTYPE html>
+  private _getHtmlForWebview() {
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -449,23 +462,23 @@ export class PomodoroPanel {
     </script>
 </body>
 </html>`;
+  }
+
+  public dispose() {
+    PomodoroPanel.currentPanel = undefined;
+
+    if (this._timer) {
+      clearInterval(this._timer);
     }
 
-    public dispose() {
-        PomodoroPanel.currentPanel = undefined;
+    this._statusBarItem.hide();
+    this._panel.dispose();
 
-        if (this._timer) {
-            clearInterval(this._timer);
-        }
-
-        this._statusBarItem.hide();
-        this._panel.dispose();
-
-        while (this._disposables.length) {
-            const x = this._disposables.pop();
-            if (x) {
-                x.dispose();
-            }
-        }
+    while (this._disposables.length) {
+      const x = this._disposables.pop();
+      if (x) {
+        x.dispose();
+      }
     }
+  }
 }

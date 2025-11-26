@@ -1,318 +1,385 @@
 import * as vscode from 'vscode';
-import { UngCli } from '../cli/ungCli';
+import type { UngCli } from '../cli/ungCli';
 
 /**
  * Statistics Panel - Rich webview with charts and analytics
  */
 export class StatisticsPanel {
-    public static currentPanel: StatisticsPanel | undefined;
-    private static readonly viewType = 'ungStatistics';
+  public static currentPanel: StatisticsPanel | undefined;
+  private static readonly viewType = 'ungStatistics';
 
-    private readonly panel: vscode.WebviewPanel;
-    private readonly cli: UngCli;
-    private disposables: vscode.Disposable[] = [];
+  private readonly panel: vscode.WebviewPanel;
+  private readonly cli: UngCli;
+  private disposables: vscode.Disposable[] = [];
 
-    public static createOrShow(cli: UngCli) {
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
+  public static createOrShow(cli: UngCli) {
+    const column = vscode.window.activeTextEditor
+      ? vscode.window.activeTextEditor.viewColumn
+      : undefined;
 
-        if (StatisticsPanel.currentPanel) {
-            StatisticsPanel.currentPanel.panel.reveal(column);
-            StatisticsPanel.currentPanel.update();
-            return;
+    if (StatisticsPanel.currentPanel) {
+      StatisticsPanel.currentPanel.panel.reveal(column);
+      StatisticsPanel.currentPanel.update();
+      return;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      StatisticsPanel.viewType,
+      'UNG Statistics & Reports',
+      column || vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      }
+    );
+
+    StatisticsPanel.currentPanel = new StatisticsPanel(panel, cli);
+  }
+
+  private constructor(panel: vscode.WebviewPanel, cli: UngCli) {
+    this.panel = panel;
+    this.cli = cli;
+
+    this.update();
+
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+
+    this.panel.webview.onDidReceiveMessage(
+      async (message) => {
+        switch (message.command) {
+          case 'refresh':
+            await this.update();
+            break;
+          case 'exportCsv':
+            await this.exportToCsv(message.type);
+            break;
+          case 'changePeriod':
+            await this.update(message.period);
+            break;
         }
+      },
+      null,
+      this.disposables
+    );
+  }
 
-        const panel = vscode.window.createWebviewPanel(
-            StatisticsPanel.viewType,
-            'UNG Statistics & Reports',
-            column || vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true
-            }
-        );
+  private async update(period: string = 'month') {
+    const data = await this.gatherStatistics(period);
+    this.panel.webview.html = this.getHtmlContent(data, period);
+  }
 
-        StatisticsPanel.currentPanel = new StatisticsPanel(panel, cli);
-    }
+  private async gatherStatistics(period: string): Promise<StatisticsData> {
+    const [invoicesResult, trackingResult, contractsResult, expensesResult] =
+      await Promise.all([
+        this.cli.listInvoices(),
+        this.cli.listTimeEntries(),
+        this.cli.listContracts(),
+        this.cli.listExpenses(),
+      ]);
 
-    private constructor(panel: vscode.WebviewPanel, cli: UngCli) {
-        this.panel = panel;
-        this.cli = cli;
+    // Parse invoices
+    const invoices = this.parseInvoices(invoicesResult.stdout || '');
+    const timeEntries = this.parseTimeEntries(trackingResult.stdout || '');
+    const contracts = this.parseContracts(contractsResult.stdout || '');
+    const expenses = this.parseExpenses(expensesResult.stdout || '');
 
-        this.update();
+    // Calculate statistics
+    const now = new Date();
+    const periodStart = this.getPeriodStart(now, period);
 
-        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    const filteredInvoices = invoices.filter(
+      (i) => new Date(i.date) >= periodStart
+    );
+    const filteredTime = timeEntries.filter(
+      (t) => new Date(t.date) >= periodStart
+    );
+    const filteredExpenses = expenses.filter(
+      (e) => new Date(e.date) >= periodStart
+    );
 
-        this.panel.webview.onDidReceiveMessage(
-            async message => {
-                switch (message.command) {
-                    case 'refresh':
-                        await this.update();
-                        break;
-                    case 'exportCsv':
-                        await this.exportToCsv(message.type);
-                        break;
-                    case 'changePeriod':
-                        await this.update(message.period);
-                        break;
-                }
-            },
-            null,
-            this.disposables
-        );
-    }
+    // Revenue calculations
+    const totalRevenue = filteredInvoices.reduce((sum, i) => sum + i.amount, 0);
+    const paidRevenue = filteredInvoices
+      .filter((i) => i.status === 'paid')
+      .reduce((sum, i) => sum + i.amount, 0);
+    const pendingRevenue = filteredInvoices
+      .filter((i) => i.status === 'pending' || i.status === 'sent')
+      .reduce((sum, i) => sum + i.amount, 0);
+    const overdueRevenue = filteredInvoices
+      .filter((i) => i.status === 'overdue')
+      .reduce((sum, i) => sum + i.amount, 0);
 
-    private async update(period: string = 'month') {
-        const data = await this.gatherStatistics(period);
-        this.panel.webview.html = this.getHtmlContent(data, period);
-    }
+    // Time calculations
+    const totalHours = filteredTime.reduce((sum, t) => sum + t.hours, 0);
+    const billableHours = filteredTime
+      .filter((t) => t.billable)
+      .reduce((sum, t) => sum + t.hours, 0);
 
-    private async gatherStatistics(period: string): Promise<StatisticsData> {
-        const [invoicesResult, trackingResult, contractsResult, expensesResult] = await Promise.all([
-            this.cli.listInvoices(),
-            this.cli.listTimeEntries(),
-            this.cli.listContracts(),
-            this.cli.listExpenses()
-        ]);
+    // Expense calculations
+    const totalExpenses = filteredExpenses.reduce(
+      (sum, e) => sum + e.amount,
+      0
+    );
 
-        // Parse invoices
-        const invoices = this.parseInvoices(invoicesResult.stdout || '');
-        const timeEntries = this.parseTimeEntries(trackingResult.stdout || '');
-        const contracts = this.parseContracts(contractsResult.stdout || '');
-        const expenses = this.parseExpenses(expensesResult.stdout || '');
+    // Daily/Weekly breakdown for charts
+    const revenueByDay = this.groupByDay(
+      filteredInvoices,
+      'amount',
+      periodStart
+    );
+    const hoursByDay = this.groupByDay(filteredTime, 'hours', periodStart);
+    const revenueByClient = this.groupByField(
+      filteredInvoices,
+      'client',
+      'amount'
+    );
+    const hoursByClient = this.groupByField(filteredTime, 'client', 'hours');
 
-        // Calculate statistics
-        const now = new Date();
-        const periodStart = this.getPeriodStart(now, period);
+    // Invoice status breakdown
+    const invoicesByStatus = {
+      draft: filteredInvoices.filter((i) => i.status === 'draft').length,
+      pending: filteredInvoices.filter((i) => i.status === 'pending').length,
+      sent: filteredInvoices.filter((i) => i.status === 'sent').length,
+      paid: filteredInvoices.filter((i) => i.status === 'paid').length,
+      overdue: filteredInvoices.filter((i) => i.status === 'overdue').length,
+    };
 
-        const filteredInvoices = invoices.filter(i => new Date(i.date) >= periodStart);
-        const filteredTime = timeEntries.filter(t => new Date(t.date) >= periodStart);
-        const filteredExpenses = expenses.filter(e => new Date(e.date) >= periodStart);
+    return {
+      period,
+      periodStart: periodStart.toISOString(),
+      revenue: {
+        total: totalRevenue,
+        paid: paidRevenue,
+        pending: pendingRevenue,
+        overdue: overdueRevenue,
+      },
+      time: {
+        totalHours,
+        billableHours,
+        avgPerDay: totalHours / this.getDaysDiff(periodStart, now),
+      },
+      expenses: {
+        total: totalExpenses,
+      },
+      netIncome: paidRevenue - totalExpenses,
+      charts: {
+        revenueByDay,
+        hoursByDay,
+        revenueByClient,
+        hoursByClient,
+        invoicesByStatus,
+      },
+      activeContracts: contracts.filter((c) => c.active).length,
+      totalInvoices: filteredInvoices.length,
+      avgInvoiceValue:
+        filteredInvoices.length > 0
+          ? totalRevenue / filteredInvoices.length
+          : 0,
+    };
+  }
 
-        // Revenue calculations
-        const totalRevenue = filteredInvoices.reduce((sum, i) => sum + i.amount, 0);
-        const paidRevenue = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
-        const pendingRevenue = filteredInvoices.filter(i => i.status === 'pending' || i.status === 'sent').reduce((sum, i) => sum + i.amount, 0);
-        const overdueRevenue = filteredInvoices.filter(i => i.status === 'overdue').reduce((sum, i) => sum + i.amount, 0);
+  private parseInvoices(output: string): Array<{
+    id: number;
+    date: string;
+    client: string;
+    amount: number;
+    status: string;
+  }> {
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return [];
 
-        // Time calculations
-        const totalHours = filteredTime.reduce((sum, t) => sum + t.hours, 0);
-        const billableHours = filteredTime.filter(t => t.billable).reduce((sum, t) => sum + t.hours, 0);
-
-        // Expense calculations
-        const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-        // Daily/Weekly breakdown for charts
-        const revenueByDay = this.groupByDay(filteredInvoices, 'amount', periodStart);
-        const hoursByDay = this.groupByDay(filteredTime, 'hours', periodStart);
-        const revenueByClient = this.groupByField(filteredInvoices, 'client', 'amount');
-        const hoursByClient = this.groupByField(filteredTime, 'client', 'hours');
-
-        // Invoice status breakdown
-        const invoicesByStatus = {
-            draft: filteredInvoices.filter(i => i.status === 'draft').length,
-            pending: filteredInvoices.filter(i => i.status === 'pending').length,
-            sent: filteredInvoices.filter(i => i.status === 'sent').length,
-            paid: filteredInvoices.filter(i => i.status === 'paid').length,
-            overdue: filteredInvoices.filter(i => i.status === 'overdue').length
-        };
-
+    return lines
+      .slice(1)
+      .map((line) => {
+        const parts = line.split(/\s{2,}/).filter((p) => p.trim());
+        const amountStr = parts[3]?.replace(/[^0-9.]/g, '') || '0';
         return {
-            period,
-            periodStart: periodStart.toISOString(),
-            revenue: {
-                total: totalRevenue,
-                paid: paidRevenue,
-                pending: pendingRevenue,
-                overdue: overdueRevenue
-            },
-            time: {
-                totalHours,
-                billableHours,
-                avgPerDay: totalHours / this.getDaysDiff(periodStart, now)
-            },
-            expenses: {
-                total: totalExpenses
-            },
-            netIncome: paidRevenue - totalExpenses,
-            charts: {
-                revenueByDay,
-                hoursByDay,
-                revenueByClient,
-                hoursByClient,
-                invoicesByStatus
-            },
-            activeContracts: contracts.filter(c => c.active).length,
-            totalInvoices: filteredInvoices.length,
-            avgInvoiceValue: filteredInvoices.length > 0 ? totalRevenue / filteredInvoices.length : 0
+          id: parseInt(parts[0], 10),
+          date: parts[2] || new Date().toISOString(),
+          client: parts[1] || 'Unknown',
+          amount: parseFloat(amountStr),
+          status: (parts[4] || 'draft').toLowerCase(),
         };
+      })
+      .filter((i) => !Number.isNaN(i.id));
+  }
+
+  private parseTimeEntries(
+    output: string
+  ): Array<{ date: string; hours: number; client: string; billable: boolean }> {
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    return lines
+      .slice(1)
+      .map((line) => {
+        const parts = line.split(/\s{2,}/).filter((p) => p.trim());
+        const hoursStr = parts[2]?.replace(/[^0-9.]/g, '') || '0';
+        return {
+          date: parts[1] || new Date().toISOString(),
+          hours: parseFloat(hoursStr),
+          client: parts[3] || 'Unknown',
+          billable: !line.toLowerCase().includes('non-billable'),
+        };
+      })
+      .filter((t) => !Number.isNaN(t.hours));
+  }
+
+  private parseContracts(
+    output: string
+  ): Array<{ id: number; active: boolean }> {
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    return lines
+      .slice(1)
+      .map((line) => {
+        const parts = line.split(/\s{2,}/).filter((p) => p.trim());
+        return {
+          id: parseInt(parts[0], 10),
+          active: line.includes('✓'),
+        };
+      })
+      .filter((c) => !Number.isNaN(c.id));
+  }
+
+  private parseExpenses(
+    output: string
+  ): Array<{ date: string; amount: number; category: string }> {
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    return lines
+      .slice(1)
+      .map((line) => {
+        const parts = line.split(/\s{2,}/).filter((p) => p.trim());
+        const amountStr = parts[2]?.replace(/[^0-9.]/g, '') || '0';
+        return {
+          date: parts[1] || new Date().toISOString(),
+          amount: parseFloat(amountStr),
+          category: parts[3] || 'Other',
+        };
+      })
+      .filter((e) => !Number.isNaN(e.amount));
+  }
+
+  private getPeriodStart(now: Date, period: string): Date {
+    const start = new Date(now);
+    switch (period) {
+      case 'week':
+        start.setDate(start.getDate() - 7);
+        break;
+      case 'month':
+        start.setMonth(start.getMonth() - 1);
+        break;
+      case 'quarter':
+        start.setMonth(start.getMonth() - 3);
+        break;
+      case 'year':
+        start.setFullYear(start.getFullYear() - 1);
+        break;
+      default:
+        start.setMonth(start.getMonth() - 1);
+    }
+    return start;
+  }
+
+  private getDaysDiff(start: Date, end: Date): number {
+    const diff = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diff / (1000 * 60 * 60 * 24)) || 1;
+  }
+
+  private groupByDay(
+    items: Array<{ date: string; [key: string]: any }>,
+    valueKey: string,
+    periodStart: Date
+  ): Array<{ date: string; value: number }> {
+    const grouped: { [key: string]: number } = {};
+    const now = new Date();
+
+    // Initialize all days in period
+    const current = new Date(periodStart);
+    while (current <= now) {
+      const key = current.toISOString().split('T')[0];
+      grouped[key] = 0;
+      current.setDate(current.getDate() + 1);
     }
 
-    private parseInvoices(output: string): Array<{ id: number; date: string; client: string; amount: number; status: string }> {
-        const lines = output.trim().split('\n');
-        if (lines.length < 2) return [];
-
-        return lines.slice(1).map(line => {
-            const parts = line.split(/\s{2,}/).filter(p => p.trim());
-            const amountStr = parts[3]?.replace(/[^0-9.]/g, '') || '0';
-            return {
-                id: parseInt(parts[0], 10),
-                date: parts[2] || new Date().toISOString(),
-                client: parts[1] || 'Unknown',
-                amount: parseFloat(amountStr),
-                status: (parts[4] || 'draft').toLowerCase()
-            };
-        }).filter(i => !isNaN(i.id));
+    // Sum values by day
+    for (const item of items) {
+      const key = new Date(item.date).toISOString().split('T')[0];
+      if (grouped[key] !== undefined) {
+        grouped[key] += item[valueKey] || 0;
+      }
     }
 
-    private parseTimeEntries(output: string): Array<{ date: string; hours: number; client: string; billable: boolean }> {
-        const lines = output.trim().split('\n');
-        if (lines.length < 2) return [];
+    return Object.entries(grouped)
+      .map(([date, value]) => ({ date, value }))
+      .slice(-14); // Last 14 days for chart
+  }
 
-        return lines.slice(1).map(line => {
-            const parts = line.split(/\s{2,}/).filter(p => p.trim());
-            const hoursStr = parts[2]?.replace(/[^0-9.]/g, '') || '0';
-            return {
-                date: parts[1] || new Date().toISOString(),
-                hours: parseFloat(hoursStr),
-                client: parts[3] || 'Unknown',
-                billable: !line.toLowerCase().includes('non-billable')
-            };
-        }).filter(t => !isNaN(t.hours));
+  private groupByField(
+    items: Array<{ [key: string]: any }>,
+    groupKey: string,
+    valueKey: string
+  ): Array<{ label: string; value: number }> {
+    const grouped: { [key: string]: number } = {};
+
+    for (const item of items) {
+      const key = item[groupKey] || 'Unknown';
+      grouped[key] = (grouped[key] || 0) + (item[valueKey] || 0);
     }
 
-    private parseContracts(output: string): Array<{ id: number; active: boolean }> {
-        const lines = output.trim().split('\n');
-        if (lines.length < 2) return [];
+    return Object.entries(grouped)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5); // Top 5
+  }
 
-        return lines.slice(1).map(line => {
-            const parts = line.split(/\s{2,}/).filter(p => p.trim());
-            return {
-                id: parseInt(parts[0], 10),
-                active: line.includes('✓')
-            };
-        }).filter(c => !isNaN(c.id));
+  private async exportToCsv(type: string) {
+    let data = '';
+    let filename = '';
+
+    switch (type) {
+      case 'invoices': {
+        const invoicesResult = await this.cli.listInvoices();
+        data = invoicesResult.stdout || '';
+        filename = 'invoices.csv';
+        break;
+      }
+      case 'time': {
+        const timeResult = await this.cli.listTimeEntries();
+        data = timeResult.stdout || '';
+        filename = 'time-entries.csv';
+        break;
+      }
+      case 'expenses': {
+        const expensesResult = await this.cli.listExpenses();
+        data = expensesResult.stdout || '';
+        filename = 'expenses.csv';
+        break;
+      }
     }
 
-    private parseExpenses(output: string): Array<{ date: string; amount: number; category: string }> {
-        const lines = output.trim().split('\n');
-        if (lines.length < 2) return [];
+    if (data) {
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(filename),
+        filters: { 'CSV Files': ['csv'] },
+      });
 
-        return lines.slice(1).map(line => {
-            const parts = line.split(/\s{2,}/).filter(p => p.trim());
-            const amountStr = parts[2]?.replace(/[^0-9.]/g, '') || '0';
-            return {
-                date: parts[1] || new Date().toISOString(),
-                amount: parseFloat(amountStr),
-                category: parts[3] || 'Other'
-            };
-        }).filter(e => !isNaN(e.amount));
+      if (uri) {
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(data, 'utf-8'));
+        vscode.window.showInformationMessage(`Exported to ${uri.fsPath}`);
+      }
     }
+  }
 
-    private getPeriodStart(now: Date, period: string): Date {
-        const start = new Date(now);
-        switch (period) {
-            case 'week':
-                start.setDate(start.getDate() - 7);
-                break;
-            case 'month':
-                start.setMonth(start.getMonth() - 1);
-                break;
-            case 'quarter':
-                start.setMonth(start.getMonth() - 3);
-                break;
-            case 'year':
-                start.setFullYear(start.getFullYear() - 1);
-                break;
-            default:
-                start.setMonth(start.getMonth() - 1);
-        }
-        return start;
-    }
+  private getHtmlContent(data: StatisticsData, period: string): string {
+    const formatCurrency = (value: number) =>
+      `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formatHours = (value: number) => value.toFixed(1);
 
-    private getDaysDiff(start: Date, end: Date): number {
-        const diff = Math.abs(end.getTime() - start.getTime());
-        return Math.ceil(diff / (1000 * 60 * 60 * 24)) || 1;
-    }
-
-    private groupByDay(items: Array<{ date: string; [key: string]: any }>, valueKey: string, periodStart: Date): Array<{ date: string; value: number }> {
-        const grouped: { [key: string]: number } = {};
-        const now = new Date();
-
-        // Initialize all days in period
-        const current = new Date(periodStart);
-        while (current <= now) {
-            const key = current.toISOString().split('T')[0];
-            grouped[key] = 0;
-            current.setDate(current.getDate() + 1);
-        }
-
-        // Sum values by day
-        for (const item of items) {
-            const key = new Date(item.date).toISOString().split('T')[0];
-            if (grouped[key] !== undefined) {
-                grouped[key] += item[valueKey] || 0;
-            }
-        }
-
-        return Object.entries(grouped).map(([date, value]) => ({ date, value })).slice(-14); // Last 14 days for chart
-    }
-
-    private groupByField(items: Array<{ [key: string]: any }>, groupKey: string, valueKey: string): Array<{ label: string; value: number }> {
-        const grouped: { [key: string]: number } = {};
-
-        for (const item of items) {
-            const key = item[groupKey] || 'Unknown';
-            grouped[key] = (grouped[key] || 0) + (item[valueKey] || 0);
-        }
-
-        return Object.entries(grouped)
-            .map(([label, value]) => ({ label, value }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 5); // Top 5
-    }
-
-    private async exportToCsv(type: string) {
-        let data = '';
-        let filename = '';
-
-        switch (type) {
-            case 'invoices':
-                const invoicesResult = await this.cli.listInvoices();
-                data = invoicesResult.stdout || '';
-                filename = 'invoices.csv';
-                break;
-            case 'time':
-                const timeResult = await this.cli.listTimeEntries();
-                data = timeResult.stdout || '';
-                filename = 'time-entries.csv';
-                break;
-            case 'expenses':
-                const expensesResult = await this.cli.listExpenses();
-                data = expensesResult.stdout || '';
-                filename = 'expenses.csv';
-                break;
-        }
-
-        if (data) {
-            const uri = await vscode.window.showSaveDialog({
-                defaultUri: vscode.Uri.file(filename),
-                filters: { 'CSV Files': ['csv'] }
-            });
-
-            if (uri) {
-                await vscode.workspace.fs.writeFile(uri, Buffer.from(data, 'utf-8'));
-                vscode.window.showInformationMessage(`Exported to ${uri.fsPath}`);
-            }
-        }
-    }
-
-    private getHtmlContent(data: StatisticsData, period: string): string {
-        const formatCurrency = (value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        const formatHours = (value: number) => value.toFixed(1);
-
-        return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -708,54 +775,54 @@ export class StatisticsPanel {
     </script>
 </body>
 </html>`;
+  }
+
+  public dispose() {
+    StatisticsPanel.currentPanel = undefined;
+
+    this.panel.dispose();
+
+    while (this.disposables.length) {
+      const x = this.disposables.pop();
+      if (x) {
+        x.dispose();
+      }
     }
-
-    public dispose() {
-        StatisticsPanel.currentPanel = undefined;
-
-        this.panel.dispose();
-
-        while (this.disposables.length) {
-            const x = this.disposables.pop();
-            if (x) {
-                x.dispose();
-            }
-        }
-    }
+  }
 }
 
 interface StatisticsData {
-    period: string;
-    periodStart: string;
-    revenue: {
-        total: number;
-        paid: number;
-        pending: number;
-        overdue: number;
+  period: string;
+  periodStart: string;
+  revenue: {
+    total: number;
+    paid: number;
+    pending: number;
+    overdue: number;
+  };
+  time: {
+    totalHours: number;
+    billableHours: number;
+    avgPerDay: number;
+  };
+  expenses: {
+    total: number;
+  };
+  netIncome: number;
+  charts: {
+    revenueByDay: Array<{ date: string; value: number }>;
+    hoursByDay: Array<{ date: string; value: number }>;
+    revenueByClient: Array<{ label: string; value: number }>;
+    hoursByClient: Array<{ label: string; value: number }>;
+    invoicesByStatus: {
+      draft: number;
+      pending: number;
+      sent: number;
+      paid: number;
+      overdue: number;
     };
-    time: {
-        totalHours: number;
-        billableHours: number;
-        avgPerDay: number;
-    };
-    expenses: {
-        total: number;
-    };
-    netIncome: number;
-    charts: {
-        revenueByDay: Array<{ date: string; value: number }>;
-        hoursByDay: Array<{ date: string; value: number }>;
-        revenueByClient: Array<{ label: string; value: number }>;
-        hoursByClient: Array<{ label: string; value: number }>;
-        invoicesByStatus: {
-            draft: number;
-            pending: number;
-            sent: number;
-            paid: number;
-            overdue: number;
-        };
-    };
-    activeContracts: number;
-    totalInvoices: number;
-    avgInvoiceValue: number;
+  };
+  activeContracts: number;
+  totalInvoices: number;
+  avgInvoiceValue: number;
 }

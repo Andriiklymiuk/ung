@@ -239,3 +239,248 @@ func (c *DashboardController) GetSummary(w http.ResponseWriter, r *http.Request)
 
 	RespondJSON(w, summary, http.StatusOK)
 }
+
+// ProfitDashboard represents the profit dashboard data
+type ProfitDashboard struct {
+	CurrentMonth ProfitPeriod   `json:"current_month"`
+	PreviousMonth ProfitPeriod  `json:"previous_month"`
+	YearToDate   ProfitPeriod   `json:"year_to_date"`
+	TopClients   []ClientRevenue `json:"top_clients"`
+	ExpensesByCategory map[string]float64 `json:"expenses_by_category"`
+	MonthlyTrend []MonthlyProfitData `json:"monthly_trend"`
+	GoalProgress *GoalProgressInfo `json:"goal_progress,omitempty"`
+	QuickStats   QuickStats `json:"quick_stats"`
+}
+
+// ProfitPeriod represents profit data for a period
+type ProfitPeriod struct {
+	Revenue   float64 `json:"revenue"`
+	Expenses  float64 `json:"expenses"`
+	Profit    float64 `json:"profit"`
+	PeriodStart string `json:"period_start"`
+	PeriodEnd   string `json:"period_end"`
+}
+
+// ClientRevenue represents revenue for a client
+type ClientRevenue struct {
+	ClientName string  `json:"client_name"`
+	Revenue    float64 `json:"revenue"`
+}
+
+// MonthlyProfitData represents monthly profit trend data
+type MonthlyProfitData struct {
+	Month    string  `json:"month"`
+	Revenue  float64 `json:"revenue"`
+	Expenses float64 `json:"expenses"`
+	Profit   float64 `json:"profit"`
+}
+
+// GoalProgressInfo represents progress toward a monthly goal
+type GoalProgressInfo struct {
+	GoalAmount float64 `json:"goal_amount"`
+	Current    float64 `json:"current"`
+	Progress   float64 `json:"progress_percent"`
+	Remaining  float64 `json:"remaining"`
+}
+
+// QuickStats represents quick statistics
+type QuickStats struct {
+	ProfitMargin    float64 `json:"profit_margin_percent"`
+	MonthChange     float64 `json:"month_change_percent"`
+	AverageMonthly  float64 `json:"average_monthly"`
+}
+
+// GetProfit handles GET /api/v1/dashboard/profit
+func (c *DashboardController) GetProfit(w http.ResponseWriter, r *http.Request) {
+	db := middleware.GetTenantDB(r)
+
+	now := time.Now()
+	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	startOfPrevMonth := startOfMonth.AddDate(0, -1, 0)
+	startOfYear := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+
+	dashboard := ProfitDashboard{
+		ExpensesByCategory: make(map[string]float64),
+	}
+
+	// Current month revenue (paid invoices)
+	var currentRevenue float64
+	var currentMonthInvoices []models.Invoice
+	db.Where("status = ? AND updated_at >= ? AND updated_at < ?",
+		models.StatusPaid, startOfMonth, now).Find(&currentMonthInvoices)
+	for _, inv := range currentMonthInvoices {
+		currentRevenue += inv.Amount
+	}
+
+	// Current month expenses
+	var currentExpenses float64
+	var currentMonthExpenses []models.Expense
+	db.Where("date >= ? AND date < ?", startOfMonth, now).Find(&currentMonthExpenses)
+	for _, exp := range currentMonthExpenses {
+		currentExpenses += exp.Amount
+	}
+
+	dashboard.CurrentMonth = ProfitPeriod{
+		Revenue:     currentRevenue,
+		Expenses:    currentExpenses,
+		Profit:      currentRevenue - currentExpenses,
+		PeriodStart: startOfMonth.Format("2006-01-02"),
+		PeriodEnd:   now.Format("2006-01-02"),
+	}
+
+	// Previous month
+	var prevRevenue float64
+	var prevMonthInvoices []models.Invoice
+	db.Where("status = ? AND updated_at >= ? AND updated_at < ?",
+		models.StatusPaid, startOfPrevMonth, startOfMonth).Find(&prevMonthInvoices)
+	for _, inv := range prevMonthInvoices {
+		prevRevenue += inv.Amount
+	}
+
+	var prevExpenses float64
+	var prevMonthExpenses []models.Expense
+	db.Where("date >= ? AND date < ?", startOfPrevMonth, startOfMonth).Find(&prevMonthExpenses)
+	for _, exp := range prevMonthExpenses {
+		prevExpenses += exp.Amount
+	}
+
+	dashboard.PreviousMonth = ProfitPeriod{
+		Revenue:     prevRevenue,
+		Expenses:    prevExpenses,
+		Profit:      prevRevenue - prevExpenses,
+		PeriodStart: startOfPrevMonth.Format("2006-01-02"),
+		PeriodEnd:   startOfMonth.AddDate(0, 0, -1).Format("2006-01-02"),
+	}
+
+	// Year to date
+	var yearRevenue float64
+	var yearInvoices []models.Invoice
+	db.Where("status = ? AND updated_at >= ?", models.StatusPaid, startOfYear).Find(&yearInvoices)
+	for _, inv := range yearInvoices {
+		yearRevenue += inv.Amount
+	}
+
+	var yearExpenses float64
+	var yearExpensesList []models.Expense
+	db.Where("date >= ?", startOfYear).Find(&yearExpensesList)
+	for _, exp := range yearExpensesList {
+		yearExpenses += exp.Amount
+	}
+
+	dashboard.YearToDate = ProfitPeriod{
+		Revenue:     yearRevenue,
+		Expenses:    yearExpenses,
+		Profit:      yearRevenue - yearExpenses,
+		PeriodStart: startOfYear.Format("2006-01-02"),
+		PeriodEnd:   now.Format("2006-01-02"),
+	}
+
+	// Top clients (by paid invoices all time)
+	type clientRevenueResult struct {
+		Name  string
+		Total float64
+	}
+	var topClients []clientRevenueResult
+	db.Raw(`
+		SELECT c.name, COALESCE(SUM(i.amount), 0) as total
+		FROM clients c
+		LEFT JOIN invoice_recipients ir ON c.id = ir.client_id
+		LEFT JOIN invoices i ON ir.invoice_id = i.id AND i.status = ?
+		GROUP BY c.id, c.name
+		HAVING total > 0
+		ORDER BY total DESC
+		LIMIT 5
+	`, models.StatusPaid).Scan(&topClients)
+
+	for _, tc := range topClients {
+		dashboard.TopClients = append(dashboard.TopClients, ClientRevenue{
+			ClientName: tc.Name,
+			Revenue:    tc.Total,
+		})
+	}
+
+	// Expenses by category (YTD)
+	type categoryResult struct {
+		Category string
+		Total    float64
+	}
+	var categoryResults []categoryResult
+	db.Raw(`
+		SELECT category, SUM(amount) as total
+		FROM expenses
+		WHERE date >= ?
+		GROUP BY category
+		ORDER BY total DESC
+	`, startOfYear).Scan(&categoryResults)
+
+	for _, cr := range categoryResults {
+		dashboard.ExpensesByCategory[cr.Category] = cr.Total
+	}
+
+	// Monthly trend (last 6 months)
+	for i := 5; i >= 0; i-- {
+		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, -i, 0)
+		monthEnd := monthStart.AddDate(0, 1, 0)
+
+		var monthRev float64
+		var monthInvoices []models.Invoice
+		db.Where("status = ? AND updated_at >= ? AND updated_at < ?",
+			models.StatusPaid, monthStart, monthEnd).Find(&monthInvoices)
+		for _, inv := range monthInvoices {
+			monthRev += inv.Amount
+		}
+
+		var monthExp float64
+		var monthExpenses []models.Expense
+		db.Where("date >= ? AND date < ?", monthStart, monthEnd).Find(&monthExpenses)
+		for _, exp := range monthExpenses {
+			monthExp += exp.Amount
+		}
+
+		dashboard.MonthlyTrend = append(dashboard.MonthlyTrend, MonthlyProfitData{
+			Month:    monthStart.Format("Jan"),
+			Revenue:  monthRev,
+			Expenses: monthExp,
+			Profit:   monthRev - monthExp,
+		})
+	}
+
+	// Get monthly goal if set
+	var goal models.IncomeGoal
+	if err := db.Where("period = ? AND year = ? AND month = ?",
+		"monthly", now.Year(), int(now.Month())).First(&goal).Error; err == nil {
+		progress := (currentRevenue / goal.Amount) * 100
+		if progress > 100 {
+			progress = 100
+		}
+		dashboard.GoalProgress = &GoalProgressInfo{
+			GoalAmount: goal.Amount,
+			Current:    currentRevenue,
+			Progress:   progress,
+			Remaining:  goal.Amount - currentRevenue,
+		}
+	}
+
+	// Quick stats
+	if yearRevenue > 0 {
+		dashboard.QuickStats.ProfitMargin = ((yearRevenue - yearExpenses) / yearRevenue) * 100
+	}
+
+	if dashboard.PreviousMonth.Profit != 0 {
+		dashboard.QuickStats.MonthChange = ((dashboard.CurrentMonth.Profit - dashboard.PreviousMonth.Profit) / absFloat(dashboard.PreviousMonth.Profit)) * 100
+	}
+
+	monthNumber := int(now.Month())
+	if monthNumber > 0 {
+		dashboard.QuickStats.AverageMonthly = yearRevenue / float64(monthNumber)
+	}
+
+	RespondJSON(w, dashboard, http.StatusOK)
+}
+
+func absFloat(f float64) float64 {
+	if f < 0 {
+		return -f
+	}
+	return f
+}

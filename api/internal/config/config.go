@@ -13,6 +13,9 @@ type Config struct {
 	UserDataDir     string
 	JWTSecret       string
 	CORSOrigins     []string
+	// RevenueCat configuration
+	RevenueCatAPIKey  string
+	RevenueCatEnabled bool
 }
 
 // Load loads configuration from environment variables
@@ -46,12 +49,18 @@ func Load() *Config {
 
 	corsOrigins := []string{"http://localhost:3000", "https://ung.app"}
 
+	// RevenueCat configuration
+	revenueCatAPIKey := os.Getenv("REVENUECAT_API_KEY")
+	revenueCatEnabled := os.Getenv("REVENUECAT_ENABLED") == "true"
+
 	return &Config{
-		Port:            port,
-		Env:             env,
-		APIDatabasePath: apiDBPath,
-		UserDataDir:     userDataDir,
-		JWTSecret:       jwtSecret,
-		CORSOrigins:     corsOrigins,
+		Port:              port,
+		Env:               env,
+		APIDatabasePath:   apiDBPath,
+		UserDataDir:       userDataDir,
+		JWTSecret:         jwtSecret,
+		CORSOrigins:       corsOrigins,
+		RevenueCatAPIKey:  revenueCatAPIKey,
+		RevenueCatEnabled: revenueCatEnabled,
 	}
 }

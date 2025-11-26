@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"ung/api/internal/controllers"
+	ungMiddleware "ung/api/internal/middleware"
 )
 
 // SetupRouter creates and configures the Chi router
@@ -21,8 +22,13 @@ func SetupRouter(
 	expenseController *controllers.ExpenseController,
 	trackingController *controllers.TrackingController,
 	dashboardController *controllers.DashboardController,
+	settingsController *controllers.SettingsController,
+	rateController *controllers.RateController,
+	goalController *controllers.GoalController,
+	subscriptionController *ungMiddleware.SubscriptionController,
 	authMiddleware func(http.Handler) http.Handler,
 	tenantMiddleware func(http.Handler) http.Handler,
+	subscriptionMiddleware func(http.Handler) http.Handler,
 ) *chi.Mux {
 	r := chi.NewRouter()
 
@@ -130,7 +136,39 @@ func SetupRouter(
 				r.Route("/dashboard", func(r chi.Router) {
 					r.Get("/revenue", dashboardController.GetRevenue)
 					r.Get("/summary", dashboardController.GetSummary)
+					r.Get("/profit", dashboardController.GetProfit)
 				})
+
+				// Settings
+				r.Route("/settings", func(r chi.Router) {
+					r.Get("/", settingsController.Get)
+					r.Put("/", settingsController.Update)
+					r.Get("/working-hours", settingsController.GetWorkingHours)
+				})
+
+				// Rate Calculator
+				r.Route("/rate", func(r chi.Router) {
+					r.Post("/calculate", rateController.Calculate)
+					r.Get("/analyze", rateController.Analyze)
+					r.Get("/compare", rateController.Compare)
+				})
+
+				// Income Goals
+				r.Route("/goals", func(r chi.Router) {
+					r.Get("/", goalController.List)
+					r.Post("/", goalController.Create)
+					r.Get("/status", goalController.Status)
+					r.Get("/{id}", goalController.Get)
+					r.Put("/{id}", goalController.Update)
+					r.Delete("/{id}", goalController.Delete)
+				})
+			})
+
+			// Subscription routes (no tenant DB needed)
+			r.Route("/subscription", func(r chi.Router) {
+				r.Use(subscriptionMiddleware)
+				r.Get("/", subscriptionController.GetStatus)
+				r.Post("/verify", subscriptionController.VerifyPurchase)
 			})
 		})
 	})

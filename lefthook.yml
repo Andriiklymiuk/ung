@@ -1,0 +1,26 @@
+pre-commit:
+  parallel: true
+  commands:
+    vscode-biome-check:
+      root: "vscode-ung/"
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: bunx @biomejs/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+    docs-biome-check:
+      root: "ung-docs/"
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: bunx @biomejs/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+
+pre-push:
+  parallel: true
+  commands:
+    vscode-biome-lint:
+      root: "vscode-ung/"
+      run: bunx @biomejs/biome check ./src
+    vscode-typescript:
+      root: "vscode-ung/"
+      run: bun run compile
+    docs-biome-lint:
+      root: "ung-docs/"
+      run: bunx @biomejs/biome check ./src *.js

@@ -282,8 +282,8 @@ func runInvoiceNew(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid due date format (use YYYY-MM-DD): %w", err)
 		}
 	} else {
-		// Default: 30 days from now
-		dueDate = time.Now().AddDate(0, 0, 30)
+		// Default: 30 days from invoice date
+		dueDate = issuedDate.AddDate(0, 0, 30)
 	}
 
 	// Insert invoice
@@ -561,7 +561,7 @@ func generateInvoiceFromTime(clientName string) (int64, error) {
 	// Create invoice - use end of current month for issued date
 	now := time.Now()
 	issuedDate := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, now.Location())
-	dueDate := issuedDate.AddDate(0, 1, 0) // 1 month from issued date
+	dueDate := issuedDate.AddDate(0, 0, 30) // 30 days from issued date
 
 	result, err := db.DB.Exec(`
 		INSERT INTO invoices (invoice_num, company_id, amount, currency, description, status, issued_date, due_date)

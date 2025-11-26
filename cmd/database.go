@@ -8,6 +8,7 @@ import (
 
 	"github.com/Andriiklymiuk/ung/internal/config"
 	"github.com/Andriiklymiuk/ung/internal/db"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -62,11 +63,30 @@ var dbInfoCmd = &cobra.Command{
 	Run:   runDBInfo,
 }
 
+var dbResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "Reset database (delete all data)",
+	Long: `⚠️  DANGER: Reset the database by deleting ALL data.
+
+This command will permanently delete:
+  • All companies
+  • All clients
+  • All contracts
+  • All invoices
+  • All tracking sessions
+  • All expenses
+  • All recurring invoices
+
+This action CANNOT be undone! Make sure to backup first with 'ung sync backup'.`,
+	Run: runDBReset,
+}
+
 func init() {
 	databaseCmd.AddCommand(dbListCmd)
 	databaseCmd.AddCommand(dbSwitchCmd)
 	databaseCmd.AddCommand(dbCurrentCmd)
 	databaseCmd.AddCommand(dbInfoCmd)
+	databaseCmd.AddCommand(dbResetCmd)
 	rootCmd.AddCommand(databaseCmd)
 }
 
@@ -329,4 +349,126 @@ func expandPathForUser(path string) string {
 	}
 
 	return path
+}
+
+func runDBReset(cmd *cobra.Command, args []string) {
+	currentDB := db.GetDBPath()
+
+	if _, err := os.Stat(currentDB); os.IsNotExist(err) {
+		fmt.Println("❌ Database doesn't exist yet. Nothing to reset.")
+		return
+	}
+
+	// Show current stats
+	fmt.Println("⚠️  DATABASE RESET WARNING")
+	fmt.Println("==========================")
+	fmt.Printf("\nDatabase: %s\n", currentDB)
+
+	if db.DB == nil {
+		fmt.Println("⚠️  Database not initialized")
+		return
+	}
+
+	// Get current record counts
+	var companyCount, clientCount, contractCount, invoiceCount, sessionCount, expenseCount, recurringCount int
+	db.DB.QueryRow("SELECT COUNT(*) FROM companies").Scan(&companyCount)
+	db.DB.QueryRow("SELECT COUNT(*) FROM clients").Scan(&clientCount)
+	db.DB.QueryRow("SELECT COUNT(*) FROM contracts").Scan(&contractCount)
+	db.DB.QueryRow("SELECT COUNT(*) FROM invoices").Scan(&invoiceCount)
+	db.DB.QueryRow("SELECT COUNT(*) FROM tracking_sessions").Scan(&sessionCount)
+	db.DB.QueryRow("SELECT COUNT(*) FROM expenses").Scan(&expenseCount)
+	db.DB.QueryRow("SELECT COUNT(*) FROM recurring_invoices").Scan(&recurringCount)
+
+	fmt.Println("\n⚠️  The following data will be PERMANENTLY DELETED:")
+	fmt.Printf("   • %d companies\n", companyCount)
+	fmt.Printf("   • %d clients\n", clientCount)
+	fmt.Printf("   • %d contracts\n", contractCount)
+	fmt.Printf("   • %d invoices\n", invoiceCount)
+	fmt.Printf("   • %d tracking sessions\n", sessionCount)
+	fmt.Printf("   • %d expenses\n", expenseCount)
+	fmt.Printf("   • %d recurring invoices\n", recurringCount)
+
+	totalRecords := companyCount + clientCount + contractCount + invoiceCount + sessionCount + expenseCount + recurringCount
+	if totalRecords == 0 {
+		fmt.Println("\nDatabase is already empty. Nothing to reset.")
+		return
+	}
+
+	fmt.Println("\n💡 Tip: Run 'ung sync backup' first to create a backup!")
+
+	// First confirmation
+	var confirm1 bool
+	form1 := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Are you sure you want to reset the database?").
+				Description("This action CANNOT be undone!").
+				Affirmative("Yes, I understand").
+				Negative("Cancel").
+				Value(&confirm1),
+		),
+	)
+
+	if err := form1.Run(); err != nil || !confirm1 {
+		fmt.Println("\n✅ Reset cancelled. Your data is safe.")
+		return
+	}
+
+	// Second confirmation - require typing "RESET"
+	var confirmText string
+	form2 := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Type RESET to confirm").
+				Description("This is your last chance to cancel!").
+				Placeholder("Type RESET").
+				Value(&confirmText).
+				Validate(func(s string) error {
+					if s != "RESET" {
+						return fmt.Errorf("please type RESET exactly to confirm")
+					}
+					return nil
+				}),
+		),
+	)
+
+	if err := form2.Run(); err != nil {
+		fmt.Println("\n✅ Reset cancelled. Your data is safe.")
+		return
+	}
+
+	if confirmText != "RESET" {
+		fmt.Println("\n✅ Reset cancelled. Your data is safe.")
+		return
+	}
+
+	// Perform the reset
+	fmt.Println("\n🔄 Resetting database...")
+
+	// Delete all data in order (respect foreign keys)
+	tables := []string{
+		"invoice_line_items",
+		"invoice_recipients",
+		"invoices",
+		"tracking_sessions",
+		"expenses",
+		"recurring_invoices",
+		"contracts",
+		"clients",
+		"companies",
+	}
+
+	for _, table := range tables {
+		_, err := db.DB.Exec(fmt.Sprintf("DELETE FROM %s", table))
+		if err != nil {
+			fmt.Printf("⚠️  Warning: Failed to clear %s: %v\n", table, err)
+		}
+	}
+
+	// Reset SQLite auto-increment counters
+	db.DB.Exec("DELETE FROM sqlite_sequence")
+
+	fmt.Println("\n✅ Database has been reset successfully!")
+	fmt.Println("   All data has been permanently deleted.")
+	fmt.Println("\n💡 Run 'ung create' to set up your data again.")
 }

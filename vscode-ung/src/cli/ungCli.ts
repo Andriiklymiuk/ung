@@ -592,4 +592,80 @@ export class UngCli {
         if (password) args.push('--password', password);
         return this.exec(args);
     }
+
+    // ========== Database Commands ==========
+
+    /**
+     * Get database info/statistics
+     */
+    async getDatabaseInfo(): Promise<CliResult> {
+        return this.exec(['database', 'info']);
+    }
+
+    /**
+     * Get current database path
+     */
+    async getDatabaseCurrent(): Promise<CliResult> {
+        return this.exec(['database', 'current']);
+    }
+
+    /**
+     * List available databases
+     */
+    async listDatabases(): Promise<CliResult> {
+        return this.exec(['database', 'list']);
+    }
+
+    /**
+     * Switch to a different database
+     */
+    async switchDatabase(dbPath: string): Promise<CliResult> {
+        return this.exec(['database', 'switch', dbPath]);
+    }
+
+    // ========== Additional Tracking Commands ==========
+
+    /**
+     * Get unbilled time sessions (for invoicing)
+     */
+    async getUnbilledSessions(): Promise<CliResult> {
+        return this.exec(['track', 'ls', '--unbilled']);
+    }
+
+    // ========== Report Commands ==========
+
+    /**
+     * Get monthly report
+     */
+    async getMonthlyReport(): Promise<CliResult> {
+        return this.exec(['report', 'monthly']);
+    }
+
+    /**
+     * Get revenue report
+     */
+    async getRevenueReport(): Promise<CliResult> {
+        return this.exec(['report', 'revenue']);
+    }
+
+    /**
+     * Get unpaid invoices report
+     */
+    async getUnpaidReport(): Promise<CliResult> {
+        return this.exec(['report', 'unpaid']);
+    }
+
+    /**
+     * Get overdue invoices report
+     */
+    async getOverdueReport(): Promise<CliResult> {
+        return this.exec(['report', 'overdue']);
+    }
+
+    /**
+     * Get dashboard data
+     */
+    async getDashboard(): Promise<CliResult> {
+        return this.exec(['dashboard']);
+    }
 }

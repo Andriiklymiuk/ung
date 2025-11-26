@@ -9,6 +9,7 @@ import (
 
 	"github.com/Andriiklymiuk/ung/internal/db"
 	"github.com/Andriiklymiuk/ung/internal/models"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -38,6 +39,19 @@ var clientEditCmd = &cobra.Command{
 	RunE:  runClientEdit,
 }
 
+var clientDeleteCmd = &cobra.Command{
+	Use:   "delete [id]",
+	Short: "Delete a client",
+	Long: `Delete a client by ID.
+
+Warning: This will also affect related contracts, invoices, and time entries.
+
+Examples:
+  ung client delete 5     Delete client with ID 5`,
+	Args: cobra.ExactArgs(1),
+	RunE: runClientDelete,
+}
+
 var (
 	clientName    string
 	clientEmail   string
@@ -50,6 +64,7 @@ func init() {
 	clientCmd.AddCommand(clientAddCmd)
 	clientCmd.AddCommand(clientListCmd)
 	clientCmd.AddCommand(clientEditCmd)
+	clientCmd.AddCommand(clientDeleteCmd)
 
 	// Add flags
 	clientAddCmd.Flags().StringVar(&clientName, "name", "", "Client name (required)")
@@ -156,5 +171,76 @@ func runClientEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("✓ Client %d updated successfully\n", id)
+	return nil
+}
+
+func runClientDelete(cmd *cobra.Command, args []string) error {
+	id, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid client ID: %w", err)
+	}
+
+	// Check if client exists and get name
+	var clientName string
+	err = db.DB.QueryRow("SELECT name FROM clients WHERE id = ?", id).Scan(&clientName)
+	if err != nil {
+		return fmt.Errorf("client with ID %d not found", id)
+	}
+
+	// Check for related records
+	var contractCount, invoiceCount, sessionCount int
+	db.DB.QueryRow("SELECT COUNT(*) FROM contracts WHERE client_id = ?", id).Scan(&contractCount)
+	db.DB.QueryRow(`
+		SELECT COUNT(*) FROM invoices i
+		JOIN invoice_recipients ir ON i.id = ir.invoice_id
+		WHERE ir.client_id = ?
+	`, id).Scan(&invoiceCount)
+	db.DB.QueryRow("SELECT COUNT(*) FROM tracking_sessions WHERE client_id = ? AND deleted_at IS NULL", id).Scan(&sessionCount)
+
+	// Show warning if there are related records
+	if contractCount > 0 || invoiceCount > 0 || sessionCount > 0 {
+		fmt.Printf("\n⚠️  Warning: Client '%s' has related records:\n", clientName)
+		if contractCount > 0 {
+			fmt.Printf("   • %d contract(s)\n", contractCount)
+		}
+		if invoiceCount > 0 {
+			fmt.Printf("   • %d invoice(s)\n", invoiceCount)
+		}
+		if sessionCount > 0 {
+			fmt.Printf("   • %d time session(s)\n", sessionCount)
+		}
+		fmt.Println()
+	}
+
+	// Confirm deletion
+	var confirm bool
+	confirmForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf("Delete client '%s' (ID: %d)?", clientName, id)).
+				Description("This action cannot be undone. Related records will be orphaned.").
+				Affirmative("Yes, Delete").
+				Negative("Cancel").
+				Value(&confirm),
+		),
+	)
+
+	if err := confirmForm.Run(); err != nil || !confirm {
+		fmt.Println("Deletion cancelled")
+		return nil
+	}
+
+	// Delete the client
+	result, err := db.DB.Exec("DELETE FROM clients WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete client: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("client with ID %d not found", id)
+	}
+
+	fmt.Printf("✓ Client '%s' (ID: %d) deleted successfully\n", clientName, id)
 	return nil
 }

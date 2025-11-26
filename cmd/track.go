@@ -59,6 +59,7 @@ var (
 	trackBillable   bool
 	trackNotes      string
 	trackHours      float64
+	trackUnbilled   bool
 )
 
 func init() {
@@ -81,6 +82,9 @@ func init() {
 	trackLogCmd.Flags().Float64Var(&trackHours, "hours", 0, "Hours worked")
 	trackLogCmd.Flags().StringVar(&trackProject, "project", "", "Project name")
 	trackLogCmd.Flags().StringVar(&trackNotes, "notes", "", "Session notes")
+
+	// List flags
+	trackListCmd.Flags().BoolVar(&trackUnbilled, "unbilled", false, "Show only unbilled sessions")
 }
 
 func runTrackStart(cmd *cobra.Command, args []string) error {
@@ -208,14 +212,31 @@ func runTrackNow(cmd *cobra.Command, args []string) error {
 }
 
 func runTrackList(cmd *cobra.Command, args []string) error {
-	query := `
-		SELECT ts.id, ts.project_name, ts.start_time, ts.end_time, ts.duration, ts.billable,
-		       c.name as client_name
-		FROM tracking_sessions ts
-		LEFT JOIN clients c ON ts.client_id = c.id
-		ORDER BY ts.start_time DESC
-		LIMIT 50
-	`
+	var query string
+	if trackUnbilled {
+		// Show only unbilled sessions (billable but not yet invoiced)
+		query = `
+			SELECT ts.id, ts.project_name, ts.start_time, ts.end_time, ts.duration, ts.billable,
+			       c.name as client_name
+			FROM tracking_sessions ts
+			LEFT JOIN clients c ON ts.client_id = c.id
+			WHERE ts.billable = 1
+			  AND ts.deleted_at IS NULL
+			  AND (ts.notes NOT LIKE '%[Invoiced:%' OR ts.notes IS NULL)
+			ORDER BY ts.start_time DESC
+			LIMIT 50
+		`
+	} else {
+		query = `
+			SELECT ts.id, ts.project_name, ts.start_time, ts.end_time, ts.duration, ts.billable,
+			       c.name as client_name
+			FROM tracking_sessions ts
+			LEFT JOIN clients c ON ts.client_id = c.id
+			WHERE ts.deleted_at IS NULL
+			ORDER BY ts.start_time DESC
+			LIMIT 50
+		`
+	}
 
 	rows, err := db.DB.Query(query)
 	if err != nil {

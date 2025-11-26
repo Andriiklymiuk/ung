@@ -151,12 +151,16 @@ export async function activate(context: vscode.ExtensionContext) {
                             return;
                         }
 
-                        const current = currentVersion.replace('v', '').trim();
-                        if (current === latestVersion) {
+                        // Parse version number from output like "ung version 1.0.17" or "v1.0.17"
+                        const versionMatch = currentVersion.match(/(\d+\.\d+\.\d+)/);
+                        const current = versionMatch ? versionMatch[1] : currentVersion.replace(/[^0-9.]/g, '').trim();
+                        const latest = latestVersion.replace(/[^0-9.]/g, '').trim();
+
+                        if (current === latest) {
                             vscode.window.showInformationMessage(`UNG CLI is up to date (v${current})`);
                         } else {
                             const action = await vscode.window.showInformationMessage(
-                                `UNG CLI update available: v${current} → v${latestVersion}`,
+                                `UNG CLI update available: v${current} → v${latest}`,
                                 'Update Now',
                                 'View Release Notes'
                             );

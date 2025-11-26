@@ -48,9 +48,9 @@ export class CommandQueue {
       };
 
       if (options?.priority) {
-        this.queue.unshift(command);
+        this.queue.unshift(command as QueuedCommand);
       } else {
-        this.queue.push(command);
+        this.queue.push(command as QueuedCommand);
       }
 
       this.processQueue();

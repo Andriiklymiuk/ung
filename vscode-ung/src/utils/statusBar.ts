@@ -112,7 +112,7 @@ export class StatusBarManager {
         this.activeSessionData = this.parseSessionData(output);
         this.isTracking = true;
 
-        if (this.activeSessionData) {
+        if (this.activeSessionData?.started) {
           const elapsed = this.calculateElapsed(this.activeSessionData.started);
           const project = this.activeSessionData.project || 'Tracking';
 

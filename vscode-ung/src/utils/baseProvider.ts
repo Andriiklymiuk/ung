@@ -76,7 +76,7 @@ export abstract class BaseProvider<T extends vscode.TreeItem>
 
     if (cached && now - cached.timestamp < effectiveTTL) {
       ErrorHandler.logInfo(`Cache hit for key: ${key}`);
-      return cached.data;
+      return cached.data as D;
     }
 
     ErrorHandler.logInfo(`Cache miss for key: ${key}, fetching data...`);

@@ -290,7 +290,7 @@ export class StatisticsPanel {
   }
 
   private groupByDay(
-    items: Array<{ date: string; [key: string]: any }>,
+    items: Array<{ date: string; [key: string]: string | number | boolean }>,
     valueKey: string,
     periodStart: Date
   ): Array<{ date: string; value: number }> {
@@ -309,7 +309,8 @@ export class StatisticsPanel {
     for (const item of items) {
       const key = new Date(item.date).toISOString().split('T')[0];
       if (grouped[key] !== undefined) {
-        grouped[key] += item[valueKey] || 0;
+        const value = item[valueKey];
+        grouped[key] += typeof value === 'number' ? value : 0;
       }
     }
 
@@ -319,15 +320,17 @@ export class StatisticsPanel {
   }
 
   private groupByField(
-    items: Array<{ [key: string]: any }>,
+    items: Array<{ [key: string]: string | number | boolean }>,
     groupKey: string,
     valueKey: string
   ): Array<{ label: string; value: number }> {
     const grouped: { [key: string]: number } = {};
 
     for (const item of items) {
-      const key = item[groupKey] || 'Unknown';
-      grouped[key] = (grouped[key] || 0) + (item[valueKey] || 0);
+      const key = String(item[groupKey] || 'Unknown');
+      const value = item[valueKey];
+      grouped[key] =
+        (grouped[key] || 0) + (typeof value === 'number' ? value : 0);
     }
 
     return Object.entries(grouped)

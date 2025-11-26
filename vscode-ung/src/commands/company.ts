@@ -118,7 +118,18 @@ export class CompanyCommands {
       return;
     }
 
-    let company;
+    let company:
+      | {
+          id: number;
+          name: string;
+          email: string;
+          address?: string;
+          taxId?: string;
+          bankName?: string;
+          bankAccount?: string;
+          bankSwift?: string;
+        }
+      | undefined;
     if (companyId) {
       company = companies.find((c) => c.id === companyId);
     } else {
@@ -241,7 +252,7 @@ export class CompanyCommands {
 
         if (newValue === undefined) return; // Cancelled
         if (newValue !== field.current) {
-          (updates as any)[field.key] = newValue;
+          updates[field.key as keyof typeof updates] = newValue;
         }
       }
     } else {
@@ -262,7 +273,7 @@ export class CompanyCommands {
 
       if (newValue === undefined) return;
       if (newValue !== editField.value) {
-        (updates as any)[editField.field] = newValue;
+        updates[editField.field as keyof typeof updates] = newValue;
       }
     }
 

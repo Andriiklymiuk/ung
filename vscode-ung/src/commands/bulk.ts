@@ -213,7 +213,7 @@ export class BulkCommands extends BaseCommand {
    */
   private async executeBulkOperation<T extends BulkItem>(
     items: T[],
-    operation: (item: T) => Promise<any>,
+    operation: (item: T) => Promise<{ success: boolean; error?: string }>,
     progressTitle: string,
     operationName: string
   ): Promise<void> {

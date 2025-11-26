@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 interface CommandItem extends vscode.QuickPickItem {
   command?: string;
   category?: string;
-  args?: any[];
+  args?: unknown[];
 }
 
 /**

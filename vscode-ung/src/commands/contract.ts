@@ -148,7 +148,17 @@ export class ContractCommands {
       return;
     }
 
-    let contract;
+    let contract:
+      | {
+          id: number;
+          contractNum: string;
+          name: string;
+          client: string;
+          type: string;
+          ratePrice: string;
+          active: boolean;
+        }
+      | undefined;
     if (contractId) {
       contract = contracts.find((c) => c.id === contractId);
     } else {

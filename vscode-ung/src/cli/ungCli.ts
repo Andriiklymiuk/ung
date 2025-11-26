@@ -7,7 +7,7 @@ const execAsync = promisify(exec);
 /**
  * Result from CLI execution
  */
-export interface CliResult<T = any> {
+export interface CliResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -32,7 +32,7 @@ export class UngCli {
    * @param options Execution options
    * @returns Promise with result
    */
-  async exec<T = any>(
+  async exec<T = unknown>(
     args: string[],
     options?: { parseJson?: boolean; cwd?: string }
   ): Promise<CliResult<T>> {
@@ -63,10 +63,10 @@ export class UngCli {
           data = JSON.parse(stdout);
         } catch (_err) {
           // Not valid JSON, return as string
-          data = stdout as any;
+          data = stdout as T;
         }
       } else {
-        data = stdout as any;
+        data = stdout as T;
       }
 
       return {
@@ -75,15 +75,17 @@ export class UngCli {
         stdout,
         stderr,
       };
-    } catch (error: any) {
-      const errorMessage = error.message || String(error);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const execError = error as { stdout?: string; stderr?: string };
       this.outputChannel.appendLine(`Error: ${errorMessage}`);
 
       return {
         success: false,
         error: errorMessage,
-        stdout: error.stdout,
-        stderr: error.stderr,
+        stdout: execError.stdout,
+        stderr: execError.stderr,
       };
     }
   }
@@ -116,7 +118,7 @@ export class UngCli {
   /**
    * List all companies
    */
-  async listCompanies(): Promise<CliResult<any[]>> {
+  async listCompanies(): Promise<CliResult<unknown[]>> {
     return this.exec(['company', 'ls']);
   }
 
@@ -154,7 +156,7 @@ export class UngCli {
   /**
    * List all clients
    */
-  async listClients(): Promise<CliResult<any[]>> {
+  async listClients(): Promise<CliResult<unknown[]>> {
     return this.exec(['client', 'ls']);
   }
 
@@ -238,7 +240,7 @@ export class UngCli {
   /**
    * List all contracts
    */
-  async listContracts(): Promise<CliResult<any[]>> {
+  async listContracts(): Promise<CliResult<unknown[]>> {
     return this.exec(['contract', 'ls']);
   }
 
@@ -285,7 +287,7 @@ export class UngCli {
   /**
    * List all invoices
    */
-  async listInvoices(): Promise<CliResult<any[]>> {
+  async listInvoices(): Promise<CliResult<unknown[]>> {
     return this.exec(['invoice', 'ls']);
   }
 
@@ -417,7 +419,7 @@ export class UngCli {
   /**
    * List all expenses
    */
-  async listExpenses(): Promise<CliResult<any[]>> {
+  async listExpenses(): Promise<CliResult<unknown[]>> {
     return this.exec(['expense', 'ls']);
   }
 
@@ -433,14 +435,14 @@ export class UngCli {
   /**
    * List tracking sessions
    */
-  async listTrackingSessions(): Promise<CliResult<any[]>> {
+  async listTrackingSessions(): Promise<CliResult<unknown[]>> {
     return this.exec(['track', 'ls']);
   }
 
   /**
    * List time entries (alias for tracking sessions)
    */
-  async listTimeEntries(): Promise<CliResult<any[]>> {
+  async listTimeEntries(): Promise<CliResult<unknown[]>> {
     return this.exec(['track', 'ls']);
   }
 

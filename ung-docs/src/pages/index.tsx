@@ -15,7 +15,22 @@ function HomepageHeader() {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(INSTALL_COMMAND);
+      // Try modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(INSTALL_COMMAND);
+      } else {
+        // Fallback for non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = INSTALL_COMMAND;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -37,12 +52,12 @@ function HomepageHeader() {
             <code>{INSTALL_COMMAND}</code>
           </pre>
           <button
-            className={styles.copyButton}
+            className={clsx(styles.copyButton, copied && styles.copyButtonCopied)}
             onClick={handleCopy}
             title="Copy to clipboard"
             aria-label="Copy install command to clipboard"
           >
-            {copied ? 'Copied!' : 'Copy'}
+            {copied ? '✓ Copied!' : 'Copy'}
           </button>
         </div>
         <div className={styles.buttons}>

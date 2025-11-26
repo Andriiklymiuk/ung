@@ -237,12 +237,17 @@ export class PomodoroPanel {
             border: none;
             padding: 12px 24px;
             font-size: 16px;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.2s ease;
+            font-weight: 500;
         }
         button:hover {
-            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        button:active {
+            transform: translateY(0);
         }
         button.secondary {
             background: var(--vscode-button-secondaryBackground);
@@ -251,6 +256,8 @@ export class PomodoroPanel {
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         .settings {
             margin-top: 40px;

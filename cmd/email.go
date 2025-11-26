@@ -61,7 +61,7 @@ func init() {
 }
 
 func runEmailSetup(cmd *cobra.Command, args []string) {
-	fmt.Println("📧 Email Configuration Setup\n")
+	fmt.Println("📧 Email Configuration Setup")
 
 	cfg, _ := config.Load()
 
@@ -216,7 +216,7 @@ func runEmailSetup(cmd *cobra.Command, args []string) {
 }
 
 func runEmailTest(cmd *cobra.Command, args []string) {
-	fmt.Println("🔍 Testing email configuration...\n")
+	fmt.Println("🔍 Testing email configuration...")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -280,7 +280,7 @@ func runEmailShow(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Println("📧 Email Configuration\n")
+	fmt.Println("📧 Email Configuration")
 	fmt.Printf("SMTP Host:  %s\n", cfg.Email.SMTPHost)
 	fmt.Printf("SMTP Port:  %d\n", cfg.Email.SMTPPort)
 	fmt.Printf("Username:   %s\n", cfg.Email.Username)

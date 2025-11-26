@@ -36,7 +36,7 @@ type CheckResult struct {
 }
 
 func runDoctor(cmd *cobra.Command, args []string) {
-	fmt.Println("🏥 Running ung health checks...\n")
+	fmt.Println("🏥 Running ung health checks...")
 
 	checks := []CheckResult{}
 

@@ -91,7 +91,7 @@ func init() {
 }
 
 func runDBList(cmd *cobra.Command, args []string) {
-	fmt.Println("📊 Known Databases\n")
+	fmt.Println("📊 Known Databases")
 
 	// Get current database
 	currentDB := db.GetDBPath()
@@ -180,7 +180,7 @@ func runDBCurrent(cmd *cobra.Command, args []string) {
 	currentDB := db.GetDBPath()
 	invoicesDir := db.GetInvoicesDir()
 
-	fmt.Println("📍 Current Database\n")
+	fmt.Println("📍 Current Database")
 	fmt.Printf("Database:  %s\n", currentDB)
 	fmt.Printf("Invoices:  %s\n", invoicesDir)
 
@@ -218,7 +218,7 @@ func runDBInfo(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Println("📈 Database Statistics\n")
+	fmt.Println("📈 Database Statistics")
 
 	// Get detailed stats
 	if db.DB == nil {

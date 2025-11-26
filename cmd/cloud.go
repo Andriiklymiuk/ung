@@ -55,7 +55,7 @@ func runCloudStatus(cmd *cobra.Command, args []string) {
 	dbPath := db.GetDBPath()
 	invoicesDir := db.GetInvoicesDir()
 
-	fmt.Println("☁️  iCloud Sync Status\n")
+	fmt.Println("☁️  iCloud Sync Status")
 
 	// Check if database is in iCloud
 	dbInCloud := cloud.IsSyncedToiCloud(dbPath)
@@ -97,7 +97,7 @@ func runCloudStatus(cmd *cobra.Command, args []string) {
 }
 
 func runCloudAvailable(cmd *cobra.Command, args []string) {
-	fmt.Println("☁️  iCloud Drive Availability\n")
+	fmt.Println("☁️  iCloud Drive Availability")
 
 	available := cloud.ICloudAvailable()
 
@@ -129,7 +129,7 @@ func runCloudAvailable(cmd *cobra.Command, args []string) {
 }
 
 func runCloudPath(cmd *cobra.Command, args []string) {
-	fmt.Println("☁️  iCloud Drive Paths\n")
+	fmt.Println("☁️  iCloud Drive Paths")
 
 	if !cloud.ICloudAvailable() {
 		fmt.Println("❌ iCloud Drive is not available")

@@ -75,7 +75,7 @@ func runExpenseAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Interactive mode
-	fmt.Println("💸 Add Business Expense\n")
+	fmt.Println("💸 Add Business Expense")
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -259,7 +259,7 @@ func runExpenseList(cmd *cobra.Command, args []string) error {
 }
 
 func runExpenseReport(cmd *cobra.Command, args []string) error {
-	fmt.Println("💸 Expense Report\n")
+	fmt.Println("💸 Expense Report")
 
 	// Total expenses by category
 	categoryQuery := `

@@ -526,7 +526,7 @@ func generateInvoiceFromTime(clientName string) (int64, error) {
 	} else if selectedGroup.ContractType == "fixed_price" && selectedGroup.FixedPrice != nil {
 		fmt.Printf(" [Fixed price: %.2f %s]", *selectedGroup.FixedPrice, selectedGroup.Currency)
 	}
-	fmt.Println("\n")
+	fmt.Println()
 
 	// Get company ID (should be 1 typically)
 	var companyID uint
@@ -1003,7 +1003,7 @@ func runInvoiceGenerateAll(cmd *cobra.Command, args []string) error {
 	}
 
 	// Show summary
-	fmt.Println("📊 Clients with unbilled time:\n")
+	fmt.Println("📊 Clients with unbilled time:")
 	totalAmount := 0.0
 	for i, group := range groups {
 		amount := 0.0

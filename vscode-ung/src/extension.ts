@@ -56,11 +56,6 @@ export async function activate(context: vscode.ExtensionContext) {
             value: 'homebrew',
           },
           {
-            label: '$(cloud-download) Download from GitHub',
-            description: 'Download binary directly',
-            value: 'github',
-          },
-          {
             label: '$(book) View Instructions',
             description: 'Open installation guide',
             value: 'docs',
@@ -71,15 +66,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
       if (action?.value === 'homebrew') {
         vscode.commands.executeCommand('ung.installViaHomebrew');
-      } else if (action?.value === 'github') {
-        vscode.env.openExternal(
-          vscode.Uri.parse(
-            'https://github.com/Andriiklymiuk/ung/releases/latest'
-          )
-        );
       } else if (action?.value === 'docs') {
         vscode.env.openExternal(
-          vscode.Uri.parse('https://github.com/Andriiklymiuk/ung#installation')
+          vscode.Uri.parse('https://andriiklymiuk.github.io/ung/docs/installation')
         );
       }
     }),
@@ -147,27 +136,9 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     ),
 
-    vscode.commands.registerCommand('ung.openReleases', () => {
-      vscode.env.openExternal(
-        vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/releases')
-      );
-    }),
-
     vscode.commands.registerCommand('ung.openDocs', () => {
       vscode.env.openExternal(
         vscode.Uri.parse('https://andriiklymiuk.github.io/ung/docs/intro')
-      );
-    }),
-
-    vscode.commands.registerCommand('ung.openGitHub', () => {
-      vscode.env.openExternal(
-        vscode.Uri.parse('https://github.com/Andriiklymiuk/ung')
-      );
-    }),
-
-    vscode.commands.registerCommand('ung.reportIssue', () => {
-      vscode.env.openExternal(
-        vscode.Uri.parse('https://github.com/Andriiklymiuk/ung/issues/new')
       );
     }),
 
@@ -233,8 +204,7 @@ export async function activate(context: vscode.ExtensionContext) {
             } else {
               const action = await vscode.window.showInformationMessage(
                 `UNG CLI update available: v${current} → v${latest}`,
-                'Update Now',
-                'View Release Notes'
+                'Update Now'
               );
 
               if (action === 'Update Now') {
@@ -253,12 +223,6 @@ export async function activate(context: vscode.ExtensionContext) {
                       );
                     }
                   });
-              } else if (action === 'View Release Notes') {
-                vscode.env.openExternal(
-                  vscode.Uri.parse(
-                    'https://github.com/Andriiklymiuk/ung/releases/latest'
-                  )
-                );
               }
             }
           } catch (_error) {

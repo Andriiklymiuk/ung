@@ -165,9 +165,9 @@ export class WelcomeProvider implements vscode.TreeDataProvider<WelcomeItem> {
     );
 
     items.push(
-      new WelcomeItem('View All Releases', 'action', 'github', {
-        command: 'ung.openReleases',
-        title: 'Open GitHub Releases',
+      new WelcomeItem('View Documentation', 'action', 'book', {
+        command: 'ung.openDocs',
+        title: 'Open Documentation',
       })
     );
 
@@ -196,14 +196,6 @@ export class WelcomeProvider implements vscode.TreeDataProvider<WelcomeItem> {
       new WelcomeItem('Documentation', 'action', 'book', {
         command: 'ung.openDocs',
         title: 'Open Documentation',
-      }),
-      new WelcomeItem('GitHub Repository', 'action', 'github', {
-        command: 'ung.openGitHub',
-        title: 'Open GitHub',
-      }),
-      new WelcomeItem('Report an Issue', 'action', 'bug', {
-        command: 'ung.reportIssue',
-        title: 'Report Issue',
       }),
       new WelcomeItem('Check CLI Installation', 'action', 'refresh', {
         command: 'ung.recheckCli',

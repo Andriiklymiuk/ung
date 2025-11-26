@@ -278,27 +278,10 @@
         "category": "UNG"
       },
       {
-        "command": "ung.openReleases",
-        "title": "View GitHub Releases",
-        "category": "UNG"
-      },
-      {
         "command": "ung.openDocs",
         "title": "Open Documentation",
         "category": "UNG",
         "icon": "$(book)"
-      },
-      {
-        "command": "ung.openGitHub",
-        "title": "Open GitHub Repository",
-        "category": "UNG",
-        "icon": "$(github)"
-      },
-      {
-        "command": "ung.reportIssue",
-        "title": "Report an Issue",
-        "category": "UNG",
-        "icon": "$(bug)"
       },
       {
         "command": "ung.recheckCli",

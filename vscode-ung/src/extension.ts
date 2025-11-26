@@ -68,7 +68,9 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('ung.installViaHomebrew');
       } else if (action?.value === 'docs') {
         vscode.env.openExternal(
-          vscode.Uri.parse('https://andriiklymiuk.github.io/ung/docs/installation')
+          vscode.Uri.parse(
+            'https://andriiklymiuk.github.io/ung/docs/installation'
+          )
         );
       }
     }),

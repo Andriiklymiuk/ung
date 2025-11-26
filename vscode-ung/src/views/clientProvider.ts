@@ -2,27 +2,57 @@ import * as vscode from 'vscode';
 import { UngCli } from '../cli/ungCli';
 
 /**
+ * Client tree item types
+ */
+type ClientItemType = 'summary' | 'action' | 'client' | 'header';
+
+/**
  * Client tree item
  */
 export class ClientItem extends vscode.TreeItem {
     constructor(
+        public readonly itemType: ClientItemType,
         public readonly itemId: number,
         public readonly name: string,
         public readonly email: string,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState
+        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+        public readonly contractCount?: number,
+        public readonly totalRevenue?: number
     ) {
         super(name, collapsibleState);
 
-        this.id = String(itemId);
-        this.tooltip = `${name}\n${email}`;
-        this.description = email;
-        this.contextValue = 'client';
-        this.iconPath = new vscode.ThemeIcon('person');
+        this.id = `${itemType}-${itemId}`;
+
+        switch (itemType) {
+            case 'summary':
+                this.contextValue = 'summary';
+                break;
+            case 'action':
+                this.contextValue = 'action';
+                break;
+            case 'header':
+                this.contextValue = 'header';
+                break;
+            case 'client':
+                this.tooltip = this.buildTooltip();
+                this.description = email || '';
+                this.contextValue = 'client';
+                this.iconPath = new vscode.ThemeIcon('person', new vscode.ThemeColor('charts.blue'));
+                break;
+        }
+    }
+
+    private buildTooltip(): string {
+        let tooltip = `**${this.name}**\n\n`;
+        if (this.email) tooltip += `Email: ${this.email}\n`;
+        if (this.contractCount !== undefined) tooltip += `Contracts: ${this.contractCount}\n`;
+        if (this.totalRevenue !== undefined) tooltip += `Total Revenue: $${this.totalRevenue.toFixed(2)}`;
+        return tooltip;
     }
 }
 
 /**
- * Client tree data provider
+ * Client tree data provider with summary metrics
  */
 export class ClientProvider implements vscode.TreeDataProvider<ClientItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<ClientItem | undefined | null | void> = new vscode.EventEmitter<ClientItem | undefined | null | void>();
@@ -47,16 +77,101 @@ export class ClientProvider implements vscode.TreeDataProvider<ClientItem> {
             const result = await this.cli.listClients();
 
             if (!result.success || !result.stdout) {
-                return [];
+                return this.getEmptyState();
             }
 
             // Parse the CLI output
             const clients = this.parseClientOutput(result.stdout);
-            return clients;
+
+            if (clients.length === 0) {
+                return this.getEmptyState();
+            }
+
+            return this.buildTreeItems(clients);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to load clients: ${error}`);
-            return [];
+            return this.getEmptyState();
         }
+    }
+
+    /**
+     * Build tree items with summary at top
+     */
+    private buildTreeItems(clients: ClientItem[]): ClientItem[] {
+        const items: ClientItem[] = [];
+
+        // Summary section
+        const summaryItem = new ClientItem(
+            'summary',
+            0,
+            `${clients.length} Client${clients.length !== 1 ? 's' : ''}`,
+            '',
+            vscode.TreeItemCollapsibleState.None
+        );
+        summaryItem.iconPath = new vscode.ThemeIcon('organization', new vscode.ThemeColor('charts.green'));
+        summaryItem.description = 'Total';
+        items.push(summaryItem);
+
+        // Quick actions
+        const addClientItem = new ClientItem(
+            'action',
+            -1,
+            'Add New Client',
+            '',
+            vscode.TreeItemCollapsibleState.None
+        );
+        addClientItem.iconPath = new vscode.ThemeIcon('person-add', new vscode.ThemeColor('charts.blue'));
+        addClientItem.command = {
+            command: 'ung.createClient',
+            title: 'Add Client'
+        };
+        items.push(addClientItem);
+
+        // Separator-like header
+        const clientsHeader = new ClientItem(
+            'header',
+            -2,
+            'All Clients',
+            '',
+            vscode.TreeItemCollapsibleState.None
+        );
+        clientsHeader.iconPath = new vscode.ThemeIcon('list-flat');
+        items.push(clientsHeader);
+
+        // Add all clients
+        items.push(...clients);
+
+        return items;
+    }
+
+    /**
+     * Empty state with helpful message
+     */
+    private getEmptyState(): ClientItem[] {
+        const emptyItem = new ClientItem(
+            'summary',
+            0,
+            'No clients yet',
+            '',
+            vscode.TreeItemCollapsibleState.None
+        );
+        emptyItem.iconPath = new vscode.ThemeIcon('info');
+        emptyItem.description = 'Add your first client';
+
+        const addItem = new ClientItem(
+            'action',
+            -1,
+            'Add Your First Client',
+            '',
+            vscode.TreeItemCollapsibleState.None
+        );
+        addItem.iconPath = new vscode.ThemeIcon('person-add', new vscode.ThemeColor('charts.green'));
+        addItem.command = {
+            command: 'ung.createClient',
+            title: 'Add Client'
+        };
+
+        return [emptyItem, addItem];
     }
 
     /**
@@ -78,6 +193,7 @@ export class ClientProvider implements vscode.TreeDataProvider<ClientItem> {
 
                 if (!isNaN(id)) {
                     clients.push(new ClientItem(
+                        'client',
                         id,
                         name,
                         email,

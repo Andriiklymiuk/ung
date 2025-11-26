@@ -34,6 +34,18 @@
   "contributes": {
     "commands": [
       {
+        "command": "ung.commandCenter",
+        "title": "Command Center",
+        "category": "UNG",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "ung.quickActions",
+        "title": "Quick Actions",
+        "category": "UNG",
+        "icon": "$(zap)"
+      },
+      {
         "command": "ung.createCompany",
         "title": "Create Company",
         "category": "UNG"
@@ -343,12 +355,6 @@
         "command": "ung.toggleTracking",
         "title": "Toggle Time Tracking",
         "category": "UNG"
-      },
-      {
-        "command": "ung.quickActions",
-        "title": "Quick Actions",
-        "category": "UNG",
-        "icon": "$(zap)"
       },
       {
         "command": "ung.refreshAll",
@@ -707,6 +713,12 @@
       }
     },
     "keybindings": [
+      {
+        "command": "ung.commandCenter",
+        "key": "ctrl+shift+u",
+        "mac": "cmd+shift+u",
+        "when": "editorTextFocus || !editorFocus"
+      },
       {
         "command": "ung.quickStart",
         "key": "ctrl+alt+t",

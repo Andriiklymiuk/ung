@@ -16,7 +16,7 @@ export abstract class BaseCommand {
   /**
    * Execute CLI command with error handling and notifications
    */
-  protected async executeCommand<T = any>(
+  protected async executeCommand<T = unknown>(
     operation: () => Promise<CliResult<T>>,
     options?: {
       successMessage?: string;
@@ -62,7 +62,7 @@ export abstract class BaseCommand {
   /**
    * Execute command through queue
    */
-  protected async executeQueued<T = any>(
+  protected async executeQueued<T = unknown>(
     operation: () => Promise<CliResult<T>>,
     options?: {
       successMessage?: string;

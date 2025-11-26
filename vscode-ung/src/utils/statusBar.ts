@@ -12,7 +12,11 @@ export class StatusBarManager {
   private quickActionItem: vscode.StatusBarItem;
   private cli: UngCli;
   private updateInterval: NodeJS.Timeout | null = null;
-  private activeSessionData: any = null;
+  private activeSessionData: {
+    project?: string;
+    started?: string;
+    client?: string;
+  } | null = null;
   private isTracking: boolean = false;
 
   constructor(cli: UngCli) {
@@ -193,9 +197,11 @@ export class StatusBarManager {
   /**
    * Parse session data from CLI output
    */
-  private parseSessionData(output: string): any {
+  private parseSessionData(
+    output: string
+  ): { project?: string; started?: string; client?: string } | null {
     const lines = output.split('\n');
-    const data: any = {};
+    const data: { project?: string; started?: string; client?: string } = {};
 
     for (const line of lines) {
       if (line.includes('Project:')) {

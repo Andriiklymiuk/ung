@@ -22,7 +22,7 @@ export class UngError extends Error {
   constructor(
     public type: ErrorType,
     message: string,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = 'UngError';

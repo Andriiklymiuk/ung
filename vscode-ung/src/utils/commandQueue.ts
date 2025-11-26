@@ -4,7 +4,7 @@ import { ErrorHandler, ErrorType, UngError } from './errors';
 /**
  * Command queue item
  */
-interface QueuedCommand<T = any> {
+interface QueuedCommand<T = unknown> {
   id: string;
   execute: () => Promise<CliResult<T>>;
   resolve: (result: CliResult<T>) => void;
@@ -28,7 +28,7 @@ export class CommandQueue {
   /**
    * Add command to queue
    */
-  async enqueue<T = any>(
+  async enqueue<T = unknown>(
     execute: () => Promise<CliResult<T>>,
     options?: {
       timeout?: number;
@@ -96,42 +96,40 @@ export class CommandQueue {
   /**
    * Execute command with timeout
    */
-  private executeWithTimeout<T>(
+  private async executeWithTimeout<T>(
     command: QueuedCommand<T>
   ): Promise<CliResult<T>> {
-    return new Promise(async (resolve, reject) => {
-      let timeoutId: NodeJS.Timeout | undefined;
+    if (!command.timeout) {
+      return command.execute();
+    }
 
-      if (command.timeout) {
-        timeoutId = setTimeout(() => {
-          reject(
-            new UngError(
-              ErrorType.TIMEOUT,
-              `Command timed out after ${command.timeout}ms`
-            )
-          );
-        }, command.timeout);
-      }
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(
+          new UngError(
+            ErrorType.TIMEOUT,
+            `Command timed out after ${command.timeout}ms`
+          )
+        );
+      }, command.timeout);
 
-      try {
-        const result = await command.execute();
-        if (timeoutId) {
+      command
+        .execute()
+        .then((result) => {
           clearTimeout(timeoutId);
-        }
-        resolve(result);
-      } catch (error) {
-        if (timeoutId) {
+          resolve(result);
+        })
+        .catch((error) => {
           clearTimeout(timeoutId);
-        }
-        reject(error);
-      }
+          reject(error);
+        });
     });
   }
 
   /**
    * Check if error is retryable
    */
-  private shouldRetry(error: any): boolean {
+  private shouldRetry(error: unknown): boolean {
     if (error instanceof UngError) {
       // Don't retry validation errors or not found errors
       if (

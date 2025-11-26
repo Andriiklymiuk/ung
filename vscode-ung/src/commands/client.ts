@@ -240,7 +240,7 @@ export class ClientCommands {
 
       if (newValue === undefined) return;
       if (newValue !== editField.value) {
-        (updates as any)[editField.field] = newValue;
+        updates[editField.field as keyof typeof updates] = newValue;
       }
     }
 

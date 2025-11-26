@@ -23,7 +23,7 @@ export abstract class BaseProvider<T extends vscode.TreeItem>
   readonly onDidChangeTreeData: vscode.Event<T | undefined | null | undefined> =
     this._onDidChangeTreeData.event;
 
-  protected cache: Map<string, CacheEntry<any>> = new Map();
+  protected cache: Map<string, CacheEntry<unknown>> = new Map();
   protected readonly cacheTTL: number;
   protected readonly enableCache: boolean;
 
@@ -104,21 +104,21 @@ export abstract class BaseProvider<T extends vscode.TreeItem>
   /**
    * Handle errors consistently
    */
-  protected handleError(error: any, context: string): T[] {
-    ErrorHandler.handle(error, context);
+  protected handleError(error: unknown, context: string): T[] {
+    ErrorHandler.handle(error as Error, context);
     return this.getErrorItem(error) as T[];
   }
 
   /**
    * Get error tree item
    */
-  protected getErrorItem(error: any): vscode.TreeItem {
+  protected getErrorItem(error: unknown): vscode.TreeItem {
     const item = new vscode.TreeItem(
       'Error loading data',
       vscode.TreeItemCollapsibleState.None
     );
     item.description = 'Click to retry';
-    item.tooltip = error.message || String(error);
+    item.tooltip = error instanceof Error ? error.message : String(error);
     item.iconPath = new vscode.ThemeIcon('error');
     item.command = {
       command: 'workbench.action.reloadWindow',

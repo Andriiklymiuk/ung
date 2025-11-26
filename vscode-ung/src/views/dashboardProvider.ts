@@ -66,6 +66,27 @@ type DashboardItem =
   | DashboardActionItem;
 
 /**
+ * Dashboard metrics interface
+ */
+interface DashboardMetrics {
+  totalMonthlyRevenue: number;
+  hourlyRevenue: number;
+  retainerRevenue: number;
+  projectedHours: number;
+  averageHourlyRate: number;
+  activeContracts: number;
+  totalClients: number;
+  pendingInvoices: number;
+  unpaidAmount: number;
+  currency: string;
+  topContracts: Array<{
+    clientName: string;
+    monthlyRevenue: number;
+    currency: string;
+  }>;
+}
+
+/**
  * Dashboard tree data provider
  */
 export class DashboardProvider
@@ -78,7 +99,7 @@ export class DashboardProvider
     DashboardItem | undefined | null | undefined
   > = this._onDidChangeTreeData.event;
 
-  private cachedMetrics: any = null;
+  private cachedMetrics: DashboardMetrics | null = null;
   private cacheTimestamp: number = 0;
   private readonly CACHE_DURATION = 60000; // 1 minute
   private activeTracking: {
@@ -457,7 +478,7 @@ export class DashboardProvider
     }
   }
 
-  private async getDashboardMetrics(): Promise<any> {
+  private async getDashboardMetrics(): Promise<DashboardMetrics> {
     // Return cached metrics if still fresh
     const now = Date.now();
     if (this.cachedMetrics && now - this.cacheTimestamp < this.CACHE_DURATION) {
@@ -483,8 +504,8 @@ export class DashboardProvider
     }
   }
 
-  private parseDashboardOutput(output: string): any {
-    const metrics: any = {
+  private parseDashboardOutput(output: string): DashboardMetrics {
+    const metrics: DashboardMetrics = {
       totalMonthlyRevenue: 0,
       hourlyRevenue: 0,
       retainerRevenue: 0,
@@ -554,7 +575,7 @@ export class DashboardProvider
     return metrics;
   }
 
-  private getDefaultMetrics(): any {
+  private getDefaultMetrics(): DashboardMetrics {
     return {
       totalMonthlyRevenue: 0,
       hourlyRevenue: 0,

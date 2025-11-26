@@ -1,6 +1,6 @@
 import * as path from 'node:path';
-import Mocha from 'mocha';
 import glob from 'glob';
+import Mocha from 'mocha';
 
 async function main() {
   const mocha = new Mocha({
@@ -20,9 +20,7 @@ async function main() {
         }
 
         // Add files to the test suite
-        files.forEach((f: string) =>
-          mocha.addFile(path.resolve(testsRoot, f))
-        );
+        files.forEach((f: string) => mocha.addFile(path.resolve(testsRoot, f)));
 
         try {
           // Run the mocha test

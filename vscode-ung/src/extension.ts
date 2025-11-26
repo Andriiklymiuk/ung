@@ -19,6 +19,7 @@ import { StatisticsPanel } from './webview/statisticsPanel';
 import { MainDashboardPanel } from './webview/mainDashboardPanel';
 import { PomodoroPanel } from './webview/pomodoroPanel';
 import { StatusBarManager } from './utils/statusBar';
+import { CommandCenter } from './commands/commandCenter';
 
 /**
  * Extension activation
@@ -403,38 +404,14 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Quick actions command
+    // Command Center - unified access to all commands
     context.subscriptions.push(
-        vscode.commands.registerCommand('ung.quickActions', async () => {
-            const actions = [
-                { label: '$(play) Start Time Tracking', command: 'ung.startTracking' },
-                { label: '$(debug-stop) Stop Time Tracking', command: 'ung.stopTracking' },
-                { label: '$(add) Log Time Manually', command: 'ung.logTimeManually' },
-                { label: '$(file-add) Create Invoice', command: 'ung.createInvoice' },
-                { label: '$(files) Generate All Invoices', command: 'ung.generateAllInvoices' },
-                { label: '$(send) Send All Pending Invoices', command: 'ung.sendAllInvoices' },
-                { label: '$(file-code) Create Contract', command: 'ung.createContract' },
-                { label: '$(person-add) Add Client', command: 'ung.createClient' },
-                { label: '$(search) Search Everything', command: 'ung.search' },
-                { label: '$(graph) View Statistics', command: 'ung.openStatistics' },
-                { label: '$(credit-card) Log Expense', command: 'ung.logExpense' },
-                { label: '$(watch) Pomodoro Timer', command: 'ung.startPomodoro' },
-                { label: '$(sync) Recurring Invoices', command: 'ung.manageRecurring' },
-                { label: '$(export) Export Data', command: 'ung.exportData' },
-                { label: '$(cloud) Backup & Sync', command: 'ung.syncData' },
-                { label: '$(folder-opened) Import Data', command: 'ung.importData' },
-                { label: '$(dashboard) Business Insights', command: 'ung.businessInsights' },
-                { label: '$(refresh) Refresh All', command: 'ung.refreshAll' }
-            ];
+        vscode.commands.registerCommand('ung.commandCenter', () => CommandCenter.show())
+    );
 
-            const selected = await vscode.window.showQuickPick(actions, {
-                placeHolder: 'UNG Quick Actions'
-            });
-
-            if (selected) {
-                vscode.commands.executeCommand(selected.command);
-            }
-        })
+    // Quick Actions - most common operations
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.quickActions', () => CommandCenter.showQuickActions())
     );
 
     // Refresh all command

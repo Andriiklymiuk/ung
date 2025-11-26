@@ -382,10 +382,8 @@ func runRecurringGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	var dueInvoices []dueInvoice
-	scanner := rows.(*interface{})
-	_ = scanner // Type assertion placeholder
 
-	// Re-query with proper scanning
+	// Query and scan
 	if recurringGenerateAll {
 		rows2, _ := db.DB.Query(query)
 		defer rows2.Close()

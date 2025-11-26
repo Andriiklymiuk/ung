@@ -26,7 +26,6 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          routeBasePath: '/',
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl: 'https://github.com/Andriiklymiuk/ung/tree/main/ung-docs/',
         },
@@ -75,11 +74,11 @@ const config = {
             items: [
               {
                 label: 'Introduction',
-                to: '/',
+                to: '/docs/intro',
               },
               {
                 label: 'CLI Reference',
-                to: '/cli/ung',
+                to: '/docs/cli/ung',
               },
             ],
           },

@@ -215,13 +215,13 @@ func importClients(reader *csv.Reader) error {
 
 		// Check if client exists
 		var existing models.Client
-		if err := db.DB.Where("email = ?", client.Email).First(&existing).Error; err == nil {
+		if err := db.GormDB.Where("email = ?", client.Email).First(&existing).Error; err == nil {
 			fmt.Printf("  [Skip] %s (already exists)\n", client.Email)
 			skipped++
 			continue
 		}
 
-		if err := db.DB.Create(&client).Error; err != nil {
+		if err := db.GormDB.Create(&client).Error; err != nil {
 			fmt.Printf("  [Error] %s: %v\n", client.Name, err)
 			errors++
 			continue
@@ -304,7 +304,7 @@ func importExpenses(reader *csv.Reader) error {
 			continue
 		}
 
-		if err := db.DB.Create(&expense).Error; err != nil {
+		if err := db.GormDB.Create(&expense).Error; err != nil {
 			fmt.Printf("  [Error] %s: %v\n", expense.Description, err)
 			errors++
 			continue
@@ -329,7 +329,7 @@ func importTimeEntries(reader *csv.Reader) error {
 
 	// Get client map for lookups
 	var clients []models.Client
-	db.DB.Find(&clients)
+	db.GormDB.Find(&clients)
 	clientMap := make(map[string]uint)
 	for _, c := range clients {
 		clientMap[strings.ToLower(c.Name)] = c.ID
@@ -408,7 +408,7 @@ func importTimeEntries(reader *csv.Reader) error {
 			continue
 		}
 
-		if err := db.DB.Create(&session).Error; err != nil {
+		if err := db.GormDB.Create(&session).Error; err != nil {
 			fmt.Printf("  [Error] %v\n", err)
 			errors++
 			continue
@@ -662,13 +662,13 @@ func importCompaniesFromDB(sourceDB *db.SQLiteDB) (int, int) {
 
 		// Check if exists
 		var existing models.Company
-		if err := db.DB.Where("email = ?", c.Email).First(&existing).Error; err == nil {
+		if err := db.GormDB.Where("email = ?", c.Email).First(&existing).Error; err == nil {
 			skipped++
 			continue
 		}
 
 		if !importDryRun {
-			if err := db.DB.Create(&c).Error; err == nil {
+			if err := db.GormDB.Create(&c).Error; err == nil {
 				imported++
 			}
 		} else {
@@ -696,13 +696,13 @@ func importClientsFromDB(sourceDB *db.SQLiteDB) (int, int) {
 		}
 
 		var existing models.Client
-		if err := db.DB.Where("email = ?", c.Email).First(&existing).Error; err == nil {
+		if err := db.GormDB.Where("email = ?", c.Email).First(&existing).Error; err == nil {
 			skipped++
 			continue
 		}
 
 		if !importDryRun {
-			if err := db.DB.Create(&c).Error; err == nil {
+			if err := db.GormDB.Create(&c).Error; err == nil {
 				imported++
 			}
 		} else {
@@ -730,13 +730,13 @@ func importContractsFromDB(sourceDB *db.SQLiteDB) (int, int) {
 		}
 
 		var existing models.Contract
-		if err := db.DB.Where("contract_num = ?", c.ContractNum).First(&existing).Error; err == nil {
+		if err := db.GormDB.Where("contract_num = ?", c.ContractNum).First(&existing).Error; err == nil {
 			skipped++
 			continue
 		}
 
 		if !importDryRun {
-			if err := db.DB.Create(&c).Error; err == nil {
+			if err := db.GormDB.Create(&c).Error; err == nil {
 				imported++
 			}
 		} else {
@@ -764,13 +764,13 @@ func importInvoicesFromDB(sourceDB *db.SQLiteDB) (int, int) {
 		}
 
 		var existing models.Invoice
-		if err := db.DB.Where("invoice_num = ?", inv.InvoiceNum).First(&existing).Error; err == nil {
+		if err := db.GormDB.Where("invoice_num = ?", inv.InvoiceNum).First(&existing).Error; err == nil {
 			skipped++
 			continue
 		}
 
 		if !importDryRun {
-			if err := db.DB.Create(&inv).Error; err == nil {
+			if err := db.GormDB.Create(&inv).Error; err == nil {
 				imported++
 			}
 		} else {
@@ -799,7 +799,7 @@ func importExpensesFromDB(sourceDB *db.SQLiteDB) (int, int) {
 
 		// For expenses, we import all (no unique key to check)
 		if !importDryRun {
-			if err := db.DB.Create(&e).Error; err == nil {
+			if err := db.GormDB.Create(&e).Error; err == nil {
 				imported++
 			}
 		} else {
@@ -828,7 +828,7 @@ func importSessionsFromDB(sourceDB *db.SQLiteDB) (int, int) {
 
 		// Import all sessions (time entries are typically unique)
 		if !importDryRun {
-			if err := db.DB.Create(&s).Error; err == nil {
+			if err := db.GormDB.Create(&s).Error; err == nil {
 				imported++
 			}
 		} else {
@@ -857,13 +857,13 @@ func importRecurringFromDB(sourceDB *db.SQLiteDB) (int, int) {
 
 		// Check for similar recurring invoice
 		var existing models.RecurringInvoice
-		if err := db.DB.Where("client_id = ? AND amount = ? AND frequency = ?", r.ClientID, r.Amount, r.Frequency).First(&existing).Error; err == nil {
+		if err := db.GormDB.Where("client_id = ? AND amount = ? AND frequency = ?", r.ClientID, r.Amount, r.Frequency).First(&existing).Error; err == nil {
 			skipped++
 			continue
 		}
 
 		if !importDryRun {
-			if err := db.DB.Create(&r).Error; err == nil {
+			if err := db.GormDB.Create(&r).Error; err == nil {
 				imported++
 			}
 		} else {

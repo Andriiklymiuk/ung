@@ -131,47 +131,47 @@ func runSyncBackup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load companies
-	if err := db.DB.Find(&backup.Companies).Error; err != nil {
+	if err := db.GormDB.Find(&backup.Companies).Error; err != nil {
 		return fmt.Errorf("failed to load companies: %w", err)
 	}
 
 	// Load clients
-	if err := db.DB.Find(&backup.Clients).Error; err != nil {
+	if err := db.GormDB.Find(&backup.Clients).Error; err != nil {
 		return fmt.Errorf("failed to load clients: %w", err)
 	}
 
 	// Load contracts
-	if err := db.DB.Find(&backup.Contracts).Error; err != nil {
+	if err := db.GormDB.Find(&backup.Contracts).Error; err != nil {
 		return fmt.Errorf("failed to load contracts: %w", err)
 	}
 
 	// Load invoices
-	if err := db.DB.Find(&backup.Invoices).Error; err != nil {
+	if err := db.GormDB.Find(&backup.Invoices).Error; err != nil {
 		return fmt.Errorf("failed to load invoices: %w", err)
 	}
 
 	// Load invoice recipients
-	if err := db.DB.Find(&backup.InvoiceRecipients).Error; err != nil {
+	if err := db.GormDB.Find(&backup.InvoiceRecipients).Error; err != nil {
 		return fmt.Errorf("failed to load invoice recipients: %w", err)
 	}
 
 	// Load invoice line items
-	if err := db.DB.Find(&backup.InvoiceLineItems).Error; err != nil {
+	if err := db.GormDB.Find(&backup.InvoiceLineItems).Error; err != nil {
 		return fmt.Errorf("failed to load invoice line items: %w", err)
 	}
 
 	// Load tracking sessions
-	if err := db.DB.Unscoped().Find(&backup.TrackingSessions).Error; err != nil {
+	if err := db.GormDB.Unscoped().Find(&backup.TrackingSessions).Error; err != nil {
 		return fmt.Errorf("failed to load tracking sessions: %w", err)
 	}
 
 	// Load expenses
-	if err := db.DB.Find(&backup.Expenses).Error; err != nil {
+	if err := db.GormDB.Find(&backup.Expenses).Error; err != nil {
 		return fmt.Errorf("failed to load expenses: %w", err)
 	}
 
 	// Load recurring invoices
-	if err := db.DB.Find(&backup.RecurringInvoices).Error; err != nil {
+	if err := db.GormDB.Find(&backup.RecurringInvoices).Error; err != nil {
 		return fmt.Errorf("failed to load recurring invoices: %w", err)
 	}
 
@@ -294,63 +294,63 @@ func runSyncRestore(cmd *cobra.Command, args []string) error {
 
 	// Restore companies
 	for _, c := range backup.Companies {
-		if err := db.DB.Save(&c).Error; err == nil {
+		if err := db.GormDB.Save(&c).Error; err == nil {
 			restored["companies"]++
 		}
 	}
 
 	// Restore clients
 	for _, c := range backup.Clients {
-		if err := db.DB.Save(&c).Error; err == nil {
+		if err := db.GormDB.Save(&c).Error; err == nil {
 			restored["clients"]++
 		}
 	}
 
 	// Restore contracts
 	for _, c := range backup.Contracts {
-		if err := db.DB.Save(&c).Error; err == nil {
+		if err := db.GormDB.Save(&c).Error; err == nil {
 			restored["contracts"]++
 		}
 	}
 
 	// Restore invoices
 	for _, inv := range backup.Invoices {
-		if err := db.DB.Save(&inv).Error; err == nil {
+		if err := db.GormDB.Save(&inv).Error; err == nil {
 			restored["invoices"]++
 		}
 	}
 
 	// Restore invoice recipients
 	for _, ir := range backup.InvoiceRecipients {
-		if err := db.DB.Save(&ir).Error; err == nil {
+		if err := db.GormDB.Save(&ir).Error; err == nil {
 			restored["invoice_recipients"]++
 		}
 	}
 
 	// Restore invoice line items
 	for _, li := range backup.InvoiceLineItems {
-		if err := db.DB.Save(&li).Error; err == nil {
+		if err := db.GormDB.Save(&li).Error; err == nil {
 			restored["line_items"]++
 		}
 	}
 
 	// Restore tracking sessions
 	for _, t := range backup.TrackingSessions {
-		if err := db.DB.Save(&t).Error; err == nil {
+		if err := db.GormDB.Save(&t).Error; err == nil {
 			restored["time_entries"]++
 		}
 	}
 
 	// Restore expenses
 	for _, e := range backup.Expenses {
-		if err := db.DB.Save(&e).Error; err == nil {
+		if err := db.GormDB.Save(&e).Error; err == nil {
 			restored["expenses"]++
 		}
 	}
 
 	// Restore recurring invoices
 	for _, r := range backup.RecurringInvoices {
-		if err := db.DB.Save(&r).Error; err == nil {
+		if err := db.GormDB.Save(&r).Error; err == nil {
 			restored["recurring"]++
 		}
 	}

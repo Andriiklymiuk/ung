@@ -204,65 +204,21 @@ func runExportInteractive() error {
 }
 
 func exportInvoicesData(format, timestamp string) (string, error) {
-	query := `
-		SELECT i.id, i.invoice_num, c.name as client_name, i.amount, i.currency,
-		       i.status, i.issued_date, i.due_date, i.description
-		FROM invoices i
-		LEFT JOIN invoice_recipients ir ON i.id = ir.invoice_id
-		LEFT JOIN clients c ON ir.client_id = c.id
-	`
-	args := []interface{}{}
-
-	if exportYear > 0 {
-		query += " WHERE strftime('%Y', i.issued_date) = ?"
-		args = append(args, fmt.Sprintf("%d", exportYear))
-	}
-
-	query += " ORDER BY i.issued_date DESC"
-
-	rows, err := db.DB.Query(query, args...)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	type invoiceRow struct {
-		ID          int
-		InvoiceNum  string
-		ClientName  string
-		Amount      float64
-		Currency    string
-		Status      string
-		IssuedDate  time.Time
-		DueDate     time.Time
-		Description string
-	}
-
-	var invoices []invoiceRow
-	for rows.Next() {
-		var inv invoiceRow
-		if err := rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.ClientName, &inv.Amount,
-			&inv.Currency, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.Description); err != nil {
-			continue
-		}
-		invoices = append(invoices, inv)
-	}
-
 	filename := filepath.Join(exportOutput, fmt.Sprintf("invoices_%s.%s", timestamp, format))
 
 	switch format {
 	case "csv":
-		return exportInvoicesCSV(filename, invoices)
+		return exportInvoicesCSV(filename)
 	case "quickbooks":
-		return exportInvoicesIIF(filename, invoices)
+		return exportInvoicesIIF(filename)
 	case "json":
-		return exportInvoicesJSON(filename, invoices)
+		return exportInvoicesJSON(filename)
 	default:
 		return "", fmt.Errorf("unsupported format: %s", format)
 	}
 }
 
-func exportInvoicesCSV(filename string, invoices []interface{}) (string, error) {
+func exportInvoicesCSV(filename string) (string, error) {
 	file, err := os.Create(filename)
 	if err != nil {
 		return "", err
@@ -315,7 +271,7 @@ func exportInvoicesCSV(filename string, invoices []interface{}) (string, error) 
 	return filename, nil
 }
 
-func exportInvoicesIIF(filename string, invoices []interface{}) (string, error) {
+func exportInvoicesIIF(filename string) (string, error) {
 	file, err := os.Create(filename)
 	if err != nil {
 		return "", err
@@ -365,7 +321,7 @@ func exportInvoicesIIF(filename string, invoices []interface{}) (string, error) 
 	return filename, nil
 }
 
-func exportInvoicesJSON(filename string, invoices []interface{}) (string, error) {
+func exportInvoicesJSON(filename string) (string, error) {
 	query := `
 		SELECT i.id, i.invoice_num, c.name, i.amount, i.currency, i.status,
 		       i.issued_date, i.due_date, i.description

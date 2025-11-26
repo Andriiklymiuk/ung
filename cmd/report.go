@@ -374,7 +374,7 @@ func runReportWeekly(cmd *cobra.Command, args []string) error {
 
 	// Get time tracking data
 	var sessions []models.TrackingSession
-	db.DB.Where("start_time >= ? AND start_time < ? AND deleted_at IS NULL", startOfWeek, endOfWeek).
+	db.GormDB.Where("start_time >= ? AND start_time < ? AND deleted_at IS NULL", startOfWeek, endOfWeek).
 		Preload("Client").Find(&sessions)
 
 	totalHours := 0.0
@@ -408,7 +408,7 @@ func runReportWeekly(cmd *cobra.Command, args []string) error {
 
 	// Get invoices sent this week
 	var invoices []models.Invoice
-	db.DB.Where("issued_date >= ? AND issued_date < ?", startOfWeek, endOfWeek).Find(&invoices)
+	db.GormDB.Where("issued_date >= ? AND issued_date < ?", startOfWeek, endOfWeek).Find(&invoices)
 
 	var invoicedAmount float64
 	for _, inv := range invoices {
@@ -417,7 +417,7 @@ func runReportWeekly(cmd *cobra.Command, args []string) error {
 
 	// Get payments received this week
 	var paidInvoices []models.Invoice
-	db.DB.Where("status = ? AND updated_at >= ? AND updated_at < ?", "paid", startOfWeek, endOfWeek).Find(&paidInvoices)
+	db.GormDB.Where("status = ? AND updated_at >= ? AND updated_at < ?", "paid", startOfWeek, endOfWeek).Find(&paidInvoices)
 
 	var paidAmount float64
 	for _, inv := range paidInvoices {
@@ -426,7 +426,7 @@ func runReportWeekly(cmd *cobra.Command, args []string) error {
 
 	// Get expenses
 	var expenses []models.Expense
-	db.DB.Where("date >= ? AND date < ?", startOfWeek, endOfWeek).Find(&expenses)
+	db.GormDB.Where("date >= ? AND date < ?", startOfWeek, endOfWeek).Find(&expenses)
 
 	var expenseAmount float64
 	for _, e := range expenses {
@@ -531,7 +531,7 @@ func runReportMonthly(cmd *cobra.Command, args []string) error {
 
 	// Get time tracking data
 	var sessions []models.TrackingSession
-	db.DB.Where("start_time >= ? AND start_time < ? AND deleted_at IS NULL", startOfMonth, endOfMonth).
+	db.GormDB.Where("start_time >= ? AND start_time < ? AND deleted_at IS NULL", startOfMonth, endOfMonth).
 		Preload("Client").Find(&sessions)
 
 	totalHours := 0.0
@@ -547,7 +547,7 @@ func runReportMonthly(cmd *cobra.Command, args []string) error {
 
 	// Get invoices
 	var invoices []models.Invoice
-	db.DB.Where("issued_date >= ? AND issued_date < ?", startOfMonth, endOfMonth).Find(&invoices)
+	db.GormDB.Where("issued_date >= ? AND issued_date < ?", startOfMonth, endOfMonth).Find(&invoices)
 
 	var revenue float64
 	var pending float64
@@ -560,7 +560,7 @@ func runReportMonthly(cmd *cobra.Command, args []string) error {
 
 	// Get expenses
 	var expenses []models.Expense
-	db.DB.Where("date >= ? AND date < ?", startOfMonth, endOfMonth).Find(&expenses)
+	db.GormDB.Where("date >= ? AND date < ?", startOfMonth, endOfMonth).Find(&expenses)
 
 	var expenseTotal float64
 	expenseByCategory := make(map[string]float64)

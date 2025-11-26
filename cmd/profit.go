@@ -143,7 +143,7 @@ func loadDashboardData() tea.Msg {
 
 	// Current month revenue (paid invoices)
 	var currentRev sql.NullFloat64
-	db.DB.Raw(`
+	db.GormDB.Raw(`
 		SELECT COALESCE(SUM(amount), 0) FROM invoices
 		WHERE status = ? AND updated_at >= ? AND updated_at < ?
 	`, models.StatusPaid, startOfMonth, now).Scan(&currentRev)
@@ -151,7 +151,7 @@ func loadDashboardData() tea.Msg {
 
 	// Current month expenses
 	var currentExp sql.NullFloat64
-	db.DB.Raw(`
+	db.GormDB.Raw(`
 		SELECT COALESCE(SUM(amount), 0) FROM expenses
 		WHERE date >= ? AND date < ?
 	`, startOfMonth, now).Scan(&currentExp)
@@ -160,14 +160,14 @@ func loadDashboardData() tea.Msg {
 
 	// Previous month
 	var prevRev sql.NullFloat64
-	db.DB.Raw(`
+	db.GormDB.Raw(`
 		SELECT COALESCE(SUM(amount), 0) FROM invoices
 		WHERE status = ? AND updated_at >= ? AND updated_at < ?
 	`, models.StatusPaid, startOfPrevMonth, startOfMonth).Scan(&prevRev)
 	data.prevRevenue = prevRev.Float64
 
 	var prevExp sql.NullFloat64
-	db.DB.Raw(`
+	db.GormDB.Raw(`
 		SELECT COALESCE(SUM(amount), 0) FROM expenses
 		WHERE date >= ? AND date < ?
 	`, startOfPrevMonth, startOfMonth).Scan(&prevExp)
@@ -176,14 +176,14 @@ func loadDashboardData() tea.Msg {
 
 	// Year to date
 	var yearRev sql.NullFloat64
-	db.DB.Raw(`
+	db.GormDB.Raw(`
 		SELECT COALESCE(SUM(amount), 0) FROM invoices
 		WHERE status = ? AND updated_at >= ?
 	`, models.StatusPaid, startOfYear).Scan(&yearRev)
 	data.yearRevenue = yearRev.Float64
 
 	var yearExp sql.NullFloat64
-	db.DB.Raw(`
+	db.GormDB.Raw(`
 		SELECT COALESCE(SUM(amount), 0) FROM expenses
 		WHERE date >= ?
 	`, startOfYear).Scan(&yearExp)
@@ -191,7 +191,7 @@ func loadDashboardData() tea.Msg {
 	data.yearProfit = data.yearRevenue - data.yearExpenses
 
 	// Top clients
-	rows, _ := db.DB.Raw(`
+	rows, _ := db.GormDB.Raw(`
 		SELECT c.name, COALESCE(SUM(i.amount), 0) as total
 		FROM clients c
 		LEFT JOIN invoice_recipients ir ON c.id = ir.client_id
@@ -212,7 +212,7 @@ func loadDashboardData() tea.Msg {
 	}
 
 	// Expenses by category
-	expRows, _ := db.DB.Raw(`
+	expRows, _ := db.GormDB.Raw(`
 		SELECT category, SUM(amount) as total
 		FROM expenses
 		WHERE date >= ?
@@ -235,9 +235,9 @@ func loadDashboardData() tea.Msg {
 		monthEnd := monthStart.AddDate(0, 1, 0)
 
 		var rev, exp sql.NullFloat64
-		db.DB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE status = ? AND updated_at >= ? AND updated_at < ?`,
+		db.GormDB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE status = ? AND updated_at >= ? AND updated_at < ?`,
 			models.StatusPaid, monthStart, monthEnd).Scan(&rev)
-		db.DB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE date >= ? AND date < ?`,
+		db.GormDB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE date >= ? AND date < ?`,
 			monthStart, monthEnd).Scan(&exp)
 
 		data.monthlyTrend = append(data.monthlyTrend, monthData{
@@ -250,7 +250,7 @@ func loadDashboardData() tea.Msg {
 
 	// Get monthly goal if set
 	var goal IncomeGoal
-	if err := db.DB.Where("period = ? AND year = ? AND month = ?",
+	if err := db.GormDB.Where("period = ? AND year = ? AND month = ?",
 		"monthly", now.Year(), int(now.Month())).First(&goal).Error; err == nil {
 		data.monthlyGoal = goal.Amount
 		data.goalProgress = (data.currentRevenue / data.monthlyGoal) * 100

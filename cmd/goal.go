@@ -22,6 +22,19 @@ Commands:
   ls        List all goals
   status    Show progress toward goals
   rm        Remove a goal`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Run parent's PersistentPreRunE if exists
+		if parent := cmd.Parent(); parent != nil && parent.PersistentPreRunE != nil {
+			if err := parent.PersistentPreRunE(parent, args); err != nil {
+				return err
+			}
+		}
+		// Migrate the schema
+		if db.GormDB != nil {
+			db.GormDB.AutoMigrate(&IncomeGoal{})
+		}
+		return nil
+	},
 }
 
 var goalSetCmd = &cobra.Command{
@@ -84,12 +97,6 @@ type IncomeGoal struct {
 	UpdatedAt   time.Time
 }
 
-func init() {
-	// Migrate the schema
-	db.OnConnect(func() {
-		db.DB.AutoMigrate(&IncomeGoal{})
-	})
-}
 
 func runGoalSet(cmd *cobra.Command, args []string) error {
 	var amount float64
@@ -120,7 +127,7 @@ func runGoalSet(cmd *cobra.Command, args []string) error {
 
 	// Check for existing goal
 	var existing IncomeGoal
-	query := db.DB.Where("period = ? AND year = ?", goalPeriod, year)
+	query := db.GormDB.Where("period = ? AND year = ?", goalPeriod, year)
 	if goalPeriod == "monthly" {
 		query = query.Where("month = ?", month)
 	} else if goalPeriod == "quarterly" {
@@ -131,7 +138,7 @@ func runGoalSet(cmd *cobra.Command, args []string) error {
 		// Update existing
 		existing.Amount = amount
 		existing.Description = goalDescription
-		if err := db.DB.Save(&existing).Error; err != nil {
+		if err := db.GormDB.Save(&existing).Error; err != nil {
 			return fmt.Errorf("failed to update goal: %w", err)
 		}
 		fmt.Printf("Updated %s goal for %s: $%.2f\n", goalPeriod, formatGoalPeriod(year, month, quarter, goalPeriod), amount)
@@ -146,7 +153,7 @@ func runGoalSet(cmd *cobra.Command, args []string) error {
 			Description: goalDescription,
 		}
 
-		if err := db.DB.Create(&goal).Error; err != nil {
+		if err := db.GormDB.Create(&goal).Error; err != nil {
 			return fmt.Errorf("failed to create goal: %w", err)
 		}
 		fmt.Printf("Created %s goal for %s: $%.2f\n", goalPeriod, formatGoalPeriod(year, month, quarter, goalPeriod), amount)
@@ -157,7 +164,7 @@ func runGoalSet(cmd *cobra.Command, args []string) error {
 
 func runGoalList(cmd *cobra.Command, args []string) error {
 	var goals []IncomeGoal
-	if err := db.DB.Order("year DESC, period, month DESC, quarter DESC").Find(&goals).Error; err != nil {
+	if err := db.GormDB.Order("year DESC, period, month DESC, quarter DESC").Find(&goals).Error; err != nil {
 		return fmt.Errorf("failed to list goals: %w", err)
 	}
 
@@ -185,7 +192,7 @@ func runGoalList(cmd *cobra.Command, args []string) error {
 
 func runGoalStatus(cmd *cobra.Command, args []string) error {
 	var goals []IncomeGoal
-	query := db.DB.Order("year DESC, period, month DESC, quarter DESC")
+	query := db.GormDB.Order("year DESC, period, month DESC, quarter DESC")
 	if goalPeriod != "" {
 		query = query.Where("period = ?", goalPeriod)
 	}
@@ -251,7 +258,7 @@ func runGoalRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid ID: %s", args[0])
 	}
 
-	result := db.DB.Delete(&IncomeGoal{}, id)
+	result := db.GormDB.Delete(&IncomeGoal{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete goal: %w", result.Error)
 	}
@@ -303,7 +310,7 @@ func getGoalDateRange(g IncomeGoal) (time.Time, time.Time) {
 func getIncomeForPeriod(start, end time.Time) float64 {
 	// Sum of paid invoices in the period
 	var total sql.NullFloat64
-	db.DB.Raw(`
+	db.GormDB.Raw(`
 		SELECT COALESCE(SUM(amount), 0)
 		FROM invoices
 		WHERE status = ?

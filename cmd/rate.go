@@ -142,7 +142,7 @@ func runRateAnalyze(cmd *cobra.Command, args []string) error {
 
 	// Get all tracking sessions with clients
 	var sessions []models.TrackingSession
-	db.DB.Where("billable = ? AND deleted_at IS NULL", true).
+	db.GormDB.Where("billable = ? AND deleted_at IS NULL", true).
 		Preload("Client").
 		Preload("Contract").
 		Find(&sessions)
@@ -185,7 +185,7 @@ func runRateAnalyze(cmd *cobra.Command, args []string) error {
 	// Get paid invoices for the last year
 	yearAgo := time.Now().AddDate(-1, 0, 0)
 	var invoices []models.Invoice
-	db.DB.Where("status = ? AND updated_at >= ?", models.StatusPaid, yearAgo).Find(&invoices)
+	db.GormDB.Where("status = ? AND updated_at >= ?", models.StatusPaid, yearAgo).Find(&invoices)
 
 	var invoiceRevenue float64
 	for _, inv := range invoices {
@@ -254,7 +254,7 @@ func runRateCompare(cmd *cobra.Command, args []string) error {
 
 	// Get contracts and their rates
 	var contracts []models.Contract
-	db.DB.Where("status = ?", models.ContractStatusActive).
+	db.GormDB.Where("active = ?", true).
 		Preload("Client").Find(&contracts)
 
 	if len(contracts) == 0 {
@@ -282,7 +282,7 @@ func runRateCompare(cmd *cobra.Command, args []string) error {
 		}
 
 		clientName := "Unknown"
-		if c.Client != nil {
+		if c.Client.Name != "" {
 			clientName = c.Client.Name
 		}
 
@@ -319,7 +319,7 @@ func runRateCompare(cmd *cobra.Command, args []string) error {
 	// Compare with actual earned
 	var sessions []models.TrackingSession
 	thirtyDays := time.Now().AddDate(0, 0, -30)
-	db.DB.Where("billable = ? AND start_time >= ? AND deleted_at IS NULL", true, thirtyDays).
+	db.GormDB.Where("billable = ? AND start_time >= ? AND deleted_at IS NULL", true, thirtyDays).
 		Find(&sessions)
 
 	var actualHours float64
@@ -331,7 +331,7 @@ func runRateCompare(cmd *cobra.Command, args []string) error {
 
 	var paidAmount float64
 	var paidInvoices []models.Invoice
-	db.DB.Where("status = ? AND updated_at >= ?", models.StatusPaid, thirtyDays).Find(&paidInvoices)
+	db.GormDB.Where("status = ? AND updated_at >= ?", models.StatusPaid, thirtyDays).Find(&paidInvoices)
 	for _, inv := range paidInvoices {
 		paidAmount += inv.Amount
 	}

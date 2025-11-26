@@ -1,7 +1,7 @@
 ---
 id: intro
 title: Introduction
-slug: /
+sidebar_position: 1
 ---
 
 # UNG - Universal Next-Gen Billing & Tracking

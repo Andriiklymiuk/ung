@@ -234,35 +234,37 @@ func exportInvoicesCSV(filename string) (string, error) {
 		"Issue Date", "Due Date", "Description",
 	})
 
-	// Query and write data
-	query := `
-		SELECT i.invoice_num, c.name, i.amount, i.currency, i.status,
-		       i.issued_date, i.due_date, i.description
-		FROM invoices i
-		LEFT JOIN invoice_recipients ir ON i.id = ir.invoice_id
-		LEFT JOIN clients c ON ir.client_id = c.id
-	`
-	args := []interface{}{}
+	// Get invoices
+	var invoices []models.Invoice
+	query := db.GormDB.Order("issued_date DESC")
 	if exportYear > 0 {
-		query += " WHERE strftime('%Y', i.issued_date) = ?"
-		args = append(args, fmt.Sprintf("%d", exportYear))
+		startOfYear := time.Date(exportYear, 1, 1, 0, 0, 0, 0, time.UTC)
+		endOfYear := time.Date(exportYear+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		query = query.Where("issued_date >= ? AND issued_date < ?", startOfYear, endOfYear)
 	}
-	query += " ORDER BY i.issued_date DESC"
+	query.Find(&invoices)
 
-	rows, _ := db.DB.Query(query, args...)
-	defer rows.Close()
+	// Get clients for mapping
+	var recipients []models.InvoiceRecipient
+	db.GormDB.Find(&recipients)
+	var clients []models.Client
+	db.GormDB.Find(&clients)
+
+	clientMap := make(map[uint]string)
+	for _, c := range clients {
+		clientMap[c.ID] = c.Name
+	}
+	invoiceClient := make(map[uint]string)
+	for _, r := range recipients {
+		invoiceClient[r.InvoiceID] = clientMap[r.ClientID]
+	}
 
 	count := 0
-	for rows.Next() {
-		var num, client, currency, status, desc string
-		var amount float64
-		var issued, due time.Time
-
-		rows.Scan(&num, &client, &amount, &currency, &status, &issued, &due, &desc)
-
+	for _, inv := range invoices {
+		clientName := invoiceClient[inv.ID]
 		writer.Write([]string{
-			num, client, fmt.Sprintf("%.2f", amount), currency, status,
-			issued.Format("2006-01-02"), due.Format("2006-01-02"), desc,
+			inv.InvoiceNum, clientName, fmt.Sprintf("%.2f", inv.Amount), inv.Currency, string(inv.Status),
+			inv.IssuedDate.Format("2006-01-02"), inv.DueDate.Format("2006-01-02"), inv.Description,
 		})
 		count++
 	}
@@ -283,36 +285,41 @@ func exportInvoicesIIF(filename string) (string, error) {
 	fmt.Fprintln(file, "!SPL\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO")
 	fmt.Fprintln(file, "!ENDTRNS")
 
-	query := `
-		SELECT i.invoice_num, c.name, i.amount, i.issued_date, i.description
-		FROM invoices i
-		LEFT JOIN invoice_recipients ir ON i.id = ir.invoice_id
-		LEFT JOIN clients c ON ir.client_id = c.id
-		WHERE i.status = 'paid'
-	`
-	args := []interface{}{}
+	// Get paid invoices
+	var invoices []models.Invoice
+	query := db.GormDB.Where("status = ?", models.StatusPaid)
 	if exportYear > 0 {
-		query += " AND strftime('%Y', i.issued_date) = ?"
-		args = append(args, fmt.Sprintf("%d", exportYear))
+		startOfYear := time.Date(exportYear, 1, 1, 0, 0, 0, 0, time.UTC)
+		endOfYear := time.Date(exportYear+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		query = query.Where("issued_date >= ? AND issued_date < ?", startOfYear, endOfYear)
+	}
+	query.Find(&invoices)
+
+	// Get clients for mapping
+	var recipients []models.InvoiceRecipient
+	db.GormDB.Find(&recipients)
+	var clients []models.Client
+	db.GormDB.Find(&clients)
+
+	clientMap := make(map[uint]string)
+	for _, c := range clients {
+		clientMap[c.ID] = c.Name
+	}
+	invoiceClient := make(map[uint]string)
+	for _, r := range recipients {
+		invoiceClient[r.InvoiceID] = clientMap[r.ClientID]
 	}
 
-	rows, _ := db.DB.Query(query, args...)
-	defer rows.Close()
-
 	count := 0
-	for rows.Next() {
-		var num, client, desc string
-		var amount float64
-		var issued time.Time
-
-		rows.Scan(&num, &client, &amount, &issued, &desc)
+	for _, inv := range invoices {
+		clientName := invoiceClient[inv.ID]
 
 		// TRNS line (main transaction)
 		fmt.Fprintf(file, "TRNS\tINVOICE\t%s\tAccounts Receivable\t%s\t%.2f\t%s\t%s\n",
-			issued.Format("01/02/2006"), client, amount, num, desc)
+			inv.IssuedDate.Format("01/02/2006"), clientName, inv.Amount, inv.InvoiceNum, inv.Description)
 		// SPL line (split)
 		fmt.Fprintf(file, "SPL\tINVOICE\t%s\tSales\t-%.2f\t%s\n",
-			issued.Format("01/02/2006"), amount, desc)
+			inv.IssuedDate.Format("01/02/2006"), inv.Amount, inv.Description)
 		fmt.Fprintln(file, "ENDTRNS")
 		count++
 	}
@@ -322,24 +329,33 @@ func exportInvoicesIIF(filename string) (string, error) {
 }
 
 func exportInvoicesJSON(filename string) (string, error) {
-	query := `
-		SELECT i.id, i.invoice_num, c.name, i.amount, i.currency, i.status,
-		       i.issued_date, i.due_date, i.description
-		FROM invoices i
-		LEFT JOIN invoice_recipients ir ON i.id = ir.invoice_id
-		LEFT JOIN clients c ON ir.client_id = c.id
-	`
-	args := []interface{}{}
+	// Get invoices
+	var invoices []models.Invoice
+	query := db.GormDB.Order("issued_date DESC")
 	if exportYear > 0 {
-		query += " WHERE strftime('%Y', i.issued_date) = ?"
-		args = append(args, fmt.Sprintf("%d", exportYear))
+		startOfYear := time.Date(exportYear, 1, 1, 0, 0, 0, 0, time.UTC)
+		endOfYear := time.Date(exportYear+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		query = query.Where("issued_date >= ? AND issued_date < ?", startOfYear, endOfYear)
+	}
+	query.Find(&invoices)
+
+	// Get clients for mapping
+	var recipients []models.InvoiceRecipient
+	db.GormDB.Find(&recipients)
+	var clients []models.Client
+	db.GormDB.Find(&clients)
+
+	clientMap := make(map[uint]string)
+	for _, c := range clients {
+		clientMap[c.ID] = c.Name
+	}
+	invoiceClient := make(map[uint]string)
+	for _, r := range recipients {
+		invoiceClient[r.InvoiceID] = clientMap[r.ClientID]
 	}
 
-	rows, _ := db.DB.Query(query, args...)
-	defer rows.Close()
-
 	type jsonInvoice struct {
-		ID          int       `json:"id"`
+		ID          uint      `json:"id"`
 		InvoiceNum  string    `json:"invoice_number"`
 		Client      string    `json:"client"`
 		Amount      float64   `json:"amount"`
@@ -351,11 +367,18 @@ func exportInvoicesJSON(filename string) (string, error) {
 	}
 
 	var data []jsonInvoice
-	for rows.Next() {
-		var inv jsonInvoice
-		rows.Scan(&inv.ID, &inv.InvoiceNum, &inv.Client, &inv.Amount,
-			&inv.Currency, &inv.Status, &inv.IssuedDate, &inv.DueDate, &inv.Description)
-		data = append(data, inv)
+	for _, inv := range invoices {
+		data = append(data, jsonInvoice{
+			ID:          inv.ID,
+			InvoiceNum:  inv.InvoiceNum,
+			Client:      invoiceClient[inv.ID],
+			Amount:      inv.Amount,
+			Currency:    inv.Currency,
+			Status:      string(inv.Status),
+			IssuedDate:  inv.IssuedDate,
+			DueDate:     inv.DueDate,
+			Description: inv.Description,
+		})
 	}
 
 	file, err := os.Create(filename)
@@ -380,27 +403,29 @@ func exportInvoicesJSON(filename string) (string, error) {
 func exportExpensesData(format, timestamp string) (string, error) {
 	filename := filepath.Join(exportOutput, fmt.Sprintf("expenses_%s.%s", timestamp, format))
 
-	query := `SELECT id, description, amount, currency, category, date, vendor, notes FROM expenses`
-	args := []interface{}{}
+	// Get expenses
+	var expenses []models.Expense
+	query := db.GormDB.Order("date DESC")
 	if exportYear > 0 {
-		query += " WHERE strftime('%Y', date) = ?"
-		args = append(args, fmt.Sprintf("%d", exportYear))
+		startOfYear := time.Date(exportYear, 1, 1, 0, 0, 0, 0, time.UTC)
+		endOfYear := time.Date(exportYear+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		query = query.Where("date >= ? AND date < ?", startOfYear, endOfYear)
 	}
-	query += " ORDER BY date DESC"
+	query.Find(&expenses)
 
 	switch format {
 	case "csv":
-		return exportExpensesCSV(filename, query, args)
+		return exportExpensesCSV(filename, expenses)
 	case "json":
-		return exportExpensesJSON(filename, query, args)
+		return exportExpensesJSON(filename, expenses)
 	default:
 		// For QuickBooks, use CSV as fallback
 		filename = filepath.Join(exportOutput, fmt.Sprintf("expenses_%s.csv", timestamp))
-		return exportExpensesCSV(filename, query, args)
+		return exportExpensesCSV(filename, expenses)
 	}
 }
 
-func exportExpensesCSV(filename, query string, args []interface{}) (string, error) {
+func exportExpensesCSV(filename string, expenses []models.Expense) (string, error) {
 	file, err := os.Create(filename)
 	if err != nil {
 		return "", err
@@ -412,21 +437,11 @@ func exportExpensesCSV(filename, query string, args []interface{}) (string, erro
 
 	writer.Write([]string{"Date", "Description", "Category", "Amount", "Currency", "Vendor", "Notes"})
 
-	rows, _ := db.DB.Query(query, args...)
-	defer rows.Close()
-
 	count := 0
-	for rows.Next() {
-		var id int
-		var desc, currency, category, vendor, notes string
-		var amount float64
-		var date time.Time
-
-		rows.Scan(&id, &desc, &amount, &currency, &category, &date, &vendor, &notes)
-
+	for _, exp := range expenses {
 		writer.Write([]string{
-			date.Format("2006-01-02"), desc, category,
-			fmt.Sprintf("%.2f", amount), currency, vendor, notes,
+			exp.Date.Format("2006-01-02"), exp.Description, string(exp.Category),
+			fmt.Sprintf("%.2f", exp.Amount), exp.Currency, exp.Vendor, exp.Notes,
 		})
 		count++
 	}
@@ -435,12 +450,9 @@ func exportExpensesCSV(filename, query string, args []interface{}) (string, erro
 	return filename, nil
 }
 
-func exportExpensesJSON(filename, query string, args []interface{}) (string, error) {
-	rows, _ := db.DB.Query(query, args...)
-	defer rows.Close()
-
+func exportExpensesJSON(filename string, expenses []models.Expense) (string, error) {
 	type jsonExpense struct {
-		ID          int       `json:"id"`
+		ID          uint      `json:"id"`
 		Description string    `json:"description"`
 		Amount      float64   `json:"amount"`
 		Currency    string    `json:"currency"`
@@ -451,11 +463,17 @@ func exportExpensesJSON(filename, query string, args []interface{}) (string, err
 	}
 
 	var data []jsonExpense
-	for rows.Next() {
-		var exp jsonExpense
-		rows.Scan(&exp.ID, &exp.Description, &exp.Amount, &exp.Currency,
-			&exp.Category, &exp.Date, &exp.Vendor, &exp.Notes)
-		data = append(data, exp)
+	for _, exp := range expenses {
+		data = append(data, jsonExpense{
+			ID:          exp.ID,
+			Description: exp.Description,
+			Amount:      exp.Amount,
+			Currency:    exp.Currency,
+			Category:    string(exp.Category),
+			Date:        exp.Date,
+			Vendor:      exp.Vendor,
+			Notes:       exp.Notes,
+		})
 	}
 
 	file, err := os.Create(filename)
@@ -480,32 +498,28 @@ func exportExpensesJSON(filename, query string, args []interface{}) (string, err
 func exportTimeData(format, timestamp string) (string, error) {
 	filename := filepath.Join(exportOutput, fmt.Sprintf("time_tracking_%s.%s", timestamp, format))
 
-	query := `
-		SELECT t.id, c.name as client, t.project_name, t.start_time, t.end_time,
-		       t.hours, t.billable, t.notes
-		FROM tracking_sessions t
-		LEFT JOIN clients c ON t.client_id = c.id
-		WHERE t.deleted_at IS NULL
-	`
-	args := []interface{}{}
+	// Get tracking sessions with client preloaded
+	var sessions []models.TrackingSession
+	query := db.GormDB.Where("deleted_at IS NULL").Preload("Client").Order("start_time DESC")
 	if exportYear > 0 {
-		query += " AND strftime('%Y', t.start_time) = ?"
-		args = append(args, fmt.Sprintf("%d", exportYear))
+		startOfYear := time.Date(exportYear, 1, 1, 0, 0, 0, 0, time.UTC)
+		endOfYear := time.Date(exportYear+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		query = query.Where("start_time >= ? AND start_time < ?", startOfYear, endOfYear)
 	}
-	query += " ORDER BY t.start_time DESC"
+	query.Find(&sessions)
 
 	switch format {
 	case "csv":
-		return exportTimeCSV(filename, query, args)
+		return exportTimeCSV(filename, sessions)
 	case "json":
-		return exportTimeJSON(filename, query, args)
+		return exportTimeJSON(filename, sessions)
 	default:
 		filename = filepath.Join(exportOutput, fmt.Sprintf("time_tracking_%s.csv", timestamp))
-		return exportTimeCSV(filename, query, args)
+		return exportTimeCSV(filename, sessions)
 	}
 }
 
-func exportTimeCSV(filename, query string, args []interface{}) (string, error) {
+func exportTimeCSV(filename string, sessions []models.TrackingSession) (string, error) {
 	file, err := os.Create(filename)
 	if err != nil {
 		return "", err
@@ -517,35 +531,28 @@ func exportTimeCSV(filename, query string, args []interface{}) (string, error) {
 
 	writer.Write([]string{"Date", "Client", "Project", "Hours", "Billable", "Notes"})
 
-	rows, _ := db.DB.Query(query, args...)
-	defer rows.Close()
-
 	count := 0
 	totalHours := 0.0
-	for rows.Next() {
-		var id int
-		var client, project, notes string
-		var startTime time.Time
-		var endTime *time.Time
-		var hours *float64
-		var billable bool
-
-		rows.Scan(&id, &client, &project, &startTime, &endTime, &hours, &billable, &notes)
+	for _, s := range sessions {
+		clientName := ""
+		if s.Client != nil {
+			clientName = s.Client.Name
+		}
 
 		h := 0.0
-		if hours != nil {
-			h = *hours
+		if s.Hours != nil {
+			h = *s.Hours
 			totalHours += h
 		}
 
 		billableStr := "No"
-		if billable {
+		if s.Billable {
 			billableStr = "Yes"
 		}
 
 		writer.Write([]string{
-			startTime.Format("2006-01-02"), client, project,
-			fmt.Sprintf("%.2f", h), billableStr, notes,
+			s.StartTime.Format("2006-01-02"), clientName, s.ProjectName,
+			fmt.Sprintf("%.2f", h), billableStr, s.Notes,
 		})
 		count++
 	}
@@ -554,12 +561,9 @@ func exportTimeCSV(filename, query string, args []interface{}) (string, error) {
 	return filename, nil
 }
 
-func exportTimeJSON(filename, query string, args []interface{}) (string, error) {
-	rows, _ := db.DB.Query(query, args...)
-	defer rows.Close()
-
+func exportTimeJSON(filename string, sessions []models.TrackingSession) (string, error) {
 	type jsonTime struct {
-		ID        int        `json:"id"`
+		ID        uint       `json:"id"`
 		Client    string     `json:"client"`
 		Project   string     `json:"project"`
 		StartTime time.Time  `json:"start_time"`
@@ -571,15 +575,28 @@ func exportTimeJSON(filename, query string, args []interface{}) (string, error) 
 
 	var data []jsonTime
 	totalHours := 0.0
-	for rows.Next() {
-		var t jsonTime
-		var hours *float64
-		rows.Scan(&t.ID, &t.Client, &t.Project, &t.StartTime, &t.EndTime, &hours, &t.Billable, &t.Notes)
-		if hours != nil {
-			t.Hours = *hours
-			totalHours += t.Hours
+	for _, s := range sessions {
+		clientName := ""
+		if s.Client != nil {
+			clientName = s.Client.Name
 		}
-		data = append(data, t)
+
+		hours := 0.0
+		if s.Hours != nil {
+			hours = *s.Hours
+			totalHours += hours
+		}
+
+		data = append(data, jsonTime{
+			ID:        s.ID,
+			Client:    clientName,
+			Project:   s.ProjectName,
+			StartTime: s.StartTime,
+			EndTime:   s.EndTime,
+			Hours:     hours,
+			Billable:  s.Billable,
+			Notes:     s.Notes,
+		})
 	}
 
 	file, err := os.Create(filename)
@@ -601,6 +618,3 @@ func exportTimeJSON(filename, query string, args []interface{}) (string, error) 
 	fmt.Printf("  ✓ Exported %d time entries (JSON)\n", len(data))
 	return filename, nil
 }
-
-// Silence unused variable warning
-var _ = models.StatusPaid

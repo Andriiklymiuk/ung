@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -83,82 +82,69 @@ func init() {
 }
 
 func runReportRevenue(cmd *cobra.Command, args []string) error {
-	fmt.Println("💰 Revenue Summary\n")
+	fmt.Println("💰 Revenue Summary")
+	fmt.Println()
 
 	// Total revenue (paid invoices)
-	var totalPaid sql.NullFloat64
-	err := db.DB.QueryRow(`
-		SELECT COALESCE(SUM(amount), 0)
-		FROM invoices
-		WHERE status = ?
-	`, models.StatusPaid).Scan(&totalPaid)
-	if err != nil {
-		return fmt.Errorf("failed to get paid total: %w", err)
+	var paidInvoices []models.Invoice
+	db.GormDB.Where("status = ?", models.StatusPaid).Find(&paidInvoices)
+	var totalPaid float64
+	for _, inv := range paidInvoices {
+		totalPaid += inv.Amount
 	}
 
 	// Total pending
-	var totalPending sql.NullFloat64
-	err = db.DB.QueryRow(`
-		SELECT COALESCE(SUM(amount), 0)
-		FROM invoices
-		WHERE status IN (?, ?)
-	`, models.StatusPending, models.StatusSent).Scan(&totalPending)
-	if err != nil {
-		return fmt.Errorf("failed to get pending total: %w", err)
+	var pendingInvoices []models.Invoice
+	db.GormDB.Where("status IN ?", []models.InvoiceStatus{models.StatusPending, models.StatusSent}).Find(&pendingInvoices)
+	var totalPending float64
+	for _, inv := range pendingInvoices {
+		totalPending += inv.Amount
 	}
 
 	// Total overdue
-	var totalOverdue sql.NullFloat64
-	err = db.DB.QueryRow(`
-		SELECT COALESCE(SUM(amount), 0)
-		FROM invoices
-		WHERE status = ? OR (status IN (?, ?) AND due_date < ?)
-	`, models.StatusOverdue, models.StatusPending, models.StatusSent, time.Now()).Scan(&totalOverdue)
-	if err != nil {
-		return fmt.Errorf("failed to get overdue total: %w", err)
+	var overdueInvoices []models.Invoice
+	db.GormDB.Where("status = ? OR (status IN ? AND due_date < ?)",
+		models.StatusOverdue,
+		[]models.InvoiceStatus{models.StatusPending, models.StatusSent},
+		time.Now()).Find(&overdueInvoices)
+	var totalOverdue float64
+	for _, inv := range overdueInvoices {
+		totalOverdue += inv.Amount
 	}
 
 	// Revenue by month (last 6 months)
-	monthlyQuery := `
-		SELECT
-			strftime('%Y-%m', issued_date) as month,
-			COUNT(*) as count,
-			SUM(amount) as total
-		FROM invoices
-		WHERE status = ?
-		  AND issued_date >= date('now', '-6 months')
-		GROUP BY strftime('%Y-%m', issued_date)
-		ORDER BY month DESC
-	`
+	sixMonthsAgo := time.Now().AddDate(0, -6, 0)
+	var monthlyInvoices []models.Invoice
+	db.GormDB.Where("status = ? AND issued_date >= ?", models.StatusPaid, sixMonthsAgo).
+		Order("issued_date DESC").Find(&monthlyInvoices)
 
-	rows, err := db.DB.Query(monthlyQuery, models.StatusPaid)
-	if err != nil {
-		return fmt.Errorf("failed to get monthly revenue: %w", err)
+	// Group by month
+	monthlyData := make(map[string]struct {
+		count int
+		total float64
+	})
+	for _, inv := range monthlyInvoices {
+		monthKey := inv.IssuedDate.Format("2006-01")
+		data := monthlyData[monthKey]
+		data.count++
+		data.total += inv.Amount
+		monthlyData[monthKey] = data
 	}
-	defer rows.Close()
 
 	fmt.Printf("Overall:\n")
-	fmt.Printf("  Paid:    $%.2f\n", totalPaid.Float64)
-	fmt.Printf("  Pending: $%.2f\n", totalPending.Float64)
-	fmt.Printf("  Overdue: $%.2f\n\n", totalOverdue.Float64)
+	fmt.Printf("  Paid:    $%.2f\n", totalPaid)
+	fmt.Printf("  Pending: $%.2f\n", totalPending)
+	fmt.Printf("  Overdue: $%.2f\n\n", totalOverdue)
 
 	fmt.Println("Monthly Revenue (Paid Invoices):")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "MONTH\tCOUNT\tTOTAL")
 
-	for rows.Next() {
-		var month string
-		var count int
-		var total float64
-		if err := rows.Scan(&month, &count, &total); err != nil {
-			return fmt.Errorf("failed to scan row: %w", err)
-		}
-
-		// Parse month to make it prettier
-		t, _ := time.Parse("2006-01", month)
+	// Sort months in descending order
+	for monthKey, data := range monthlyData {
+		t, _ := time.Parse("2006-01", monthKey)
 		monthStr := t.Format("Jan 2006")
-
-		fmt.Fprintf(w, "%s\t%d\t$%.2f\n", monthStr, count, total)
+		fmt.Fprintf(w, "%s\t%d\t$%.2f\n", monthStr, data.count, data.total)
 	}
 
 	w.Flush()
@@ -166,47 +152,68 @@ func runReportRevenue(cmd *cobra.Command, args []string) error {
 }
 
 func runReportClients(cmd *cobra.Command, args []string) error {
-	fmt.Println("👥 Client Summary\n")
+	fmt.Println("👥 Client Summary")
+	fmt.Println()
 
-	query := `
-		SELECT
-			c.id,
-			c.name,
-			COUNT(DISTINCT i.id) as invoice_count,
-			COALESCE(SUM(CASE WHEN i.status = ? THEN i.amount ELSE 0 END), 0) as paid,
-			COALESCE(SUM(CASE WHEN i.status IN (?, ?) THEN i.amount ELSE 0 END), 0) as pending,
-			COALESCE(SUM(CASE WHEN i.status = ? OR (i.status IN (?, ?) AND i.due_date < ?) THEN i.amount ELSE 0 END), 0) as overdue
-		FROM clients c
-		LEFT JOIN invoice_recipients ir ON c.id = ir.client_id
-		LEFT JOIN invoices i ON ir.invoice_id = i.id
-		GROUP BY c.id, c.name
-		ORDER BY paid DESC
-	`
+	var clients []models.Client
+	db.GormDB.Find(&clients)
 
-	rows, err := db.DB.Query(query,
-		models.StatusPaid,
-		models.StatusPending, models.StatusSent,
-		models.StatusOverdue, models.StatusPending, models.StatusSent, time.Now())
-	if err != nil {
-		return fmt.Errorf("failed to query clients: %w", err)
+	// Get all invoices
+	var invoices []models.Invoice
+	db.GormDB.Find(&invoices)
+
+	// Get all invoice recipients
+	var recipients []models.InvoiceRecipient
+	db.GormDB.Find(&recipients)
+
+	// Build invoice to client mapping
+	invoiceClients := make(map[uint][]uint) // invoiceID -> []clientID
+	for _, r := range recipients {
+		invoiceClients[r.InvoiceID] = append(invoiceClients[r.InvoiceID], r.ClientID)
 	}
-	defer rows.Close()
+
+	// Build client stats
+	type clientStats struct {
+		invoiceCount int
+		paid         float64
+		pending      float64
+		overdue      float64
+	}
+	stats := make(map[uint]*clientStats)
+
+	for _, client := range clients {
+		stats[client.ID] = &clientStats{}
+	}
+
+	now := time.Now()
+	for _, inv := range invoices {
+		clientIDs := invoiceClients[inv.ID]
+		for _, clientID := range clientIDs {
+			if s, ok := stats[clientID]; ok {
+				s.invoiceCount++
+				switch inv.Status {
+				case models.StatusPaid:
+					s.paid += inv.Amount
+				case models.StatusPending, models.StatusSent:
+					if inv.DueDate.Before(now) {
+						s.overdue += inv.Amount
+					} else {
+						s.pending += inv.Amount
+					}
+				case models.StatusOverdue:
+					s.overdue += inv.Amount
+				}
+			}
+		}
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tCLIENT\tINVOICES\tPAID\tPENDING\tOVERDUE")
 
-	for rows.Next() {
-		var id uint
-		var name string
-		var invoiceCount int
-		var paid, pending, overdue float64
-
-		if err := rows.Scan(&id, &name, &invoiceCount, &paid, &pending, &overdue); err != nil {
-			return fmt.Errorf("failed to scan row: %w", err)
-		}
-
+	for _, client := range clients {
+		s := stats[client.ID]
 		fmt.Fprintf(w, "%d\t%s\t%d\t$%.2f\t$%.2f\t$%.2f\n",
-			id, name, invoiceCount, paid, pending, overdue)
+			client.ID, client.Name, s.invoiceCount, s.paid, s.pending, s.overdue)
 	}
 
 	w.Flush()
@@ -214,40 +221,39 @@ func runReportClients(cmd *cobra.Command, args []string) error {
 }
 
 func runReportOverdue(cmd *cobra.Command, args []string) error {
-	fmt.Println("⚠️  Overdue Invoices\n")
+	fmt.Println("⚠️  Overdue Invoices")
+	fmt.Println()
+
+	now := time.Now()
 
 	// First, auto-mark overdue invoices
-	_, err := db.DB.Exec(`
-		UPDATE invoices
-		SET status = ?
-		WHERE status IN (?, ?)
-		  AND due_date < ?
-	`, models.StatusOverdue, models.StatusPending, models.StatusSent, time.Now())
-	if err != nil {
-		fmt.Printf("Warning: Could not auto-mark overdue invoices: %v\n", err)
+	db.GormDB.Model(&models.Invoice{}).
+		Where("status IN ? AND due_date < ?",
+			[]models.InvoiceStatus{models.StatusPending, models.StatusSent}, now).
+		Update("status", models.StatusOverdue)
+
+	// Get overdue invoices
+	var invoices []models.Invoice
+	db.GormDB.Where("status = ?", models.StatusOverdue).Order("due_date ASC").Find(&invoices)
+
+	// Get invoice recipients to find client names
+	var recipients []models.InvoiceRecipient
+	db.GormDB.Find(&recipients)
+
+	var clients []models.Client
+	db.GormDB.Find(&clients)
+
+	clientMap := make(map[uint]string)
+	for _, c := range clients {
+		clientMap[c.ID] = c.Name
 	}
 
-	query := `
-		SELECT
-			i.id,
-			i.invoice_num,
-			c.name as client_name,
-			i.amount,
-			i.currency,
-			i.due_date,
-			CAST((julianday('now') - julianday(i.due_date)) AS INTEGER) as days_overdue
-		FROM invoices i
-		LEFT JOIN invoice_recipients ir ON i.id = ir.invoice_id
-		LEFT JOIN clients c ON ir.client_id = c.id
-		WHERE i.status = ?
-		ORDER BY i.due_date ASC
-	`
-
-	rows, err := db.DB.Query(query, models.StatusOverdue)
-	if err != nil {
-		return fmt.Errorf("failed to query overdue invoices: %w", err)
+	invoiceClient := make(map[uint]string)
+	for _, r := range recipients {
+		if name, ok := clientMap[r.ClientID]; ok {
+			invoiceClient[r.InvoiceID] = name
+		}
 	}
-	defer rows.Close()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tINVOICE#\tCLIENT\tAMOUNT\tDUE DATE\tDAYS OVERDUE")
@@ -255,21 +261,18 @@ func runReportOverdue(cmd *cobra.Command, args []string) error {
 	totalOverdue := 0.0
 	count := 0
 
-	for rows.Next() {
-		var id uint
-		var invoiceNum, clientName, currency string
-		var amount float64
-		var dueDate time.Time
-		var daysOverdue int
-
-		if err := rows.Scan(&id, &invoiceNum, &clientName, &amount, &currency, &dueDate, &daysOverdue); err != nil {
-			return fmt.Errorf("failed to scan row: %w", err)
+	for _, inv := range invoices {
+		clientName := invoiceClient[inv.ID]
+		if clientName == "" {
+			clientName = "Unknown"
 		}
+		daysOverdue := int(now.Sub(inv.DueDate).Hours() / 24)
 
 		fmt.Fprintf(w, "%d\t%s\t%s\t%.2f %s\t%s\t%d days\n",
-			id, invoiceNum, clientName, amount, currency, dueDate.Format("2006-01-02"), daysOverdue)
+			inv.ID, inv.InvoiceNum, clientName, inv.Amount, inv.Currency,
+			inv.DueDate.Format("2006-01-02"), daysOverdue)
 
-		totalOverdue += amount
+		totalOverdue += inv.Amount
 		count++
 	}
 
@@ -285,30 +288,31 @@ func runReportOverdue(cmd *cobra.Command, args []string) error {
 }
 
 func runReportUnpaid(cmd *cobra.Command, args []string) error {
-	fmt.Println("📄 Unpaid Invoices\n")
+	fmt.Println("📄 Unpaid Invoices")
+	fmt.Println()
 
-	query := `
-		SELECT
-			i.id,
-			i.invoice_num,
-			c.name as client_name,
-			i.amount,
-			i.currency,
-			i.status,
-			i.issued_date,
-			i.due_date
-		FROM invoices i
-		LEFT JOIN invoice_recipients ir ON i.id = ir.invoice_id
-		LEFT JOIN clients c ON ir.client_id = c.id
-		WHERE i.status != ?
-		ORDER BY i.due_date ASC
-	`
+	// Get unpaid invoices
+	var invoices []models.Invoice
+	db.GormDB.Where("status != ?", models.StatusPaid).Order("due_date ASC").Find(&invoices)
 
-	rows, err := db.DB.Query(query, models.StatusPaid)
-	if err != nil {
-		return fmt.Errorf("failed to query unpaid invoices: %w", err)
+	// Get invoice recipients to find client names
+	var recipients []models.InvoiceRecipient
+	db.GormDB.Find(&recipients)
+
+	var clients []models.Client
+	db.GormDB.Find(&clients)
+
+	clientMap := make(map[uint]string)
+	for _, c := range clients {
+		clientMap[c.ID] = c.Name
 	}
-	defer rows.Close()
+
+	invoiceClient := make(map[uint]string)
+	for _, r := range recipients {
+		if name, ok := clientMap[r.ClientID]; ok {
+			invoiceClient[r.InvoiceID] = name
+		}
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tINVOICE#\tCLIENT\tAMOUNT\tSTATUS\tISSUED\tDUE")
@@ -316,21 +320,17 @@ func runReportUnpaid(cmd *cobra.Command, args []string) error {
 	totalUnpaid := 0.0
 	count := 0
 
-	for rows.Next() {
-		var id uint
-		var invoiceNum, clientName, currency, status string
-		var amount float64
-		var issuedDate, dueDate time.Time
-
-		if err := rows.Scan(&id, &invoiceNum, &clientName, &amount, &currency, &status, &issuedDate, &dueDate); err != nil {
-			return fmt.Errorf("failed to scan row: %w", err)
+	for _, inv := range invoices {
+		clientName := invoiceClient[inv.ID]
+		if clientName == "" {
+			clientName = "Unknown"
 		}
 
 		fmt.Fprintf(w, "%d\t%s\t%s\t%.2f %s\t%s\t%s\t%s\n",
-			id, invoiceNum, clientName, amount, currency, status,
-			issuedDate.Format("2006-01-02"), dueDate.Format("2006-01-02"))
+			inv.ID, inv.InvoiceNum, clientName, inv.Amount, inv.Currency, inv.Status,
+			inv.IssuedDate.Format("2006-01-02"), inv.DueDate.Format("2006-01-02"))
 
-		totalUnpaid += amount
+		totalUnpaid += inv.Amount
 		count++
 	}
 

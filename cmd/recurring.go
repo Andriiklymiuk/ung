@@ -336,84 +336,22 @@ func runRecurringList(cmd *cobra.Command, args []string) error {
 func runRecurringGenerate(cmd *cobra.Command, args []string) error {
 	now := time.Now()
 
-	// Get due recurring invoices
-	query := `
-		SELECT r.id, r.client_id, c.name, r.amount, r.currency, r.frequency,
-		       r.day_of_month, r.next_generation_date, r.description,
-		       r.auto_pdf, r.auto_send, r.email_app, r.generated_count
-		FROM recurring_invoices r
-		JOIN clients c ON r.client_id = c.id
-		WHERE r.active = 1
-	`
-
+	// Get due recurring invoices with client preloaded
+	var recurringInvoices []models.RecurringInvoice
+	query := db.GormDB.Where("active = ?", true).Preload("Client").Order("next_generation_date ASC")
 	if !recurringGenerateAll {
-		query += " AND r.next_generation_date <= ?"
+		query = query.Where("next_generation_date <= ?", now)
 	}
+	query.Find(&recurringInvoices)
 
-	query += " ORDER BY r.next_generation_date ASC"
-
-	var rows interface{ Close() error }
-	var err error
-
-	if recurringGenerateAll {
-		rows, err = db.DB.Query(query)
-	} else {
-		rows, err = db.DB.Query(query, now)
-	}
-	if err != nil {
-		return fmt.Errorf("failed to query recurring invoices: %w", err)
-	}
-	defer rows.Close()
-
-	type dueInvoice struct {
-		ID             int
-		ClientID       int
-		ClientName     string
-		Amount         float64
-		Currency       string
-		Frequency      string
-		DayOfMonth     int
-		NextDate       time.Time
-		Description    string
-		AutoPDF        bool
-		AutoSend       bool
-		EmailApp       string
-		GeneratedCount int
-	}
-
-	var dueInvoices []dueInvoice
-
-	// Query and scan
-	if recurringGenerateAll {
-		rows2, _ := db.DB.Query(query)
-		defer rows2.Close()
-		for rows2.Next() {
-			var inv dueInvoice
-			rows2.Scan(&inv.ID, &inv.ClientID, &inv.ClientName, &inv.Amount, &inv.Currency,
-				&inv.Frequency, &inv.DayOfMonth, &inv.NextDate, &inv.Description,
-				&inv.AutoPDF, &inv.AutoSend, &inv.EmailApp, &inv.GeneratedCount)
-			dueInvoices = append(dueInvoices, inv)
-		}
-	} else {
-		rows2, _ := db.DB.Query(query, now)
-		defer rows2.Close()
-		for rows2.Next() {
-			var inv dueInvoice
-			rows2.Scan(&inv.ID, &inv.ClientID, &inv.ClientName, &inv.Amount, &inv.Currency,
-				&inv.Frequency, &inv.DayOfMonth, &inv.NextDate, &inv.Description,
-				&inv.AutoPDF, &inv.AutoSend, &inv.EmailApp, &inv.GeneratedCount)
-			dueInvoices = append(dueInvoices, inv)
-		}
-	}
-
-	if len(dueInvoices) == 0 {
+	if len(recurringInvoices) == 0 {
 		fmt.Println("No recurring invoices are due for generation.")
 		return nil
 	}
 
-	fmt.Printf("📋 Found %d recurring invoice(s) to generate:\n\n", len(dueInvoices))
-	for i, inv := range dueInvoices {
-		fmt.Printf("  %d. %s - %.2f %s (%s)\n", i+1, inv.ClientName, inv.Amount, inv.Currency, inv.Frequency)
+	fmt.Printf("📋 Found %d recurring invoice(s) to generate:\n\n", len(recurringInvoices))
+	for i, inv := range recurringInvoices {
+		fmt.Printf("  %d. %s - %.2f %s (%s)\n", i+1, inv.Client.Name, inv.Amount, inv.Currency, inv.Frequency)
 	}
 
 	if recurringGenerateDryRun {
@@ -436,9 +374,9 @@ func runRecurringGenerate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Get company ID
-	var companyID uint
-	if err := db.DB.QueryRow("SELECT id FROM companies LIMIT 1").Scan(&companyID); err != nil {
+	// Get company
+	var company models.Company
+	if err := db.GormDB.First(&company).Error; err != nil {
 		return fmt.Errorf("no company found. Create one first with: ung company add")
 	}
 

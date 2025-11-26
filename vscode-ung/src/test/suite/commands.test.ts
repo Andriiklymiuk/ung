@@ -5,6 +5,14 @@ suite('Command Test Suite', () => {
   vscode.window.showInformationMessage('Start command tests.');
 
   test('All UNG commands should be registered', async () => {
+    // First, activate the extension
+    const extension = vscode.extensions.getExtension('andriiklymiuk.ung');
+    assert.ok(extension, 'Extension should be found');
+
+    if (!extension.isActive) {
+      await extension.activate();
+    }
+
     const commands = await vscode.commands.getCommands(true);
 
     // These commands are always registered (installation/help commands)

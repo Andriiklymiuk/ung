@@ -80,16 +80,16 @@ build-all:
 
 # Release - bump version, create tag, and push to trigger release
 # Usage: make release [v=1.2.3]  (if v is not specified, patch version is bumped)
+# Version is read from cmd/version.go (source of truth), then bumped
 release:
 	@git diff --quiet || (echo "Error: Working directory has uncommitted changes" && exit 1)
-	$(eval LAST_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"))
-	$(eval LAST_VERSION := $(shell echo $(LAST_TAG) | sed 's/^v//'))
-	$(eval MAJOR := $(shell echo $(LAST_VERSION) | cut -d. -f1))
-	$(eval MINOR := $(shell echo $(LAST_VERSION) | cut -d. -f2))
-	$(eval PATCH := $(shell echo $(LAST_VERSION) | cut -d. -f3))
+	$(eval CURRENT_VERSION := $(shell grep 'Version   = ' cmd/version.go | sed 's/.*"\([^"]*\)".*/\1/'))
+	$(eval MAJOR := $(shell echo $(CURRENT_VERSION) | cut -d. -f1))
+	$(eval MINOR := $(shell echo $(CURRENT_VERSION) | cut -d. -f2))
+	$(eval PATCH := $(shell echo $(CURRENT_VERSION) | cut -d. -f3))
 	$(eval NEW_PATCH := $(shell echo $$(($(PATCH) + 1))))
 	$(eval NEW_VERSION := $(or $(v),$(MAJOR).$(MINOR).$(NEW_PATCH)))
-	@echo "Releasing v$(NEW_VERSION)... (previous: $(LAST_TAG))"
+	@echo "Releasing v$(NEW_VERSION)... (current: v$(CURRENT_VERSION))"
 	@sed -i.bak 's/Version   = "[^"]*"/Version   = "$(NEW_VERSION)"/' cmd/version.go && rm -f cmd/version.go.bak
 	@sed -i.bak 's/"version": "[^"]*"/"version": "$(NEW_VERSION)"/' vscode-ung/package.json && rm -f vscode-ung/package.json.bak
 	@git add cmd/version.go vscode-ung/package.json

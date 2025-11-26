@@ -60,8 +60,8 @@ const config = {
             label: 'CLI Reference',
           },
           {
-            href: 'https://github.com/Andriiklymiuk/ung',
-            label: 'GitHub',
+            href: 'https://marketplace.visualstudio.com/items?itemName=andriiklymiuk.ung',
+            label: 'VS Code Extension',
             position: 'right',
           },
         ],
@@ -86,12 +86,8 @@ const config = {
             title: 'More',
             items: [
               {
-                label: 'GitHub',
-                href: 'https://github.com/Andriiklymiuk/ung',
-              },
-              {
-                label: 'Releases',
-                href: 'https://github.com/Andriiklymiuk/ung/releases',
+                label: 'VS Code Extension',
+                href: 'https://marketplace.visualstudio.com/items?itemName=andriiklymiuk.ung',
               },
             ],
           },

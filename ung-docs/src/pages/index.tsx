@@ -68,8 +68,8 @@ function HomepageHeader() {
           </Link>
           <Link
             className="button button--outline button--lg"
-            href="https://github.com/Andriiklymiuk/ung">
-            View on GitHub
+            href="https://marketplace.visualstudio.com/items?itemName=andriiklymiuk.ung">
+            VS Code Extension
           </Link>
         </div>
       </div>

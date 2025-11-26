@@ -394,7 +394,7 @@ func runRecurringGenerate(cmd *cobra.Command, args []string) error {
 
 		// Calculate dates
 		issuedDate := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, now.Location()) // End of month
-		dueDate := issuedDate.AddDate(0, 1, 0)                                             // 1 month from issued
+		dueDate := issuedDate.AddDate(0, 0, 30)                                            // 30 days from issued
 
 		// Create invoice
 		result, err := db.DB.Exec(`

@@ -49,45 +49,119 @@ func (h *DashboardHandler) Handle(message *tgbotapi.Message) error {
 
 	// Build dashboard message
 	var text strings.Builder
-	text.WriteString("📊 *Revenue Dashboard*\n\n")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n")
+	text.WriteString("      📊 *Dashboard*\n")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
-	text.WriteString(fmt.Sprintf("💰 *Total Monthly Revenue:* $%.2f\n\n", projection.TotalMonthlyRevenue))
+	// Main revenue highlight
+	text.WriteString("💰 *Monthly Revenue*\n")
+	text.WriteString(fmt.Sprintf("┌─────────────────────┐\n"))
+	text.WriteString(fmt.Sprintf("│    *$%.2f*    │\n", projection.TotalMonthlyRevenue))
+	text.WriteString(fmt.Sprintf("└─────────────────────┘\n\n"))
 
-	text.WriteString("📈 *Breakdown:*\n")
-	text.WriteString(fmt.Sprintf("  • Hourly: $%.2f\n", projection.HourlyContractsRevenue))
-	text.WriteString(fmt.Sprintf("  • Retainer: $%.2f\n", projection.RetainerRevenue))
-	text.WriteString(fmt.Sprintf("  • Projects: $%.2f\n",
-		projection.TotalMonthlyRevenue-projection.HourlyContractsRevenue-projection.RetainerRevenue))
-	text.WriteString("\n")
+	// Revenue breakdown with visual bars
+	text.WriteString("📈 *Revenue Breakdown*\n\n")
 
-	text.WriteString(fmt.Sprintf("⏱️ *Projected Hours:* %.0f hours\n", math.Ceil(projection.ProjectedHours)))
-	if projection.AverageHourlyRate > 0 {
-		text.WriteString(fmt.Sprintf("💵 *Average Rate:* $%.0f/hr\n", projection.AverageHourlyRate))
+	hourlyPct := 0.0
+	retainerPct := 0.0
+	projectPct := 0.0
+
+	if projection.TotalMonthlyRevenue > 0 {
+		hourlyPct = (projection.HourlyContractsRevenue / projection.TotalMonthlyRevenue) * 100
+		retainerPct = (projection.RetainerRevenue / projection.TotalMonthlyRevenue) * 100
+		projectPct = 100 - hourlyPct - retainerPct
 	}
-	text.WriteString("\n")
 
-	text.WriteString(fmt.Sprintf("📝 *Active Contracts:* %d\n\n", projection.ActiveContracts))
+	projectRevenue := projection.TotalMonthlyRevenue - projection.HourlyContractsRevenue - projection.RetainerRevenue
+
+	text.WriteString(fmt.Sprintf("⏰ *Hourly*: $%.2f\n", projection.HourlyContractsRevenue))
+	text.WriteString(fmt.Sprintf("   %s %.0f%%\n\n", generateProgressBar(hourlyPct), hourlyPct))
+
+	text.WriteString(fmt.Sprintf("🔄 *Retainer*: $%.2f\n", projection.RetainerRevenue))
+	text.WriteString(fmt.Sprintf("   %s %.0f%%\n\n", generateProgressBar(retainerPct), retainerPct))
+
+	text.WriteString(fmt.Sprintf("📁 *Projects*: $%.2f\n", projectRevenue))
+	text.WriteString(fmt.Sprintf("   %s %.0f%%\n", generateProgressBar(projectPct), projectPct))
+
+	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
+	// Quick stats
+	text.WriteString("📋 *Quick Stats*\n\n")
+	text.WriteString(fmt.Sprintf("⏱️ Projected Hours: *%.0f hrs*\n", math.Ceil(projection.ProjectedHours)))
+	if projection.AverageHourlyRate > 0 {
+		text.WriteString(fmt.Sprintf("💵 Avg Rate: *$%.0f/hr*\n", projection.AverageHourlyRate))
+	}
+	text.WriteString(fmt.Sprintf("📝 Active Contracts: *%d*\n", projection.ActiveContracts))
 
 	// Top contracts
 	if len(projection.ContractBreakdown) > 0 {
-		text.WriteString("*Top Contracts:*\n")
+		text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━\n\n")
+		text.WriteString("🏆 *Top Contracts*\n\n")
 		count := 0
 		for _, contract := range projection.ContractBreakdown {
 			if count >= 5 {
-				text.WriteString(fmt.Sprintf("\n_...and %d more_", len(projection.ContractBreakdown)-5))
+				remaining := len(projection.ContractBreakdown) - 5
+				if remaining > 0 {
+					text.WriteString(fmt.Sprintf("\n_+%d more contracts_", remaining))
+				}
 				break
 			}
 			if contract.MonthlyRevenue > 0 {
-				text.WriteString(fmt.Sprintf("• %s (%s): $%.2f/mo\n",
-					contract.ClientName, contract.ContractType, contract.MonthlyRevenue))
+				typeEmoji := "📄"
+				switch contract.ContractType {
+				case "hourly":
+					typeEmoji = "⏰"
+				case "retainer":
+					typeEmoji = "🔄"
+				case "project":
+					typeEmoji = "📁"
+				}
+				text.WriteString(fmt.Sprintf("%s *%s*\n", typeEmoji, contract.ClientName))
+				text.WriteString(fmt.Sprintf("   $%.2f/mo · %s\n\n", contract.MonthlyRevenue, contract.ContractType))
 				count++
 			}
 		}
 	}
 
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n")
+	text.WriteString("_Updated just now_")
+
 	msg := tgbotapi.NewMessage(chatID, text.String())
 	msg.ParseMode = "Markdown"
 
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔄 Refresh", "action_reports"),
+			tgbotapi.NewInlineKeyboardButtonData("📄 Invoices", "action_invoices_list"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⏱️ Track Time", "action_track"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Menu", "main_menu"),
+		),
+	)
+	msg.ReplyMarkup = keyboard
+
 	_, err = h.bot.Send(msg)
 	return err
+}
+
+// generateProgressBar creates a visual progress bar
+func generateProgressBar(percentage float64) string {
+	filled := int(percentage / 10)
+	if filled > 10 {
+		filled = 10
+	}
+	if filled < 0 {
+		filled = 0
+	}
+
+	bar := ""
+	for i := 0; i < 10; i++ {
+		if i < filled {
+			bar += "█"
+		} else {
+			bar += "░"
+		}
+	}
+	return bar
 }

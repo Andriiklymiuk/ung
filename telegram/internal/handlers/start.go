@@ -36,14 +36,22 @@ func (h *StartHandler) Handle(message *tgbotapi.Message) error {
 
 	// New user - send welcome and auth instructions
 	text := fmt.Sprintf(
-		"👋 *Welcome to UNG - Your Next Gig, Simplified!*\n\n"+
-			"I'm your billing assistant. I can help you:\n"+
-			"• 📄 Create and manage invoices\n"+
-			"• 👥 Track clients\n"+
-			"• ⏱️ Log time and generate invoices\n"+
-			"• 📊 View reports\n\n"+
-			"To get started, please authenticate with your UNG account.\n\n"+
-			"Don't have an account? Create one at %s/register",
+		"━━━━━━━━━━━━━━━━━━━━━━\n"+
+			"      🚀 *UNG Bot*\n"+
+			"  _Your Next Gig, Simplified_\n"+
+			"━━━━━━━━━━━━━━━━━━━━━━\n\n"+
+			"Welcome! I'm your personal billing assistant.\n\n"+
+			"✨ *What I can do for you:*\n\n"+
+			"📄 *Invoices* — Create & manage invoices\n"+
+			"👥 *Clients* — Track your client database\n"+
+			"⏱️ *Time* — Log hours & track work\n"+
+			"💰 *Reports* — Revenue dashboards\n"+
+			"📋 *Contracts* — Manage agreements\n"+
+			"💸 *Expenses* — Track your costs\n\n"+
+			"━━━━━━━━━━━━━━━━━━━━━━\n"+
+			"🔐 *Get Started*\n\n"+
+			"Connect your UNG account to begin.\n"+
+			"No account? Sign up free at:\n%s/register",
 		h.webAppURL,
 	)
 
@@ -52,10 +60,10 @@ func (h *StartHandler) Handle(message *tgbotapi.Message) error {
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("Create Account", h.webAppURL+"/register"),
+			tgbotapi.NewInlineKeyboardButtonData("🔐 Connect Account", "auth_login"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("I have an account", "auth_login"),
+			tgbotapi.NewInlineKeyboardButtonURL("📝 Create Free Account", h.webAppURL+"/register"),
 		),
 	)
 	msg.ReplyMarkup = keyboard
@@ -65,20 +73,34 @@ func (h *StartHandler) Handle(message *tgbotapi.Message) error {
 }
 
 func (h *StartHandler) sendMainMenu(chatID int64, name string) error {
-	text := fmt.Sprintf("Welcome back, %s! 👋\n\nWhat would you like to do?", name)
+	text := fmt.Sprintf(
+		"━━━━━━━━━━━━━━━━━━━━━━\n"+
+			"      🏠 *Main Menu*\n"+
+			"━━━━━━━━━━━━━━━━━━━━━━\n\n"+
+			"Hey %s! 👋\n\n"+
+			"What would you like to do today?\n\n"+
+			"💡 _Tip: Use /help for all commands_",
+		name,
+	)
 
 	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "Markdown"
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📄 Create Invoice", "action_invoice"),
-			tgbotapi.NewInlineKeyboardButtonData("👥 Clients", "action_clients"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📄 New Invoice", "action_invoice"),
 			tgbotapi.NewInlineKeyboardButtonData("⏱️ Track Time", "action_track"),
-			tgbotapi.NewInlineKeyboardButtonData("📊 Reports", "action_reports"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👥 Clients", "action_clients"),
+			tgbotapi.NewInlineKeyboardButtonData("📋 Contracts", "action_contracts"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📊 Dashboard", "action_reports"),
+			tgbotapi.NewInlineKeyboardButtonData("💸 Expenses", "action_expenses"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📑 All Invoices", "action_invoices_list"),
 			tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "action_settings"),
 		),
 	)

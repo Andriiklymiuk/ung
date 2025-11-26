@@ -289,29 +289,102 @@ func (h *InvoiceHandler) HandleList(message *tgbotapi.Message) error {
 	}
 
 	if len(invoices) == 0 {
-		msg := tgbotapi.NewMessage(chatID, "You don't have any invoices yet.\n\nCreate one with /invoice")
+		text := "━━━━━━━━━━━━━━━━━━━━━━\n" +
+			"      📄 *Invoices*\n" +
+			"━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+			"📭 No invoices yet!\n\n" +
+			"Create your first invoice to get started."
+
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ParseMode = "Markdown"
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("➕ Create Invoice", "action_invoice"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+
 		h.bot.Send(msg)
 		return nil
 	}
 
-	text := "*Your Invoices:*\n\n"
+	// Calculate totals
+	var totalAmount, paidAmount, pendingAmount float64
+	var paidCount, pendingCount, overdueCount int
+
+	for _, inv := range invoices {
+		totalAmount += inv.Amount
+		switch inv.Status {
+		case "paid":
+			paidAmount += inv.Amount
+			paidCount++
+		case "overdue":
+			overdueCount++
+			pendingAmount += inv.Amount
+		default:
+			pendingCount++
+			pendingAmount += inv.Amount
+		}
+	}
+
+	var text strings.Builder
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n")
+	text.WriteString("      📄 *Invoices*\n")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
+	// Summary stats
+	text.WriteString(fmt.Sprintf("📊 *Summary:* %d invoices\n", len(invoices)))
+	text.WriteString(fmt.Sprintf("   ✅ Paid: %d ($%.2f)\n", paidCount, paidAmount))
+	text.WriteString(fmt.Sprintf("   ⏳ Pending: %d ($%.2f)\n", pendingCount, pendingAmount))
+	if overdueCount > 0 {
+		text.WriteString(fmt.Sprintf("   ⚠️ Overdue: %d\n", overdueCount))
+	}
+	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
 	for i, inv := range invoices {
 		if i >= 10 {
-			text += fmt.Sprintf("\n_...and %d more_", len(invoices)-10)
+			text.WriteString(fmt.Sprintf("\n_...and %d more invoices_", len(invoices)-10))
 			break
 		}
+
 		statusEmoji := "⏳"
+		statusLabel := "pending"
 		switch inv.Status {
 		case "paid":
 			statusEmoji = "✅"
+			statusLabel = "paid"
 		case "overdue":
-			statusEmoji = "⚠️"
+			statusEmoji = "🔴"
+			statusLabel = "OVERDUE"
+		case "sent":
+			statusEmoji = "📤"
+			statusLabel = "sent"
+		case "draft":
+			statusEmoji = "📝"
+			statusLabel = "draft"
 		}
-		text += fmt.Sprintf("%s *%s* - $%.2f - %s\n", statusEmoji, inv.InvoiceNum, inv.Amount, inv.Status)
+
+		text.WriteString(fmt.Sprintf("%s *%s*\n", statusEmoji, inv.InvoiceNum))
+		text.WriteString(fmt.Sprintf("   💵 $%.2f · %s\n\n", inv.Amount, statusLabel))
 	}
 
-	msg := tgbotapi.NewMessage(chatID, text)
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n")
+	text.WriteString("_Use /invoices for PDF buttons_")
+
+	msg := tgbotapi.NewMessage(chatID, text.String())
 	msg.ParseMode = "Markdown"
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("➕ New Invoice", "action_invoice"),
+			tgbotapi.NewInlineKeyboardButtonData("📄 Get PDFs", "action_invoices_list"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Main Menu", "main_menu"),
+		),
+	)
+	msg.ReplyMarkup = keyboard
 
 	_, err = h.bot.Send(msg)
 	return err

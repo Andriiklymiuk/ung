@@ -16,45 +16,61 @@ func NewHelpHandler(bot *tgbotapi.BotAPI) *HelpHandler {
 
 // Handle handles the help command
 func (h *HelpHandler) Handle(message *tgbotapi.Message) error {
-	text := `*UNG Bot - Available Commands*
+	text := `━━━━━━━━━━━━━━━━━━━━━━
+      📚 *Help & Commands*
+━━━━━━━━━━━━━━━━━━━━━━
 
-*Invoices:*
-/invoice - Create new invoice
-/invoices - List invoices with PDF buttons
-/pdf <num> - Generate invoice PDF (e.g., /pdf INV-001)
+*💰 INVOICING*
+├ /invoice — Create new invoice
+├ /invoices — List all invoices
+└ /pdf ‹num› — Get PDF (e.g. /pdf INV-001)
 
-*Clients & Companies:*
-/client - Add new client
-/clients - List all clients
-/company - Add new company
-/companies - List all companies
+*👥 CLIENTS & COMPANIES*
+├ /client — Add new client
+├ /clients — View all clients
+├ /company — Add company
+└ /companies — List companies
 
-*Contracts:*
-/contract - Create new contract
-/contracts - List all contracts
+*📋 CONTRACTS*
+├ /contract — Create contract
+└ /contracts — List contracts
 
-*Time Tracking:*
-/track - Start time tracking
-/stop - Stop current session
-/active - View active session
-/log - Log time manually
-/tracking - View tracking history
+*⏱️ TIME TRACKING*
+├ /track — Start timer ▶️
+├ /stop — Stop timer ⏹️
+├ /active — View current session
+├ /log — Log time manually
+└ /tracking — View history
 
-*Expenses:*
-/expense - Add new expense
-/expenses - List all expenses
+*💸 EXPENSES*
+├ /expense — Add expense
+└ /expenses — List expenses
 
-*Reports:*
-/dashboard - Revenue overview
+*📊 REPORTS*
+└ /dashboard — Revenue overview
 
-*Getting Started:*
-/start - Main menu & authentication
-/help - Show this help
+*🔧 GENERAL*
+├ /start — Main menu
+└ /help — This help message
 
-Need help? Visit https://ung.app/help`
+━━━━━━━━━━━━━━━━━━━━━━
+💡 *Quick Tips:*
+• Start tracking with /track
+• Create invoices from tracked time
+• View dashboard for revenue stats
+━━━━━━━━━━━━━━━━━━━━━━
+🌐 Need more help? Visit ung.app/help`
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = "Markdown"
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Main Menu", "main_menu"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Dashboard", "action_reports"),
+		),
+	)
+	msg.ReplyMarkup = keyboard
 
 	_, err := h.bot.Send(msg)
 	return err

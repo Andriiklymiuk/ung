@@ -382,11 +382,11 @@ func runRecurringGenerate(cmd *cobra.Command, args []string) error {
 
 	// Generate invoices
 	generated := 0
-	for _, inv := range dueInvoices {
-		fmt.Printf("\n[%d/%d] Generating for %s...\n", generated+1, len(dueInvoices), inv.ClientName)
+	for _, inv := range recurringInvoices {
+		fmt.Printf("\n[%d/%d] Generating for %s...\n", generated+1, len(recurringInvoices), inv.Client.Name)
 
 		// Generate invoice number
-		invoiceNum, err := idgen.GenerateInvoiceNumber(db.GormDB, inv.ClientName, now)
+		invoiceNum, err := idgen.GenerateInvoiceNumber(db.GormDB, inv.Client.Name, now)
 		if err != nil {
 			fmt.Printf("  ❌ Failed to generate invoice number: %v\n", err)
 			continue
@@ -400,7 +400,7 @@ func runRecurringGenerate(cmd *cobra.Command, args []string) error {
 		result, err := db.DB.Exec(`
 			INSERT INTO invoices (invoice_num, company_id, amount, currency, description, status, issued_date, due_date)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, invoiceNum, companyID, inv.Amount, inv.Currency, inv.Description, models.StatusPending, issuedDate, dueDate)
+		`, invoiceNum, company.ID, inv.Amount, inv.Currency, inv.Description, models.StatusPending, issuedDate, dueDate)
 
 		if err != nil {
 			fmt.Printf("  ❌ Failed to create invoice: %v\n", err)

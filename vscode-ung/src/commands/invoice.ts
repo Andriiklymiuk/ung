@@ -610,30 +610,23 @@ export class InvoiceCommands {
         }
 
         try {
-            let pdfPath: string | undefined;
-
-            // Generate PDF first
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: `Generating PDF for ${invoiceNum}...`,
-                cancellable: false
-            }, async () => {
-                const result = await this.cli.exec(['invoice', 'pdf', invoiceNum]);
-                if (!result.success) {
-                    throw new Error(result.error || 'Failed to generate PDF');
-                }
-
-                // Parse PDF path from output and open it
-                pdfPath = this.parsePDFPath(result.stdout || '');
-            });
-
-            if (pdfPath) {
-                const uri = vscode.Uri.file(pdfPath);
-                await vscode.env.openExternal(uri);
-                vscode.window.showInformationMessage(`Opened ${invoiceNum} in external viewer`);
-            } else {
-                vscode.window.showWarningMessage('Could not locate generated PDF file');
+            // First, look up the invoice ID from the invoice number
+            const listResult = await this.cli.listInvoices();
+            if (!listResult.success || !listResult.stdout) {
+                vscode.window.showErrorMessage('Failed to fetch invoices');
+                return;
             }
+
+            const invoices = this.parseInvoicesFromOutput(listResult.stdout);
+            const invoice = invoices.find(inv => inv.invoiceNum === invoiceNum);
+
+            if (!invoice) {
+                vscode.window.showErrorMessage(`Invoice ${invoiceNum} not found`);
+                return;
+            }
+
+            // Generate and open PDF using the invoice ID
+            await this.exportInvoice(invoice.id);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open PDF: ${error}`);
         }

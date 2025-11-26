@@ -125,9 +125,7 @@ export class BulkCommands extends BaseCommand {
         await this.executeBulkOperation(
             invoices,
             async (invoice) => {
-                // Note: This assumes there's a CLI command for marking as paid
-                // Adjust based on actual CLI API
-                return await this.cli.exec(['invoice', 'pay', invoice.id.toString()]);
+                return await this.cli.markInvoicePaid(invoice.id);
             },
             'Marking invoices as paid',
             'Mark as Paid'
@@ -138,46 +136,8 @@ export class BulkCommands extends BaseCommand {
      * Bulk delete invoices
      */
     async bulkDeleteInvoices(): Promise<void> {
-        const invoices = await this.selectInvoices('Select invoices to delete');
-        if (!invoices || invoices.length === 0) {
-            return;
-        }
-
-        const confirmed = await this.confirm(
-            `Delete ${invoices.length} invoice(s)?`,
-            {
-                detail: 'This action cannot be undone. Are you absolutely sure?',
-                confirmLabel: 'Delete',
-                cancelLabel: 'Cancel'
-            }
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        // Double confirmation for delete
-        const doubleConfirm = await this.confirm(
-            'Final confirmation required',
-            {
-                detail: `You are about to permanently delete ${invoices.length} invoice(s).`,
-                confirmLabel: 'Yes, Delete',
-                cancelLabel: 'Cancel'
-            }
-        );
-
-        if (!doubleConfirm) {
-            return;
-        }
-
-        await this.executeBulkOperation(
-            invoices,
-            async (invoice) => {
-                return await this.cli.exec(['invoice', 'delete', invoice.id.toString()]);
-            },
-            'Deleting invoices',
-            'Delete'
-        );
+        // Invoice deletion is not yet supported in the CLI
+        NotificationManager.info('Invoice deletion will be available in a future version.');
     }
 
     /**

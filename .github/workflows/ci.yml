@@ -81,6 +81,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -95,7 +100,16 @@ jobs:
       - name: Run linter
         run: bun run lint
 
+      - name: Cache VS Code binary
+        uses: actions/cache@v4
+        with:
+          path: vscode-ung/.vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('vscode-ung/package.json') }}
+          restore-keys: |
+            vscode-test-${{ runner.os }}-
+
       - name: Run VSCode tests
-        run: xvfb-run -a bun run test:cov
-        env:
-          DISPLAY: ':99.0'
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: bun run test:cov
+          working-directory: vscode-ung

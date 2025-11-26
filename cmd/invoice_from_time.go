@@ -56,7 +56,7 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 	for rows.Next() {
 		var session models.TrackingSession
 		var clientName, contractName, contractType, currency string
-		var clientID uint
+		var clientID sql.NullInt64
 		var contractID, duration sql.NullInt64
 		var hourlyRate, fixedPrice sql.NullFloat64
 		var hours sql.NullFloat64
@@ -84,8 +84,14 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 			return nil, err
 		}
 
+		// Skip sessions without a client (can't invoice without a client)
+		if !clientID.Valid {
+			continue
+		}
+
 		// Populate session fields
-		session.ClientID = &clientID
+		cid := uint(clientID.Int64)
+		session.ClientID = &cid
 		if contractID.Valid {
 			cid := uint(contractID.Int64)
 			session.ContractID = &cid
@@ -106,7 +112,7 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 		}
 
 		// Create group key
-		groupKey := fmt.Sprintf("%d-%v", clientID, contractID.Int64)
+		groupKey := fmt.Sprintf("%d-%v", clientID.Int64, contractID.Int64)
 
 		if _, exists := groupsMap[groupKey]; !exists {
 			var rate *float64
@@ -128,7 +134,7 @@ func getUnbilledTimeSessions() ([]timeSessionGroup, error) {
 			}
 
 			groupsMap[groupKey] = &timeSessionGroup{
-				ClientID:     clientID,
+				ClientID:     uint(clientID.Int64),
 				ClientName:   clientName,
 				ContractID:   cid,
 				ContractName: contractName,

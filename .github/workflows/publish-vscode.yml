@@ -51,10 +51,3 @@ jobs:
         with:
           name: ung-extension
           path: vscode-ung/*.vsix
-
-      - name: Upload VSIX to GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: vscode-ung/*.vsix
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

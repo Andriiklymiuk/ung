@@ -16,30 +16,28 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: vscode-ung/package-lock.json
+          bun-version: latest
 
       - name: Install dependencies
         working-directory: vscode-ung
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Compile TypeScript
         working-directory: vscode-ung
-        run: npm run compile
+        run: bun run compile
 
       - name: Run tests (if available)
         working-directory: vscode-ung
-        run: npm test || echo "No tests configured"
+        run: bun test || echo "No tests configured"
         continue-on-error: true
 
       - name: Package extension
         working-directory: vscode-ung
         run: |
-          npm install -g @vscode/vsce
+          bun add -g @vscode/vsce
           vsce package
 
       - name: Publish to VSCode Marketplace

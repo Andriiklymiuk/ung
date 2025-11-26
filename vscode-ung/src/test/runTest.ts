@@ -1,22 +1,53 @@
 import * as path from 'node:path';
-import { runTests } from '@vscode/test-electron';
+import Mocha from 'mocha';
+import glob from 'glob';
 
 async function main() {
-  try {
-    // The folder containing the Extension Manifest package.json
-    // Passed to `--extensionDevelopmentPath`
-    const extensionDevelopmentPath = path.resolve(__dirname, '../../');
+  const mocha = new Mocha({
+    ui: 'tdd',
+    color: true,
+  });
 
-    // The path to the extension test script
-    // Passed to --extensionTestsPath
-    const extensionTestsPath = path.resolve(__dirname, './suite/index');
+  const testsRoot = path.resolve(__dirname, './suite');
 
-    // Download VS Code, unzip it and run the integration test
-    await runTests({ extensionDevelopmentPath, extensionTestsPath });
-  } catch (err) {
-    console.error('Failed to run tests:', err);
-    process.exit(1);
-  }
+  return new Promise<void>((resolve, reject) => {
+    glob(
+      '**/*.test.js',
+      { cwd: testsRoot },
+      (err: Error | null, files: string[]) => {
+        if (err) {
+          return reject(err);
+        }
+
+        // Add files to the test suite
+        files.forEach((f: string) =>
+          mocha.addFile(path.resolve(testsRoot, f))
+        );
+
+        try {
+          // Run the mocha test
+          mocha.run((failures: number) => {
+            if (failures > 0) {
+              reject(new Error(`${failures} tests failed.`));
+            } else {
+              resolve();
+            }
+          });
+        } catch (err) {
+          console.error(err);
+          reject(err);
+        }
+      }
+    );
+  });
 }
 
-main();
+main()
+  .then(() => {
+    console.log('All tests passed!');
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error('Failed to run tests:', err);
+    process.exit(1);
+  });

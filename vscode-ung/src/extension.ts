@@ -16,6 +16,7 @@ import { DashboardProvider } from './views/dashboardProvider';
 import { WelcomeProvider, GettingStartedProvider } from './views/welcomeProvider';
 import { ExportPanel } from './webview/exportPanel';
 import { StatisticsPanel } from './webview/statisticsPanel';
+import { MainDashboardPanel } from './webview/mainDashboardPanel';
 import { PomodoroPanel } from './webview/pomodoroPanel';
 import { StatusBarManager } from './utils/statusBar';
 
@@ -369,6 +370,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // Statistics panel command
     context.subscriptions.push(
         vscode.commands.registerCommand('ung.openStatistics', () => StatisticsPanel.createOrShow(cli))
+    );
+
+    // Main Dashboard panel command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ung.openDashboard', () => MainDashboardPanel.createOrShow(cli))
     );
 
     // Search commands

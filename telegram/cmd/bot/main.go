@@ -60,7 +60,7 @@ func main() {
 
 		// Handle callback queries
 		if update.CallbackQuery != nil {
-			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, sessionMgr); err != nil {
+			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, sessionMgr); err != nil {
 				log.Printf("Error handling callback: %v", err)
 			}
 		}
@@ -196,6 +196,7 @@ func handleCallback(
 	contractHandler *handlers.ContractHandler,
 	expenseHandler *handlers.ExpenseHandler,
 	trackingHandler *handlers.TrackingHandler,
+	dashboardHandler *handlers.DashboardHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	data := callbackQuery.Data
@@ -307,22 +308,14 @@ func handleCallback(
 	}
 
 	if data == "action_reports" {
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading dashboard...")
+		bot.Request(callback)
+		// Show dashboard directly
 		msg := &tgbotapi.Message{
 			Chat: callbackQuery.Message.Chat,
 			From: callbackQuery.From,
 		}
-		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading reports...")
-		bot.Request(callback)
-		// Show dashboard as reports
-		chatID := callbackQuery.Message.Chat.ID
-		text := "📊 *Reports*\n\nUse these commands:\n" +
-			"• /dashboard - Revenue overview\n" +
-			"• /invoices - Invoice list\n" +
-			"• /tracking - Time tracking history"
-		reportMsg := tgbotapi.NewMessage(chatID, text)
-		reportMsg.ParseMode = "Markdown"
-		bot.Send(reportMsg)
-		return nil
+		return dashboardHandler.Handle(msg)
 	}
 
 	if data == "action_settings" {
@@ -349,19 +342,33 @@ func handleCallback(
 			name = user.Name
 		}
 
-		text := fmt.Sprintf("Welcome back, %s! 👋\n\nWhat would you like to do?", name)
+		text := fmt.Sprintf(
+			"━━━━━━━━━━━━━━━━━━━━━━\n"+
+				"      🏠 *Main Menu*\n"+
+				"━━━━━━━━━━━━━━━━━━━━━━\n\n"+
+				"Hey %s! 👋\n\n"+
+				"What would you like to do today?\n\n"+
+				"💡 _Tip: Use /help for all commands_",
+			name,
+		)
 		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ParseMode = "Markdown"
 
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("📄 Create Invoice", "action_invoice"),
-				tgbotapi.NewInlineKeyboardButtonData("👥 Clients", "action_clients"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("📄 New Invoice", "action_invoice"),
 				tgbotapi.NewInlineKeyboardButtonData("⏱️ Track Time", "action_track"),
-				tgbotapi.NewInlineKeyboardButtonData("📊 Reports", "action_reports"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("👥 Clients", "action_clients"),
+				tgbotapi.NewInlineKeyboardButtonData("📋 Contracts", "action_contracts"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("📊 Dashboard", "action_reports"),
+				tgbotapi.NewInlineKeyboardButtonData("💸 Expenses", "action_expenses"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("📑 All Invoices", "action_invoices_list"),
 				tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "action_settings"),
 			),
 		)
@@ -371,6 +378,57 @@ func handleCallback(
 		callback := tgbotapi.NewCallback(callbackQuery.ID, "")
 		bot.Request(callback)
 		return nil
+	}
+
+	// New action callbacks
+	if data == "action_contracts" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading contracts...")
+		bot.Request(callback)
+		return contractHandler.HandleList(msg)
+	}
+
+	if data == "action_expenses" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading expenses...")
+		bot.Request(callback)
+		return expenseHandler.HandleList(msg)
+	}
+
+	if data == "action_invoices_list" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading invoices...")
+		bot.Request(callback)
+		return invoiceHandler.HandleListWithPDF(msg)
+	}
+
+	if data == "action_log" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading...")
+		bot.Request(callback)
+		return trackingHandler.HandleLog(msg)
+	}
+
+	if data == "action_active" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Checking session...")
+		bot.Request(callback)
+		return trackingHandler.HandleActive(msg)
 	}
 
 	// Answer callback with default response

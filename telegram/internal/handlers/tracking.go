@@ -45,49 +45,93 @@ func (h *TrackingHandler) HandleList(message *tgbotapi.Message) error {
 	}
 
 	if len(sessions) == 0 {
-		msg := tgbotapi.NewMessage(chatID, "You don't have any tracking sessions yet.\n\nUse /track to start tracking time!")
+		text := "━━━━━━━━━━━━━━━━━━━━━━\n" +
+			"      ⏱️ *Time Tracking*\n" +
+			"━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+			"📭 No sessions recorded yet!\n\n" +
+			"Start tracking your work time."
+
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ParseMode = "Markdown"
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("▶️ Start Tracking", "action_track"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+
 		_, err := h.bot.Send(msg)
 		return err
 	}
 
 	// Build tracking list message
 	var text strings.Builder
-	text.WriteString("⏱️ *Your Time Tracking Sessions*\n\n")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n")
+	text.WriteString("      ⏱️ *Time Tracking*\n")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
+	// Calculate totals
 	totalDuration := 0.0
+	activeCount := 0
+	for _, session := range sessions {
+		if session.Duration > 0 {
+			totalDuration += session.Duration
+		}
+		if session.Active {
+			activeCount++
+		}
+	}
+
+	// Summary
+	text.WriteString(fmt.Sprintf("📊 *Summary*\n"))
+	text.WriteString(fmt.Sprintf("├ Sessions: %d\n", len(sessions)))
+	text.WriteString(fmt.Sprintf("├ Total: *%.1f hours*\n", totalDuration))
+	text.WriteString(fmt.Sprintf("└ Est. Value: *$%.2f*\n", totalDuration*100))
+	if activeCount > 0 {
+		text.WriteString(fmt.Sprintf("\n🔴 *%d active session(s)*\n", activeCount))
+	}
+	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
+	text.WriteString("📋 *Recent Sessions*\n\n")
+
 	for i, session := range sessions {
-		if i >= 10 {
-			text.WriteString(fmt.Sprintf("\n_...and %d more_", len(sessions)-10))
+		if i >= 8 {
+			text.WriteString(fmt.Sprintf("\n_+%d more sessions_", len(sessions)-8))
 			break
 		}
 
-		statusEmoji := "✅"
 		if session.Active {
-			statusEmoji = "🔴 ACTIVE"
+			text.WriteString("🔴 *ACTIVE SESSION*\n")
+		} else {
+			text.WriteString(fmt.Sprintf("✅ *Session %d*\n", i+1))
 		}
 
-		text.WriteString(fmt.Sprintf("%d. %s\n", i+1, statusEmoji))
 		if session.Notes != "" {
 			text.WriteString(fmt.Sprintf("   📝 %s\n", session.Notes))
 		}
-		text.WriteString(fmt.Sprintf("   ⏰ Started: %s\n", formatTime(session.StartTime)))
-		if session.EndTime != "" {
-			text.WriteString(fmt.Sprintf("   🏁 Ended: %s\n", formatTime(session.EndTime)))
-		}
+		text.WriteString(fmt.Sprintf("   🕐 %s\n", formatTime(session.StartTime)))
 		if session.Duration > 0 {
-			text.WriteString(fmt.Sprintf("   ⏳ Duration: %.2f hours\n", session.Duration))
-			totalDuration += session.Duration
+			text.WriteString(fmt.Sprintf("   ⏳ %.1fh · $%.2f\n", session.Duration, session.Duration*100))
 		}
 		text.WriteString("\n")
 	}
 
-	if totalDuration > 0 {
-		text.WriteString(fmt.Sprintf("*Total Time:* %.2f hours\n\n", totalDuration))
-	}
-	text.WriteString("_Use /track to start a new session_")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━")
 
 	msg := tgbotapi.NewMessage(chatID, text.String())
 	msg.ParseMode = "Markdown"
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("▶️ Start", "action_track"),
+			tgbotapi.NewInlineKeyboardButtonData("📝 Log Time", "action_log"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Menu", "main_menu"),
+		),
+	)
+	msg.ReplyMarkup = keyboard
 
 	_, err = h.bot.Send(msg)
 	return err
@@ -211,9 +255,25 @@ func (h *TrackingHandler) HandleActive(message *tgbotapi.Message) error {
 	}
 
 	if activeSession == nil {
-		msg := tgbotapi.NewMessage(chatID,
-			"No active tracking session.\n\n"+
-				"Use /track to start tracking time!")
+		text := "━━━━━━━━━━━━━━━━━━━━━━\n" +
+			"      ⏱️ *Active Session*\n" +
+			"━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+			"⚪ No active session\n\n" +
+			"Start tracking your work time!"
+
+		msg := tgbotapi.NewMessage(chatID, text)
+		msg.ParseMode = "Markdown"
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("▶️ Start Tracking", "action_track"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("🏠 Menu", "main_menu"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+
 		h.bot.Send(msg)
 		return nil
 	}
@@ -222,17 +282,33 @@ func (h *TrackingHandler) HandleActive(message *tgbotapi.Message) error {
 	startTime, _ := time.Parse(time.RFC3339, activeSession.StartTime)
 	elapsed := time.Since(startTime)
 	hours := elapsed.Hours()
+	minutes := int(elapsed.Minutes()) % 60
+	secs := int(elapsed.Seconds()) % 60
 
-	// Show active session
+	// Show active session with visual timer
 	var text strings.Builder
-	text.WriteString("🔴 *Active Time Tracking*\n\n")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n")
+	text.WriteString("   🔴 *TRACKING ACTIVE*\n")
+	text.WriteString("━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
+	// Big timer display
+	text.WriteString("⏱️ *Elapsed Time*\n")
+	text.WriteString(fmt.Sprintf("┌─────────────────────┐\n"))
+	text.WriteString(fmt.Sprintf("│  *%02d:%02d:%02d*  │\n", int(hours), minutes, secs))
+	text.WriteString(fmt.Sprintf("└─────────────────────┘\n\n"))
+
+	// Details
+	text.WriteString("📋 *Session Details*\n\n")
 	text.WriteString(fmt.Sprintf("🕐 Started: %s\n", formatTime(activeSession.StartTime)))
-	text.WriteString(fmt.Sprintf("⏳ Elapsed: %.2f hours\n", hours))
-	text.WriteString(fmt.Sprintf("💰 Estimated: $%.2f (at $100/hr)\n", hours*100))
+	text.WriteString(fmt.Sprintf("⏳ Hours: *%.2f*\n", hours))
+	text.WriteString(fmt.Sprintf("💰 Est. Value: *$%.2f*\n", hours*100))
+
 	if activeSession.Notes != "" {
-		text.WriteString(fmt.Sprintf("\n📝 Notes: %s\n", activeSession.Notes))
+		text.WriteString(fmt.Sprintf("\n📝 Notes: _%s_\n", activeSession.Notes))
 	}
-	text.WriteString("\n_Use /stop to stop tracking_")
+
+	text.WriteString("\n━━━━━━━━━━━━━━━━━━━━━━\n")
+	text.WriteString("💡 _Tap Stop when done_")
 
 	msg := tgbotapi.NewMessage(chatID, text.String())
 	msg.ParseMode = "Markdown"
@@ -240,6 +316,10 @@ func (h *TrackingHandler) HandleActive(message *tgbotapi.Message) error {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⏹️ Stop Tracking", "tracking_stop"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔄 Refresh", "action_active"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠 Menu", "main_menu"),
 		),
 	)
 	msg.ReplyMarkup = keyboard

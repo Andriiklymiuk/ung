@@ -1358,15 +1358,16 @@ func runInvoiceDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid invoice ID: %s", args[0])
 	}
 
-	// Get invoice details for confirmation
+	// Get invoice details for confirmation (including pdf_path for cleanup)
 	var invoiceNum string
 	var amount float64
 	var currency string
 	var status string
+	var pdfPath *string
 	err = db.DB.QueryRow(`
-		SELECT invoice_num, amount, currency, status
+		SELECT invoice_num, amount, currency, status, pdf_path
 		FROM invoices WHERE id = ?
-	`, invoiceID).Scan(&invoiceNum, &amount, &currency, &status)
+	`, invoiceID).Scan(&invoiceNum, &amount, &currency, &status, &pdfPath)
 	if err != nil {
 		return fmt.Errorf("invoice not found: %w", err)
 	}
@@ -1402,12 +1403,24 @@ func runInvoiceDelete(cmd *cobra.Command, args []string) error {
 	db.DB.Exec("DELETE FROM invoice_line_items WHERE invoice_id = ?", invoiceID)
 	db.DB.Exec("DELETE FROM invoice_recipients WHERE invoice_id = ?", invoiceID)
 
-	// Delete invoice
+	// Delete invoice from database
 	_, err = db.DB.Exec("DELETE FROM invoices WHERE id = ?", invoiceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete invoice: %w", err)
 	}
 
-	fmt.Printf("✓ Invoice %s deleted successfully\n", invoiceNum)
+	// Delete PDF file if it exists
+	if pdfPath != nil && *pdfPath != "" {
+		if err := os.Remove(*pdfPath); err != nil {
+			// Don't fail if file doesn't exist, just warn
+			if !os.IsNotExist(err) {
+				fmt.Printf("⚠️  Warning: Could not delete PDF file: %v\n", err)
+			}
+		} else {
+			fmt.Printf("✓ PDF file deleted: %s\n", *pdfPath)
+		}
+	}
+
+	fmt.Printf("✓ Invoice %s deleted successfully!\n", invoiceNum)
 	return nil
 }

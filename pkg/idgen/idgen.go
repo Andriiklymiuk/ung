@@ -75,38 +75,38 @@ func GenerateInvoiceNumber(db *gorm.DB, clientName string, issuedDate time.Time)
 }
 
 // GenerateContractNumber creates a human-readable contract number
-// Format: contract.clientname.month.year (with _2, _3, etc. if duplicate)
+// Format: CTR-YYYY-NNN (e.g., CTR-2025-001)
 func GenerateContractNumber(db *gorm.DB, clientName string, startDate time.Time) (string, error) {
-	sanitizedClient := sanitizeName(clientName)
-	month := strings.ToLower(startDate.Format("jan")) // jan, feb, mar, etc.
 	year := startDate.Format("2006")
 
-	baseNum := fmt.Sprintf("contract.%s.%s.%s", sanitizedClient, month, year)
+	// Find the highest existing contract number for this year
+	var maxNum int
+	pattern := fmt.Sprintf("CTR-%s-%%", year)
 
-	// Check if this number exists
-	var count int64
-	err := db.Table("contracts").Where("contract_num = ?", baseNum).Count(&count).Error
+	// Get all contracts for this year and find the max number
+	var contracts []struct{ ContractNum string }
+	err := db.Table("contracts").
+		Select("contract_num").
+		Where("contract_num LIKE ?", pattern).
+		Find(&contracts).Error
 	if err != nil {
-		return "", fmt.Errorf("failed to check for duplicate contract number: %w", err)
+		return "", fmt.Errorf("failed to query contracts: %w", err)
 	}
 
-	if count == 0 {
-		return baseNum, nil
-	}
-
-	// If exists, try with _2, _3, etc.
-	for i := 2; i < 100; i++ {
-		numberedContract := fmt.Sprintf("%s_%d", baseNum, i)
-		err := db.Table("contracts").Where("contract_num = ?", numberedContract).Count(&count).Error
-		if err != nil {
-			return "", fmt.Errorf("failed to check for duplicate contract number: %w", err)
-		}
-
-		if count == 0 {
-			return numberedContract, nil
+	// Parse existing numbers to find max
+	for _, c := range contracts {
+		// Extract number from CTR-YYYY-NNN format
+		var num int
+		if _, err := fmt.Sscanf(c.ContractNum, "CTR-"+year+"-%d", &num); err == nil {
+			if num > maxNum {
+				maxNum = num
+			}
 		}
 	}
 
-	// Fallback to timestamp if we somehow have 100+ duplicates
-	return fmt.Sprintf("%s_%d", baseNum, time.Now().Unix()), nil
+	// Generate new number
+	newNum := maxNum + 1
+	contractNum := fmt.Sprintf("CTR-%s-%03d", year, newNum)
+
+	return contractNum, nil
 }

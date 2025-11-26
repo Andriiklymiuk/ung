@@ -509,6 +509,15 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('ung.viewActiveSession', () =>
       trackingCommands.viewActiveSession()
     ),
+    vscode.commands.registerCommand('ung.viewTrackingSession', (item) =>
+      trackingCommands.viewTrackingSession(item?.itemId)
+    ),
+    vscode.commands.registerCommand('ung.editTrackingSession', (item) =>
+      trackingCommands.editTrackingSession(item?.itemId)
+    ),
+    vscode.commands.registerCommand('ung.deleteTrackingSession', (item) =>
+      trackingCommands.deleteTrackingSession(item?.itemId)
+    ),
     vscode.commands.registerCommand('ung.refreshTracking', () =>
       trackingProvider.refresh()
     )

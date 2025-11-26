@@ -129,6 +129,7 @@ var invoiceMarkStatus string
 var invoiceEditAmount float64
 var invoiceEditDueDate string
 var invoiceEditDescription string
+var invoiceDeleteYes bool
 
 
 var (
@@ -168,6 +169,9 @@ func init() {
 	invoiceEditCmd.Flags().Float64Var(&invoiceEditAmount, "amount", 0, "New invoice amount")
 	invoiceEditCmd.Flags().StringVar(&invoiceEditDueDate, "due", "", "New due date (YYYY-MM-DD)")
 	invoiceEditCmd.Flags().StringVar(&invoiceEditDescription, "description", "", "New description")
+
+	// Delete command flags
+	invoiceDeleteCmd.Flags().BoolVarP(&invoiceDeleteYes, "yes", "y", false, "Skip confirmation prompt")
 
 	// Main invoice command flags
 	invoiceCmd.Flags().StringVarP(&invoiceFlagClient, "client", "c", "", "Client name (generates invoice from tracked time)")
@@ -1367,28 +1371,31 @@ func runInvoiceDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invoice not found: %w", err)
 	}
 
-	fmt.Println("⚠️  DELETE INVOICE WARNING")
-	fmt.Println("==========================")
-	fmt.Printf("\nInvoice:  %s (ID: %d)\n", invoiceNum, invoiceID)
-	fmt.Printf("Amount:   %.2f %s\n", amount, currency)
-	fmt.Printf("Status:   %s\n\n", status)
+	// Skip confirmation if --yes flag is provided
+	if !invoiceDeleteYes {
+		fmt.Println("⚠️  DELETE INVOICE WARNING")
+		fmt.Println("==========================")
+		fmt.Printf("\nInvoice:  %s (ID: %d)\n", invoiceNum, invoiceID)
+		fmt.Printf("Amount:   %.2f %s\n", amount, currency)
+		fmt.Printf("Status:   %s\n\n", status)
 
-	// Confirmation
-	var confirm bool
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Are you sure you want to delete this invoice?").
-				Description("This action cannot be undone!").
-				Affirmative("Yes, delete it").
-				Negative("Cancel").
-				Value(&confirm),
-		),
-	)
+		// Confirmation
+		var confirm bool
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Are you sure you want to delete this invoice?").
+					Description("This action cannot be undone!").
+					Affirmative("Yes, delete it").
+					Negative("Cancel").
+					Value(&confirm),
+			),
+		)
 
-	if err := form.Run(); err != nil || !confirm {
-		fmt.Println("\n✅ Deletion cancelled. Invoice is safe.")
-		return nil
+		if err := form.Run(); err != nil || !confirm {
+			fmt.Println("\n✅ Deletion cancelled. Invoice is safe.")
+			return nil
+		}
 	}
 
 	// Delete related records first
@@ -1401,6 +1408,6 @@ func runInvoiceDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to delete invoice: %w", err)
 	}
 
-	fmt.Printf("\n✓ Invoice %s deleted successfully\n", invoiceNum)
+	fmt.Printf("✓ Invoice %s deleted successfully\n", invoiceNum)
 	return nil
 }

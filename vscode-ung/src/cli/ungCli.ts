@@ -734,13 +734,12 @@ export class UngCli {
   }
 
   /**
-   * Delete an invoice (requires confirmation in terminal)
-   * For VS Code, we handle confirmation separately
+   * Delete an invoice
+   * Uses --yes flag to skip interactive confirmation (handled by VS Code dialog)
    */
   async deleteInvoice(id: number): Promise<CliResult> {
-    // Note: CLI requires interactive confirmation
-    // For VS Code, we'll handle confirmation via VS Code dialog
-    return this.exec(['invoice', 'delete', id.toString()]);
+    // Use --yes flag to skip CLI confirmation since VS Code handles it
+    return this.exec(['invoice', 'delete', id.toString(), '--yes']);
   }
 
   // ========== Tracking Edit/Delete Commands ==========

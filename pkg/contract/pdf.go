@@ -67,9 +67,9 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 	pdf.Ln(15)
 
 	// Contract metadata section (right side)
-	metaStartY := 35.0
-	metaLabelX := pageWidth - rightMargin - 85
-	metaValueX := pageWidth - rightMargin - 45
+	metaStartY := 32.0
+	metaLabelX := pageWidth - rightMargin - 80
+	metaValueX := pageWidth - rightMargin - 40
 
 	pdf.SetFont("Helvetica", "B", 9)
 	pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
@@ -129,7 +129,8 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 	drawStatusBadge(pdf, contract.Active, pdfCfg)
 
 	// Two-column layout for From/Bill To
-	currentY := 40.0
+	// Position below the metadata section to avoid overlap
+	currentY := 75.0
 
 	// Left column - From (Company)
 	pdf.SetXY(leftMargin, currentY)

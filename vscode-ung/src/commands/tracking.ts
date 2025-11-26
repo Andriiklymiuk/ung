@@ -109,9 +109,144 @@ export class TrackingCommands {
    * Log time manually
    */
   async logTimeManually(): Promise<void> {
-    vscode.window.showInformationMessage(
-      'Manual time logging is interactive. Please use the CLI: ung track log'
+    // Get contracts to select from
+    const contractResult = await this.cli.listContracts();
+    if (!contractResult.success) {
+      vscode.window.showErrorMessage('Failed to fetch contracts');
+      return;
+    }
+
+    // Parse contracts from CLI output
+    const contracts = this.parseContractsFromOutput(
+      contractResult.stdout || ''
     );
+    if (contracts.length === 0) {
+      vscode.window.showErrorMessage(
+        'No contracts found. Create one first with "ung contract add"'
+      );
+      return;
+    }
+
+    // Show contract dropdown with client name and rate info
+    const contractItems = contracts.map((c) => ({
+      label: c.client,
+      description: `${c.type} - ${c.ratePrice}`,
+      detail: c.name,
+      contract: c,
+    }));
+
+    const selectedContract = await vscode.window.showQuickPick(contractItems, {
+      placeHolder: 'Select a contract to log time for',
+      matchOnDescription: true,
+      matchOnDetail: true,
+    });
+
+    if (!selectedContract) return;
+
+    // Ask for hours
+    const hoursStr = await vscode.window.showInputBox({
+      prompt: `Hours worked for ${selectedContract.contract.client}`,
+      placeHolder: 'e.g., 2.5',
+      validateInput: (value) => {
+        if (!value) return 'Hours is required';
+        if (Number.isNaN(Number(value))) return 'Must be a valid number';
+        if (Number(value) <= 0) return 'Hours must be greater than 0';
+        return null;
+      },
+    });
+
+    if (!hoursStr) return;
+
+    // Ask for project name (optional)
+    const project = await vscode.window.showInputBox({
+      prompt: 'Project name (optional)',
+      placeHolder: 'e.g., Website Development',
+    });
+
+    // Ask for notes (optional)
+    const notes = await vscode.window.showInputBox({
+      prompt: 'Notes (optional)',
+      placeHolder: 'What did you work on?',
+    });
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Logging time...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.logTime({
+          contractId: selectedContract.contract.id,
+          hours: Number(hoursStr),
+          project: project || undefined,
+          notes: notes || undefined,
+        });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Logged ${hoursStr} hours for ${selectedContract.contract.client}!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(`Failed to log time: ${result.error}`);
+        }
+      }
+    );
+  }
+
+  /**
+   * Parse contracts from CLI output (tabular format)
+   */
+  private parseContractsFromOutput(output: string): Array<{
+    id: number;
+    contractNum: string;
+    name: string;
+    client: string;
+    type: string;
+    ratePrice: string;
+    active: boolean;
+  }> {
+    const lines = output.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    // Skip header line
+    const dataLines = lines.slice(1);
+    const contracts: Array<{
+      id: number;
+      contractNum: string;
+      name: string;
+      client: string;
+      type: string;
+      ratePrice: string;
+      active: boolean;
+    }> = [];
+
+    for (const line of dataLines) {
+      // Parse: ID  CONTRACT#  NAME  CLIENT  TYPE  RATE/PRICE  ACTIVE
+      const parts = line
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 6) {
+        const id = parseInt(parts[0], 10);
+        if (!Number.isNaN(id)) {
+          contracts.push({
+            id,
+            contractNum: parts[1],
+            name: parts[2],
+            client: parts[3],
+            type: parts[4],
+            ratePrice: parts[5],
+            active: parts[6] === '✓',
+          });
+        }
+      }
+    }
+
+    return contracts;
   }
 
   /**

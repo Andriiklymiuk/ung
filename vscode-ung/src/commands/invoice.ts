@@ -80,10 +80,29 @@ export class InvoiceCommands {
       if (!confirmAmount) return;
       amount = Number(confirmAmount);
     } else {
-      // Hourly contract - ask for amount
-      const amountStr = await vscode.window.showInputBox({
-        prompt: `Invoice amount for ${contract.client} (rate: ${contract.ratePrice})`,
-        placeHolder: 'e.g., 1500.00',
+      // Hourly contract - ask for hours worked
+      const hourlyRate = parseFloat(rateMatch?.[1] || '0');
+
+      const hoursStr = await vscode.window.showInputBox({
+        prompt: `Hours worked for ${contract.client} (rate: ${contract.ratePrice})`,
+        placeHolder: 'e.g., 40',
+        validateInput: (value) => {
+          if (!value) return 'Hours is required';
+          if (Number.isNaN(Number(value))) return 'Must be a valid number';
+          if (Number(value) <= 0) return 'Hours must be greater than 0';
+          return null;
+        },
+      });
+
+      if (!hoursStr) return;
+      const hours = Number(hoursStr);
+      amount = hours * hourlyRate;
+
+      // Show calculated amount for confirmation
+      const confirmAmount = await vscode.window.showInputBox({
+        prompt: `Calculated invoice amount (${hours} hrs × ${hourlyRate} ${currency}/hr)`,
+        value: amount.toFixed(2),
+        placeHolder: 'e.g., 1160.00',
         validateInput: (value) => {
           if (!value) return 'Amount is required';
           if (Number.isNaN(Number(value))) return 'Must be a valid number';
@@ -92,11 +111,13 @@ export class InvoiceCommands {
         },
       });
 
-      if (!amountStr) return;
-      amount = Number(amountStr);
+      if (!confirmAmount) return;
+      amount = Number(confirmAmount);
     }
 
     // Show progress
+    let createdInvoiceId: number | undefined;
+
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -111,7 +132,12 @@ export class InvoiceCommands {
         });
 
         if (result.success) {
-          vscode.window.showInformationMessage('Invoice created successfully!');
+          // Try to parse invoice ID from output
+          const idMatch = result.stdout?.match(/Invoice ID:\s*(\d+)/);
+          if (idMatch) {
+            createdInvoiceId = parseInt(idMatch[1], 10);
+          }
+
           if (this.refreshCallback) {
             this.refreshCallback();
           }
@@ -122,6 +148,11 @@ export class InvoiceCommands {
         }
       }
     );
+
+    // Auto-generate PDF and open it
+    if (createdInvoiceId) {
+      await this.exportInvoice(createdInvoiceId);
+    }
   }
 
   /**

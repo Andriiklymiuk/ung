@@ -394,6 +394,9 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('ung.createClient', () =>
       clientCommands.createClient()
     ),
+    vscode.commands.registerCommand('ung.viewClient', (clientId) =>
+      clientCommands.viewClient(clientId)
+    ),
     vscode.commands.registerCommand('ung.editClient', (item) =>
       clientCommands.editClient(item?.itemId)
     ),

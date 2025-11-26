@@ -42,7 +42,8 @@ suite('Formatter Test Suite', () => {
 
   test('truncate handles exact length', () => {
     assert.strictEqual(Formatter.truncate('12345', 5), '12345');
-    assert.strictEqual(Formatter.truncate('123456', 5), 'tr...');
+    // '123456' has 6 chars, maxLength is 5, so truncate to 2 chars + '...' = '12...'
+    assert.strictEqual(Formatter.truncate('123456', 5), '12...');
   });
 
   test('parseDate returns YYYY-MM-DD format', () => {

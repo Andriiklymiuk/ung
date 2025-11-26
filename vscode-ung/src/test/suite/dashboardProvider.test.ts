@@ -25,16 +25,16 @@ suite('DashboardProvider Test Suite', () => {
 
     const labels = items.map((item) => item.label);
     assert.ok(
-      labels.some((label) => label === 'Revenue'),
-      'Should have Revenue section'
+      labels.some((label) => label === 'Revenue Overview'),
+      'Should have Revenue Overview section'
     );
     assert.ok(
-      labels.some((label) => label === 'Contracts'),
-      'Should have Contracts section'
+      labels.some((label) => label === 'Top Contracts'),
+      'Should have Top Contracts section'
     );
     assert.ok(
-      labels.some((label) => label === 'Quick Stats'),
-      'Should have Quick Stats section'
+      labels.some((label) => label === 'Business Summary'),
+      'Should have Business Summary section'
     );
   });
 
@@ -49,7 +49,9 @@ suite('DashboardProvider Test Suite', () => {
 
   test('getChildren returns metrics when given revenue section', async () => {
     const items = await provider.getChildren();
-    const revenueSection = items.find((item) => item.label === 'Revenue');
+    const revenueSection = items.find(
+      (item) => item.label === 'Revenue Overview'
+    );
 
     if (revenueSection) {
       const metrics = await provider.getChildren(revenueSection);
@@ -60,7 +62,9 @@ suite('DashboardProvider Test Suite', () => {
 
   test('getChildren returns metrics when given contracts section', async () => {
     const items = await provider.getChildren();
-    const contractsSection = items.find((item) => item.label === 'Contracts');
+    const contractsSection = items.find(
+      (item) => item.label === 'Top Contracts'
+    );
 
     if (contractsSection) {
       const metrics = await provider.getChildren(contractsSection);
@@ -70,7 +74,9 @@ suite('DashboardProvider Test Suite', () => {
 
   test('getChildren returns metrics when given stats section', async () => {
     const items = await provider.getChildren();
-    const statsSection = items.find((item) => item.label === 'Quick Stats');
+    const statsSection = items.find(
+      (item) => item.label === 'Business Summary'
+    );
 
     if (statsSection) {
       const metrics = await provider.getChildren(statsSection);

@@ -46,11 +46,12 @@
 .installCommand pre {
   background: rgba(0, 0, 0, 0.4);
   border-radius: 8px;
-  padding: 1rem 3.5rem 1rem 1.5rem;
+  padding: 1rem 5rem 1rem 1.25rem;
   font-size: 1rem;
   text-align: left;
   overflow-x: auto;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0;
 }
 
 [data-theme='dark'] .installCommand pre {
@@ -60,30 +61,46 @@
 .installCommand code {
   color: #f39c5a;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .copyButton {
   position: absolute;
-  right: 0.75rem;
+  right: 0.5rem;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 0.4rem 0.6rem;
+  background: #e87722;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 0.85rem;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  min-width: 4rem;
+  text-align: center;
 }
 
 .copyButton:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+  background: #d16a1e;
+  transform: translateY(-50%) translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
 }
 
 .copyButton:active {
-  transform: translateY(-50%) scale(0.95);
+  transform: translateY(-50%) scale(0.97);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='dark'] .copyButton {
+  background: #f39c5a;
+  color: #1a1a1a;
+}
+
+[data-theme='dark'] .copyButton:hover {
+  background: #f08a3a;
 }
 
 @media screen and (max-width: 996px) {
@@ -97,5 +114,89 @@
 
   .heroSubtitle {
     font-size: 1.25rem;
+  }
+
+  .heroTagline {
+    font-size: 1rem;
+    padding: 0 1rem;
+  }
+
+  .installCommand {
+    max-width: 100%;
+    padding: 0 0.5rem;
+  }
+
+  .installCommand pre {
+    padding: 0.875rem 4.5rem 0.875rem 1rem;
+    font-size: 0.85rem;
+    border-radius: 6px;
+  }
+
+  .copyButton {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    min-width: 3.5rem;
+    right: 0.4rem;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .heroBanner {
+    padding: 1.5rem 1rem;
+  }
+
+  .heroTitle {
+    font-size: 1.75rem;
+  }
+
+  .heroSubtitle {
+    font-size: 1.1rem;
+  }
+
+  .heroTagline {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .installCommand {
+    padding: 0;
+  }
+
+  .installCommand pre {
+    padding: 1rem;
+    padding-bottom: 3.25rem;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .copyButton {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    top: auto;
+    transform: none;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    min-width: auto;
+    width: calc(100% - 1rem);
+    border-radius: 4px;
+  }
+
+  .copyButton:hover {
+    transform: none;
+  }
+
+  .copyButton:active {
+    transform: scale(0.98);
+  }
+
+  .buttons {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .buttons > * {
+    width: 100%;
   }
 }

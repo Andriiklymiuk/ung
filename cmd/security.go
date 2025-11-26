@@ -78,7 +78,7 @@ func runSecurityStatus(cmd *cobra.Command, args []string) {
 	dbPath := db.GetDBPath()
 	encryptedPath := dbPath + ".encrypted"
 
-	fmt.Println("🔒 Database Security Status\n")
+	fmt.Println("🔒 Database Security Status")
 
 	// Check if encrypted file exists
 	encryptedExists := fileExists(encryptedPath)
@@ -112,7 +112,7 @@ func runSecurityEnable(cmd *cobra.Command, args []string) {
 	dbPath := db.GetDBPath()
 	encryptedPath := dbPath + ".encrypted"
 
-	fmt.Println("🔒 Enable Database Encryption\n")
+	fmt.Println("🔒 Enable Database Encryption")
 
 	// Check if already encrypted
 	if fileExists(encryptedPath) {
@@ -187,7 +187,7 @@ func runSecurityDisable(cmd *cobra.Command, args []string) {
 	dbPath := db.GetDBPath()
 	encryptedPath := dbPath + ".encrypted"
 
-	fmt.Println("🔓 Disable Database Encryption\n")
+	fmt.Println("🔓 Disable Database Encryption")
 
 	// Check if encrypted
 	if !fileExists(encryptedPath) {
@@ -242,7 +242,7 @@ func runSecurityChangePassword(cmd *cobra.Command, args []string) {
 	dbPath := db.GetDBPath()
 	encryptedPath := dbPath + ".encrypted"
 
-	fmt.Println("🔑 Change Encryption Password\n")
+	fmt.Println("🔑 Change Encryption Password")
 
 	// Check if encrypted
 	if !fileExists(encryptedPath) {

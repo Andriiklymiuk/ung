@@ -1,8 +1,6 @@
 module ung/api
 
-go 1.23
-
-toolchain go1.24.7
+go 1.24
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.40.0

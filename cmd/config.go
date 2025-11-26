@@ -232,7 +232,7 @@ func runConfigPath(cmd *cobra.Command, args []string) {
 	globalConfig := filepath.Join(home, ".ung", "config.yaml")
 	localConfig := ".ung.yaml"
 
-	fmt.Println("📂 Configuration File Paths\n")
+	fmt.Println("📂 Configuration File Paths")
 
 	// Check local config
 	if _, err := os.Stat(localConfig); err == nil {

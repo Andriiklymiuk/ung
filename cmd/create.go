@@ -20,7 +20,7 @@ func init() {
 
 func runCreate(cmd *cobra.Command, args []string) error {
 	fmt.Println("🎯 UNG Creation Wizard")
-	fmt.Println("What would you like to create?\n")
+	fmt.Println("What would you like to create?")
 
 	var selection string
 	form := huh.NewForm(

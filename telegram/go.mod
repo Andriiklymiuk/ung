@@ -1,6 +1,6 @@
 module ung-telegram
 
-go 1.24.7
+go 1.24
 
 require (
 	github.com/Andriiklymiuk/ung v0.0.0

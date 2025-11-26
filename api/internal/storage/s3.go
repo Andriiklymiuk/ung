@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -212,7 +213,7 @@ func (s *S3Storage) CreateBackup(ctx context.Context, tenantID string) error {
 	sourceKey := s.getTenantDBKey(tenantID)
 	backupKey := fmt.Sprintf("tenants/%s/backups/ung_%d.db.encrypted",
 		tenantID,
-		// timestamp would go here
+		time.Now().Unix(),
 	)
 
 	// Copy object to backup location

@@ -6,7 +6,6 @@
 vscode-ung/
 ├── package.json              # Extension manifest
 ├── tsconfig.json            # TypeScript configuration
-├── .eslintrc.json           # ESLint configuration
 ├── .gitignore              # Git ignore patterns
 ├── .vscodeignore           # VSIX packaging exclusions
 ├── README.md               # User documentation
@@ -106,9 +105,6 @@ Then press `F5` to debug. Changes will recompile automatically.
 ```bash
 # Run all tests
 npm test
-
-# Run linter
-npm run lint
 
 # Compile before testing
 npm run pretest

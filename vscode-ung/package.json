@@ -200,6 +200,21 @@
         "category": "UNG"
       },
       {
+        "command": "ung.viewTrackingSession",
+        "title": "View Tracking Session",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.editTrackingSession",
+        "title": "Edit Tracking Session",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.deleteTrackingSession",
+        "title": "Delete Tracking Session",
+        "category": "UNG"
+      },
+      {
         "command": "ung.refreshInvoices",
         "title": "Refresh Invoices",
         "category": "UNG",
@@ -666,6 +681,21 @@
         {
           "command": "ung.deleteExpense",
           "when": "view == ungExpenses && viewItem == expense",
+          "group": "2_delete"
+        },
+        {
+          "command": "ung.viewTrackingSession",
+          "when": "view == ungTracking && viewItem == tracking",
+          "group": "inline"
+        },
+        {
+          "command": "ung.editTrackingSession",
+          "when": "view == ungTracking && viewItem == tracking",
+          "group": "1_modify"
+        },
+        {
+          "command": "ung.deleteTrackingSession",
+          "when": "view == ungTracking && viewItem == tracking",
           "group": "2_delete"
         }
       ]

@@ -20,23 +20,15 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 
-	// Set up page footer with page numbers
-	if pdfCfg.ShowPageNumber {
-		pdf.SetFooterFunc(func() {
-			pdf.SetY(-15)
-			pdf.SetFont("Helvetica", "I", 8)
-			pdf.SetTextColor(128, 128, 128)
-			pdf.CellFormat(0, 10, fmt.Sprintf("Page %d/{nb}", pdf.PageNo()), "", 0, "C", false, 0, "")
-		})
-		pdf.AliasNbPages("")
-	}
+	// Note: Page numbers disabled for contracts since they are typically single-page documents
+	// For multi-page contracts, the page number would show "Page 1/1" which looks odd
 
 	pdf.AddPage()
 
-	// Draw status watermark if enabled
-	if pdfCfg.ShowWatermark {
-		drawContractWatermark(pdf, contract.Active, pdfCfg)
-	}
+	// Note: Watermark disabled for contracts - not needed for professional look
+	// if pdfCfg.ShowWatermark {
+	// 	drawContractWatermark(pdf, contract.Active, pdfCfg)
+	// }
 
 	// Set margins
 	leftMargin := 15.0
@@ -82,149 +74,138 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 	pdf.SetXY(metaValueX, metaStartY)
 	pdf.Cell(45, 5, contract.ContractNum)
 
-	// Contract Name
+	// Type (moved up since Name is removed)
 	pdf.SetFont("Helvetica", "B", 9)
 	pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
 	pdf.SetXY(metaLabelX, metaStartY+6)
-	pdf.Cell(40, 5, "Name")
-	pdf.SetFont("Helvetica", "", 9)
-	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.SetXY(metaValueX, metaStartY+6)
-	pdf.Cell(45, 5, truncateString(contract.Name, 25))
-
-	// Type
-	pdf.SetFont("Helvetica", "B", 9)
-	pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-	pdf.SetXY(metaLabelX, metaStartY+12)
 	pdf.Cell(40, 5, "Type")
 	pdf.SetFont("Helvetica", "", 9)
 	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.SetXY(metaValueX, metaStartY+12)
+	pdf.SetXY(metaValueX, metaStartY+6)
 	pdf.Cell(45, 5, formatContractType(contract.ContractType))
 
 	// Start Date
 	pdf.SetFont("Helvetica", "B", 9)
 	pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-	pdf.SetXY(metaLabelX, metaStartY+18)
+	pdf.SetXY(metaLabelX, metaStartY+12)
 	pdf.Cell(40, 5, "Start Date")
 	pdf.SetFont("Helvetica", "", 9)
 	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.SetXY(metaValueX, metaStartY+18)
+	pdf.SetXY(metaValueX, metaStartY+12)
 	pdf.Cell(45, 5, contract.StartDate.Format("02 Jan 2006"))
 
 	// End Date
 	if contract.EndDate != nil {
 		pdf.SetFont("Helvetica", "B", 9)
 		pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-		pdf.SetXY(metaLabelX, metaStartY+24)
+		pdf.SetXY(metaLabelX, metaStartY+18)
 		pdf.Cell(40, 5, "End Date")
 		pdf.SetFont("Helvetica", "", 9)
 		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-		pdf.SetXY(metaValueX, metaStartY+24)
+		pdf.SetXY(metaValueX, metaStartY+18)
 		pdf.Cell(45, 5, contract.EndDate.Format("02 Jan 2006"))
 	}
 
-	// Status badge
-	pdf.SetXY(metaLabelX, metaStartY+32)
-	drawStatusBadge(pdf, contract.Active, pdfCfg)
+	// Note: Status badge removed - not needed for professional contracts
 
-	// Two-column layout for From/Bill To
+	// Two-column layout for Bill To/From
 	// Position below the metadata section to avoid overlap
 	currentY := 75.0
 
-	// Left column - From (Company)
+	// Left column - Bill To (Client)
 	pdf.SetXY(leftMargin, currentY)
 	pdf.SetFont("Helvetica", "B", 10)
 	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.Cell(90, 6, cfg.Invoice.FromLabel)
+	pdf.Cell(90, 6, cfg.Invoice.BillToLabel)
 
 	pdf.SetFont("Helvetica", "B", 11)
 	pdf.SetTextColor(40, 40, 40)
 	pdf.SetXY(leftMargin, currentY+7)
-	pdf.Cell(90, 5, company.Name)
-
-	pdf.SetFont("Helvetica", "", 9)
-	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	companyY := currentY + 13
-	if company.Email != "" {
-		pdf.SetXY(leftMargin, companyY)
-		pdf.Cell(90, 5, company.Email)
-		companyY += 5
-	}
-	if company.Phone != "" {
-		pdf.SetXY(leftMargin, companyY)
-		pdf.Cell(90, 5, company.Phone)
-		companyY += 5
-	}
-	if company.Address != "" {
-		pdf.SetXY(leftMargin, companyY)
-		pdf.MultiCell(85, 5, company.Address, "", "L", false)
-		companyY = pdf.GetY()
-	}
-	if company.TaxID != "" {
-		pdf.SetXY(leftMargin, companyY)
-		pdf.Cell(90, 5, fmt.Sprintf("Tax ID: %s", company.TaxID))
-		companyY += 5
-	}
-
-	// Bank details
-	if company.BankName != "" || company.BankAccount != "" {
-		pdf.SetXY(leftMargin, companyY+2)
-		pdf.SetFont("Helvetica", "B", 9)
-		pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-		pdf.Cell(90, 5, "Bank Details:")
-		pdf.SetFont("Helvetica", "", 9)
-		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-		companyY += 7
-		if company.BankName != "" {
-			pdf.SetXY(leftMargin, companyY)
-			pdf.Cell(90, 5, company.BankName)
-			companyY += 5
-		}
-		if company.BankAccount != "" {
-			pdf.SetXY(leftMargin, companyY)
-			pdf.Cell(90, 5, fmt.Sprintf("Account: %s", company.BankAccount))
-			companyY += 5
-		}
-		if company.BankSWIFT != "" {
-			pdf.SetXY(leftMargin, companyY)
-			pdf.Cell(90, 5, fmt.Sprintf("SWIFT: %s", company.BankSWIFT))
-			companyY += 5
-		}
-	}
-
-	leftColumnEndY := companyY
-
-	// Right column - Bill To (Client)
-	pdf.SetXY(110, currentY)
-	pdf.SetFont("Helvetica", "B", 10)
-	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.Cell(85, 6, cfg.Invoice.BillToLabel)
-
-	pdf.SetFont("Helvetica", "B", 11)
-	pdf.SetTextColor(40, 40, 40)
-	pdf.SetXY(110, currentY+7)
-	pdf.Cell(85, 5, client.Name)
+	pdf.Cell(90, 5, client.Name)
 
 	pdf.SetFont("Helvetica", "", 9)
 	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
 	clientY := currentY + 13
 	if client.Email != "" {
-		pdf.SetXY(110, clientY)
-		pdf.Cell(85, 5, client.Email)
+		pdf.SetXY(leftMargin, clientY)
+		pdf.Cell(90, 5, client.Email)
 		clientY += 5
 	}
 	if client.Address != "" {
-		pdf.SetXY(110, clientY)
-		pdf.MultiCell(80, 5, client.Address, "", "L", false)
+		pdf.SetXY(leftMargin, clientY)
+		pdf.MultiCell(85, 5, client.Address, "", "L", false)
 		clientY = pdf.GetY()
 	}
 	if client.TaxID != "" {
-		pdf.SetXY(110, clientY)
-		pdf.Cell(85, 5, fmt.Sprintf("Tax ID: %s", client.TaxID))
+		pdf.SetXY(leftMargin, clientY)
+		pdf.Cell(90, 5, fmt.Sprintf("Tax ID: %s", client.TaxID))
+		clientY += 5
 	}
 
-	rightColumnEndY := pdf.GetY()
+	leftColumnEndY := clientY
+
+	// Right column - From (Company)
+	pdf.SetXY(110, currentY)
+	pdf.SetFont("Helvetica", "B", 10)
+	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
+	pdf.Cell(85, 6, cfg.Invoice.FromLabel)
+
+	pdf.SetFont("Helvetica", "B", 11)
+	pdf.SetTextColor(40, 40, 40)
+	pdf.SetXY(110, currentY+7)
+	pdf.Cell(85, 5, company.Name)
+
+	pdf.SetFont("Helvetica", "", 9)
+	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
+	companyY := currentY + 13
+	if company.Email != "" {
+		pdf.SetXY(110, companyY)
+		pdf.Cell(85, 5, company.Email)
+		companyY += 5
+	}
+	if company.Phone != "" {
+		pdf.SetXY(110, companyY)
+		pdf.Cell(85, 5, company.Phone)
+		companyY += 5
+	}
+	if company.Address != "" {
+		pdf.SetXY(110, companyY)
+		pdf.MultiCell(80, 5, company.Address, "", "L", false)
+		companyY = pdf.GetY()
+	}
+	if company.TaxID != "" {
+		pdf.SetXY(110, companyY)
+		pdf.Cell(85, 5, fmt.Sprintf("Tax ID: %s", company.TaxID))
+		companyY += 5
+	}
+
+	// Bank details
+	if company.BankName != "" || company.BankAccount != "" {
+		pdf.SetXY(110, companyY+2)
+		pdf.SetFont("Helvetica", "B", 9)
+		pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
+		pdf.Cell(85, 5, "Bank Details:")
+		pdf.SetFont("Helvetica", "", 9)
+		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
+		companyY += 7
+		if company.BankName != "" {
+			pdf.SetXY(110, companyY)
+			pdf.Cell(85, 5, company.BankName)
+			companyY += 5
+		}
+		if company.BankAccount != "" {
+			pdf.SetXY(110, companyY)
+			pdf.Cell(85, 5, fmt.Sprintf("Account: %s", company.BankAccount))
+			companyY += 5
+		}
+		if company.BankSWIFT != "" {
+			pdf.SetXY(110, companyY)
+			pdf.Cell(85, 5, fmt.Sprintf("SWIFT: %s", company.BankSWIFT))
+			companyY += 5
+		}
+	}
+
+	rightColumnEndY := companyY
 
 	// Move past both columns
 	maxY := leftColumnEndY
@@ -284,20 +265,7 @@ func GeneratePDF(contract models.Contract, company models.Company, client models
 		pdf.CellFormat(contentWidth-60, 7, contract.EndDate.Format("January 2, 2006"), "1", 1, "L", false, 0, "")
 	}
 
-	// Status row with color
-	pdf.SetX(leftMargin)
-	pdf.CellFormat(60, 7, "Status", "1", 0, "L", false, 0, "")
-	statusText := "Active"
-	if contract.Active {
-		pdf.SetTextColor(34, 139, 34) // Green
-	} else {
-		statusText = "Inactive"
-		pdf.SetTextColor(220, 20, 60) // Red
-	}
-	pdf.SetFont("Helvetica", "B", 10)
-	pdf.CellFormat(contentWidth-60, 7, statusText, "1", 1, "L", false, 0, "")
-	pdf.SetFont("Helvetica", "", 10)
-	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
+	// Note: Status row removed - not needed for professional contracts
 
 	pdf.Ln(5)
 

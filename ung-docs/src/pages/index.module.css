@@ -103,6 +103,28 @@
   background: #f08a3a;
 }
 
+.copyButtonCopied {
+  background: #22c55e !important;
+  animation: copySuccess 0.3s ease;
+}
+
+[data-theme='dark'] .copyButtonCopied {
+  background: #22c55e !important;
+  color: #ffffff;
+}
+
+@keyframes copySuccess {
+  0% {
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+    transform: translateY(-50%) scale(1.1);
+  }
+  100% {
+    transform: translateY(-50%) scale(1);
+  }
+}
+
 @media screen and (max-width: 996px) {
   .heroBanner {
     padding: 2rem;
@@ -189,6 +211,22 @@
 
   .copyButton:active {
     transform: scale(0.98);
+  }
+
+  .copyButtonCopied {
+    animation: copySuccessMobile 0.3s ease;
+  }
+
+  @keyframes copySuccessMobile {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 
   .buttons {

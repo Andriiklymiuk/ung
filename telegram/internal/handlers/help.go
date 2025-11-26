@@ -20,32 +20,36 @@ func (h *HelpHandler) Handle(message *tgbotapi.Message) error {
 
 *Invoices:*
 /invoice - Create new invoice
-/invoices - List all invoices
-/unpaid - View unpaid invoices
+/invoices - List invoices with PDF buttons
+/pdf <num> - Generate invoice PDF (e.g., /pdf INV-001)
 
-*Clients:*
-/client - Manage clients
+*Clients & Companies:*
+/client - Add new client
 /clients - List all clients
+/company - Add new company
+/companies - List all companies
+
+*Contracts:*
+/contract - Create new contract
+/contracts - List all contracts
 
 *Time Tracking:*
-/track - Log time
-/today - Today's tracked time
-/week - This week's summary
+/track - Start time tracking
+/stop - Stop current session
+/active - View active session
+/log - Log time manually
+/tracking - View tracking history
+
+*Expenses:*
+/expense - Add new expense
+/expenses - List all expenses
 
 *Reports:*
-/report - View reports
-/revenue - Revenue summary
-/overdue - Overdue invoices
+/dashboard - Revenue overview
 
-*Other:*
-/status - Account status
-/settings - Bot settings
+*Getting Started:*
+/start - Main menu & authentication
 /help - Show this help
-
-*Quick Actions:*
-Just send me a message like:
-• "3h website design" - Log time quickly
-• "invoice for Acme Corp" - Create invoice
 
 Need help? Visit https://ung.app/help`
 

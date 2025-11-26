@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -280,6 +281,94 @@ func handleCallback(
 		bot.Send(msg)
 
 		callback := tgbotapi.NewCallback(callbackQuery.ID, "Please visit the link to authenticate")
+		bot.Request(callback)
+		return nil
+	}
+
+	// Quick action callbacks from main menu
+	if data == "action_clients" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading clients...")
+		bot.Request(callback)
+		return clientHandler.HandleList(msg)
+	}
+
+	if data == "action_track" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Starting tracking...")
+		bot.Request(callback)
+		return trackingHandler.HandleStart(msg)
+	}
+
+	if data == "action_reports" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading reports...")
+		bot.Request(callback)
+		// Show dashboard as reports
+		chatID := callbackQuery.Message.Chat.ID
+		text := "📊 *Reports*\n\nUse these commands:\n" +
+			"• /dashboard - Revenue overview\n" +
+			"• /invoices - Invoice list\n" +
+			"• /tracking - Time tracking history"
+		reportMsg := tgbotapi.NewMessage(chatID, text)
+		reportMsg.ParseMode = "Markdown"
+		bot.Send(reportMsg)
+		return nil
+	}
+
+	if data == "action_settings" {
+		chatID := callbackQuery.Message.Chat.ID
+		text := "⚙️ *Settings*\n\n" +
+			"Settings are managed via the web app or CLI.\n\n" +
+			"Visit https://ung.app/settings to configure your account."
+		settingsMsg := tgbotapi.NewMessage(chatID, text)
+		settingsMsg.ParseMode = "Markdown"
+		bot.Send(settingsMsg)
+
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Settings info shown")
+		bot.Request(callback)
+		return nil
+	}
+
+	if data == "main_menu" {
+		chatID := callbackQuery.Message.Chat.ID
+		telegramID := callbackQuery.From.ID
+
+		user := sessionMgr.GetUser(telegramID)
+		name := "there"
+		if user != nil {
+			name = user.Name
+		}
+
+		text := fmt.Sprintf("Welcome back, %s! 👋\n\nWhat would you like to do?", name)
+		msg := tgbotapi.NewMessage(chatID, text)
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("📄 Create Invoice", "action_invoice"),
+				tgbotapi.NewInlineKeyboardButtonData("👥 Clients", "action_clients"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("⏱️ Track Time", "action_track"),
+				tgbotapi.NewInlineKeyboardButtonData("📊 Reports", "action_reports"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "action_settings"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+		bot.Send(msg)
+
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "")
 		bot.Request(callback)
 		return nil
 	}

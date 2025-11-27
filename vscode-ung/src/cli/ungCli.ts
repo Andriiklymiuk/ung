@@ -28,6 +28,14 @@ function getWorkspaceCwd(): string | undefined {
 }
 
 /**
+ * Check if useGlobalConfig setting is enabled
+ */
+function shouldUseGlobalConfig(): boolean {
+  const config = vscode.workspace.getConfiguration('ung');
+  return config.get<boolean>('useGlobalConfig', true);
+}
+
+/**
  * CLI wrapper for executing UNG commands
  */
 export class UngCli {
@@ -44,9 +52,9 @@ export class UngCli {
    * @param options Execution options
    * @returns Promise with result
    *
-   * By default, commands are executed in the workspace folder (if available)
-   * to allow the CLI to detect local .ung/ configuration.
-   * Use options.cwd to override, or options.useGlobal to force global config.
+   * By default, commands use the ung.useGlobalConfig setting to determine
+   * whether to use global (~/.ung/) or local (.ung/) configuration.
+   * Use options.useGlobal to explicitly override.
    */
   async exec<T = unknown>(
     args: string[],
@@ -56,8 +64,11 @@ export class UngCli {
     // Default to workspace folder for local config detection
     const cwd = options?.cwd ?? getWorkspaceCwd();
 
+    // Use setting if useGlobal not explicitly provided
+    const useGlobal = options?.useGlobal ?? shouldUseGlobalConfig();
+
     // If useGlobal is set, add the --global flag
-    const commandArgs = options?.useGlobal ? ['--global', ...args] : args;
+    const commandArgs = useGlobal ? ['--global', ...args] : args;
 
     const command = `${this.CLI_COMMAND} ${commandArgs.join(' ')}`;
     this.outputChannel.appendLine(`> ${command}${cwd ? ` (cwd: ${cwd})` : ''}`);

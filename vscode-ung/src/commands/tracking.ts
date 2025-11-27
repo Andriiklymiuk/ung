@@ -403,8 +403,30 @@ export class TrackingCommands {
       return;
     }
 
+    // Get session details for potential revert
+    const sessionsResult = await this.cli.listTrackingSessions();
+    let sessionData: {
+      project: string;
+      client: string;
+      hours: number;
+      billable: boolean;
+      notes?: string;
+    } | null = null;
+
+    if (sessionsResult.success && sessionsResult.stdout) {
+      const session = this.parseSessionFromOutput(
+        sessionsResult.stdout,
+        sessionId
+      );
+      if (session) {
+        sessionData = session;
+      }
+    }
+
     const confirm = await vscode.window.showWarningMessage(
-      `Delete tracking session #${sessionId}? This is a soft delete.`,
+      sessionData
+        ? `Delete tracking session "${sessionData.project}"? This is a soft delete.`
+        : `Delete tracking session #${sessionId}? This is a soft delete.`,
       { modal: true },
       'Yes, Delete',
       'Cancel'
@@ -412,6 +434,7 @@ export class TrackingCommands {
 
     if (confirm !== 'Yes, Delete') return;
 
+    let deleteSuccess = false;
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -422,13 +445,150 @@ export class TrackingCommands {
         const result = await this.cli.deleteTrackingSession(sessionId);
 
         if (result.success) {
-          vscode.window.showInformationMessage('Session deleted successfully!');
+          deleteSuccess = true;
           if (this.refreshCallback) {
             this.refreshCallback();
           }
         } else {
           vscode.window.showErrorMessage(
             `Failed to delete session: ${result.error}`
+          );
+        }
+      }
+    );
+
+    // Show success message with revert option
+    if (deleteSuccess && sessionData) {
+      const action = await vscode.window.showInformationMessage(
+        `Session "${sessionData.project}" deleted successfully!`,
+        'Revert'
+      );
+
+      if (action === 'Revert') {
+        await this.revertSessionDeletion(sessionData);
+      }
+    } else if (deleteSuccess) {
+      vscode.window.showInformationMessage('Session deleted successfully!');
+    }
+  }
+
+  /**
+   * Parse a specific session from CLI output
+   */
+  private parseSessionFromOutput(
+    output: string,
+    sessionId: number
+  ): {
+    project: string;
+    client: string;
+    hours: number;
+    billable: boolean;
+    notes?: string;
+  } | null {
+    const lines = output.split('\n').filter((line) => line.trim());
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const parts = line.split(/\s{2,}/);
+      if (parts.length >= 6) {
+        const id = parseInt(parts[0], 10);
+        if (id === sessionId) {
+          const project = parts[1] || 'Untitled';
+          const client = parts[2] || '';
+          const duration = parts[4];
+          const billable =
+            parts[5]?.toLowerCase() === 'yes' ||
+            parts[5]?.toLowerCase() === 'true';
+
+          // Parse duration to hours
+          let hours = 0;
+          const hourMatch = duration.match(/(\d+(?:\.\d+)?)\s*h/i);
+          const minMatch = duration.match(/(\d+)\s*m/i);
+          const colonMatch = duration.match(/(\d+):(\d+)/);
+
+          if (colonMatch) {
+            hours =
+              parseInt(colonMatch[1], 10) + parseInt(colonMatch[2], 10) / 60;
+          } else {
+            if (hourMatch) {
+              hours += parseFloat(hourMatch[1]);
+            }
+            if (minMatch) {
+              hours += parseInt(minMatch[1], 10) / 60;
+            }
+          }
+
+          return {
+            project,
+            client,
+            hours: Math.round(hours * 100) / 100,
+            billable,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Revert a session deletion by re-logging the time
+   */
+  private async revertSessionDeletion(sessionData: {
+    project: string;
+    client: string;
+    hours: number;
+    billable: boolean;
+    notes?: string;
+  }): Promise<void> {
+    // First, we need to find the contract ID from the client name
+    const contractsResult = await this.cli.listContracts();
+    if (!contractsResult.success || !contractsResult.stdout) {
+      vscode.window.showErrorMessage(
+        'Failed to revert: Could not fetch contracts'
+      );
+      return;
+    }
+
+    // Parse contracts to find one matching the client
+    const contracts = this.parseContractsFromOutput(contractsResult.stdout);
+    const matchingContract = contracts.find(
+      (c) => c.client === sessionData.client
+    );
+
+    if (!matchingContract) {
+      vscode.window.showErrorMessage(
+        `Failed to revert: No contract found for client "${sessionData.client}"`
+      );
+      return;
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Reverting session deletion...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.logTime({
+          contractId: matchingContract.id,
+          hours: sessionData.hours,
+          project: sessionData.project,
+          notes: sessionData.notes,
+        });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Session "${sessionData.project}" restored successfully!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to restore session: ${result.error}`
           );
         }
       }

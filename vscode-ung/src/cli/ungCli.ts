@@ -824,10 +824,9 @@ export class UngCli {
 
   /**
    * Delete a tracking session (soft delete)
+   * Uses --yes flag to skip CLI confirmation since VS Code handles it
    */
   async deleteTrackingSession(id: number): Promise<CliResult> {
-    // Note: CLI requires interactive confirmation
-    // For VS Code, we'll handle confirmation via VS Code dialog
-    return this.exec(['track', 'delete', id.toString()]);
+    return this.exec(['track', 'delete', id.toString(), '--yes']);
   }
 }

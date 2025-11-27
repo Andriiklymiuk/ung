@@ -218,8 +218,31 @@ export class ExpenseCommands {
       return;
     }
 
+    // Get expense details for confirmation and potential revert
+    const expensesResult = await this.cli.listExpenses();
+    let expenseData: {
+      description: string;
+      amount: number;
+      currency: string;
+      category: string;
+      date: string;
+      vendor?: string;
+    } | null = null;
+
+    if (expensesResult.success && expensesResult.stdout) {
+      const expense = this.parseExpenseFromOutput(
+        expensesResult.stdout,
+        expenseId
+      );
+      if (expense) {
+        expenseData = expense;
+      }
+    }
+
     const confirm = await vscode.window.showWarningMessage(
-      `Are you sure you want to delete this expense?`,
+      expenseData
+        ? `Are you sure you want to delete "${expenseData.description}"?`
+        : `Are you sure you want to delete this expense?`,
       { modal: true },
       'Yes',
       'No'
@@ -227,6 +250,7 @@ export class ExpenseCommands {
 
     if (confirm !== 'Yes') return;
 
+    let deleteSuccess = false;
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -241,11 +265,124 @@ export class ExpenseCommands {
         ]);
 
         if (result.success) {
-          vscode.window.showInformationMessage('Expense deleted successfully');
+          deleteSuccess = true;
           this.refreshCallback?.();
         } else {
           vscode.window.showErrorMessage(
             `Failed to delete expense: ${result.error}`
+          );
+        }
+      }
+    );
+
+    // Show success message with revert option
+    if (deleteSuccess && expenseData) {
+      const action = await vscode.window.showInformationMessage(
+        `Expense "${expenseData.description}" deleted successfully!`,
+        'Revert'
+      );
+
+      if (action === 'Revert') {
+        await this.revertExpenseDeletion(expenseData);
+      }
+    } else if (deleteSuccess) {
+      vscode.window.showInformationMessage('Expense deleted successfully');
+    }
+  }
+
+  /**
+   * Parse a specific expense from CLI output
+   */
+  private parseExpenseFromOutput(
+    output: string,
+    expenseId: number
+  ): {
+    description: string;
+    amount: number;
+    currency: string;
+    category: string;
+    date: string;
+    vendor?: string;
+  } | null {
+    const lines = output.split('\n').filter((line) => line.trim());
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('Total:')) continue;
+
+      const parts = line.split(/\s{2,}/);
+      if (parts.length >= 6) {
+        const id = parseInt(parts[0], 10);
+        if (id === expenseId) {
+          const date = parts[1];
+          const description = parts[2];
+          const category = parts[3];
+          const vendor = parts[4] !== '-' ? parts[4] : undefined;
+          const amountParts = parts[5].split(' ');
+          const amount = parseFloat(amountParts[0]);
+          const currency = amountParts[1] || 'USD';
+
+          return {
+            description,
+            amount,
+            currency,
+            category,
+            date,
+            vendor,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Revert an expense deletion by re-creating the expense
+   */
+  private async revertExpenseDeletion(expenseData: {
+    description: string;
+    amount: number;
+    currency: string;
+    category: string;
+    date: string;
+    vendor?: string;
+  }): Promise<void> {
+    const args = [
+      'expense',
+      'add',
+      '--description',
+      expenseData.description,
+      '--amount',
+      expenseData.amount.toString(),
+      '--category',
+      expenseData.category,
+    ];
+
+    if (expenseData.vendor) {
+      args.push('--vendor', expenseData.vendor);
+    }
+    if (expenseData.date) {
+      args.push('--date', expenseData.date);
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Reverting expense deletion...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.exec(args);
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Expense "${expenseData.description}" restored successfully!`
+          );
+          this.refreshCallback?.();
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to restore expense: ${result.error}`
           );
         }
       }

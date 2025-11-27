@@ -506,11 +506,7 @@
         {
           "id": "ungDashboard",
           "name": "Dashboard",
-          "when": "ung.cliInstalled && ung.isInitialized"
-        },
-        {
-          "id": "ungGettingStarted",
-          "name": "Quick Setup",
+          "type": "webview",
           "when": "ung.cliInstalled && ung.isInitialized"
         },
         {

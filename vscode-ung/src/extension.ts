@@ -11,11 +11,10 @@ import { TrackingCommands } from './commands/tracking';
 import { StatusBarManager } from './utils/statusBar';
 import { ClientProvider } from './views/clientProvider';
 import { ContractProvider } from './views/contractProvider';
-import { DashboardProvider } from './views/dashboardProvider';
 import { ExpenseProvider } from './views/expenseProvider';
 import { InvoiceProvider } from './views/invoiceProvider';
 import { TrackingProvider } from './views/trackingProvider';
-import { GettingStartedProvider } from './views/welcomeProvider';
+import { DashboardWebviewProvider } from './webview/dashboardWebviewProvider';
 import { ExportPanel } from './webview/exportPanel';
 import { MainDashboardPanel } from './webview/mainDashboardPanel';
 import { OnboardingWebviewProvider } from './webview/onboardingWebviewProvider';
@@ -46,6 +45,18 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider(
       OnboardingWebviewProvider.viewType,
       onboardingProvider
+    )
+  );
+
+  // Register Dashboard webview provider for sidebar
+  const dashboardWebviewProvider = new DashboardWebviewProvider(
+    context.extensionUri,
+    cli
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      DashboardWebviewProvider.viewType,
+      dashboardWebviewProvider
     )
   );
 
@@ -247,49 +258,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const isInstalled = await cli.isInstalled();
   vscode.commands.executeCommand('setContext', 'ung.cliInstalled', isInstalled);
 
-  // Register Getting Started provider (always, to avoid "No view is registered" error)
-  // It will only be visible when ung.cliInstalled is true due to the "when" clause in package.json
-  const gettingStartedProvider = new GettingStartedProvider(
-    async (): Promise<boolean> => {
-      if (!isInstalled) return false;
-      const result = await cli.exec(['company', 'list']);
-      return !!(
-        result.success &&
-        result.stdout &&
-        !result.stdout.includes('No company')
-      );
-    },
-    async (): Promise<boolean> => {
-      if (!isInstalled) return false;
-      const result = await cli.exec(['client', 'list']);
-      return !!(
-        result.success &&
-        result.stdout &&
-        result.stdout.split('\n').length > 2
-      );
-    },
-    async (): Promise<boolean> => {
-      if (!isInstalled) return false;
-      const result = await cli.exec(['contract', 'list']);
-      return !!(
-        result.success &&
-        result.stdout &&
-        result.stdout.split('\n').length > 2
-      );
-    }
-  );
-  const gettingStartedTree = vscode.window.createTreeView('ungGettingStarted', {
-    treeDataProvider: gettingStartedProvider,
-  });
-  context.subscriptions.push(gettingStartedTree);
-
-  // Register refresh command for Getting Started (always available)
-  context.subscriptions.push(
-    vscode.commands.registerCommand('ung.refreshGettingStarted', () =>
-      gettingStartedProvider.refresh()
-    )
-  );
-
   if (!isInstalled) {
     // CLI not installed - the onboarding webview will show installation options
     // No blocking alert needed, the webview handles the UX
@@ -412,10 +380,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const clientProvider = new ClientProvider(cli);
   const expenseProvider = new ExpenseProvider(cli);
   const trackingProvider = new TrackingProvider(cli);
-  const dashboardProvider = new DashboardProvider(cli);
-
-  // Refresh Getting Started provider now that CLI is installed
-  await gettingStartedProvider.refresh();
 
   // Register tree views
   const invoicesTree = vscode.window.createTreeView('ungInvoices', {
@@ -433,17 +397,13 @@ export async function activate(context: vscode.ExtensionContext) {
   const trackingTree = vscode.window.createTreeView('ungTracking', {
     treeDataProvider: trackingProvider,
   });
-  const dashboardTree = vscode.window.createTreeView('ungDashboard', {
-    treeDataProvider: dashboardProvider,
-  });
 
   context.subscriptions.push(
     invoicesTree,
     contractsTree,
     clientsTree,
     expensesTree,
-    trackingTree,
-    dashboardTree
+    trackingTree
   );
 
   // Initialize command handlers
@@ -613,7 +573,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Dashboard commands
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.refreshDashboard', () =>
-      dashboardProvider.refresh()
+      dashboardWebviewProvider.refresh()
     )
   );
 
@@ -718,8 +678,7 @@ export async function activate(context: vscode.ExtensionContext) {
       clientProvider.refresh();
       expenseProvider.refresh();
       trackingProvider.refresh();
-      dashboardProvider.refresh();
-      gettingStartedProvider.refresh();
+      dashboardWebviewProvider.refresh();
       statusBar.forceUpdate();
       vscode.window.showInformationMessage('All views refreshed!');
     })

@@ -329,7 +329,11 @@ export async function activate(context: vscode.ExtensionContext) {
         async () => {
           const result = await cli.initialize(true);
           if (result.success) {
-            vscode.commands.executeCommand('setContext', 'ung.isInitialized', true);
+            vscode.commands.executeCommand(
+              'setContext',
+              'ung.isInitialized',
+              true
+            );
             vscode.window
               .showInformationMessage(
                 'UNG is now set up! Your data will be stored in ~/.ung/',
@@ -337,7 +341,9 @@ export async function activate(context: vscode.ExtensionContext) {
               )
               .then((choice) => {
                 if (choice === 'Get Started') {
-                  vscode.commands.executeCommand('workbench.action.reloadWindow');
+                  vscode.commands.executeCommand(
+                    'workbench.action.reloadWindow'
+                  );
                 }
               });
           } else {
@@ -356,7 +362,11 @@ export async function activate(context: vscode.ExtensionContext) {
         async () => {
           const result = await cli.initialize(false);
           if (result.success) {
-            vscode.commands.executeCommand('setContext', 'ung.isInitialized', true);
+            vscode.commands.executeCommand(
+              'setContext',
+              'ung.isInitialized',
+              true
+            );
             vscode.window
               .showInformationMessage(
                 'UNG is now set up! Your data will be stored in .ung/ folder',
@@ -364,7 +374,9 @@ export async function activate(context: vscode.ExtensionContext) {
               )
               .then((choice) => {
                 if (choice === 'Get Started') {
-                  vscode.commands.executeCommand('workbench.action.reloadWindow');
+                  vscode.commands.executeCommand(
+                    'workbench.action.reloadWindow'
+                  );
                 }
               });
           } else {

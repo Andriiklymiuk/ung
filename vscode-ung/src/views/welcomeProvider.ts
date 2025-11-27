@@ -3,7 +3,14 @@ import * as vscode from 'vscode';
 /**
  * Welcome item types
  */
-type WelcomeItemType = 'header' | 'feature' | 'action' | 'info' | 'separator' | 'step' | 'benefit';
+type WelcomeItemType =
+  | 'header'
+  | 'feature'
+  | 'action'
+  | 'info'
+  | 'separator'
+  | 'step'
+  | 'benefit';
 
 /**
  * Welcome tree item with rich formatting

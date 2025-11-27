@@ -397,6 +397,17 @@
         "icon": "$(export)"
       },
       {
+        "command": "ung.openExportWizard",
+        "title": "Open Export Wizard",
+        "category": "UNG",
+        "icon": "$(export)"
+      },
+      {
+        "command": "ung.viewClient",
+        "title": "View Client Details",
+        "category": "UNG"
+      },
+      {
         "command": "ung.syncData",
         "title": "Backup & Sync Data",
         "category": "UNG",

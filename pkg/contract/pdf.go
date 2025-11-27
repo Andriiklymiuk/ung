@@ -13,289 +13,201 @@ import (
 	"github.com/jung-kurt/gofpdf"
 )
 
-// GeneratePDF creates a professional PDF for a contract with enhanced features
+// GeneratePDF creates a professional PDF for a contract as a clean one-page document
 func GeneratePDF(contract models.Contract, company models.Company, client models.Client) (string, error) {
 	cfg, _ := config.Load()
 	pdfCfg := cfg.PDF
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
-
-	// Note: Page numbers disabled for contracts since they are typically single-page documents
-	// For multi-page contracts, the page number would show "Page 1/1" which looks odd
-
 	pdf.AddPage()
 
-	// Note: Watermark disabled for contracts - not needed for professional look
-	// if pdfCfg.ShowWatermark {
-	// 	drawContractWatermark(pdf, contract.Active, pdfCfg)
-	// }
-
 	// Set margins
-	leftMargin := 15.0
-	rightMargin := 15.0
+	leftMargin := 20.0
+	rightMargin := 20.0
 	pageWidth := 210.0
 	contentWidth := pageWidth - leftMargin - rightMargin
 
-	// Header section with logo
-	headerY := 15.0
-	logoEndX := leftMargin
-
-	// Draw company logo if available and enabled
-	if pdfCfg.ShowLogo && company.LogoPath != "" {
-		logoEndX = drawLogo(pdf, company.LogoPath, leftMargin, headerY)
-	}
-
-	// Company name (after logo or at start)
-	pdf.SetFont("Helvetica", "B", 16)
+	// Document Title - centered at top
+	pdf.SetFont("Helvetica", "B", 20)
 	pdf.SetTextColor(40, 40, 40)
-	pdf.SetXY(logoEndX+5, headerY)
-	pdf.Cell(contentWidth/2-logoEndX, 10, company.Name)
+	pdf.SetXY(leftMargin, 20)
+	pdf.CellFormat(contentWidth, 10, "SERVICE AGREEMENT", "", 1, "C", false, 0, "")
 
-	// CONTRACT title on right with custom color
-	pdf.SetFont("Helvetica", "B", 24)
-	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.SetXY(pageWidth-rightMargin-60, headerY)
-	pdf.Cell(60, 10, "CONTRACT")
-	pdf.Ln(15)
+	// Contract reference line
+	pdf.SetFont("Helvetica", "", 10)
+	pdf.SetTextColor(100, 100, 100)
+	pdf.SetXY(leftMargin, 32)
+	pdf.CellFormat(contentWidth, 6, fmt.Sprintf("Contract Reference: %s", contract.ContractNum), "", 1, "C", false, 0, "")
 
-	// Contract metadata section (right side)
-	metaStartY := 32.0
-	metaLabelX := pageWidth - rightMargin - 80
-	metaValueX := pageWidth - rightMargin - 40
+	// Horizontal line
+	pdf.SetDrawColor(200, 200, 200)
+	pdf.Line(leftMargin, 42, pageWidth-rightMargin, 42)
 
-	pdf.SetFont("Helvetica", "B", 9)
-	pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-
-	// Contract Number
-	pdf.SetXY(metaLabelX, metaStartY)
-	pdf.Cell(40, 5, "Contract#")
-	pdf.SetFont("Helvetica", "", 9)
+	// Introduction paragraph
+	pdf.SetFont("Helvetica", "", 11)
 	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.SetXY(metaValueX, metaStartY)
-	pdf.Cell(45, 5, contract.ContractNum)
+	pdf.SetXY(leftMargin, 50)
 
-	// Type (moved up since Name is removed)
-	pdf.SetFont("Helvetica", "B", 9)
-	pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-	pdf.SetXY(metaLabelX, metaStartY+6)
-	pdf.Cell(40, 5, "Type")
-	pdf.SetFont("Helvetica", "", 9)
-	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.SetXY(metaValueX, metaStartY+6)
-	pdf.Cell(45, 5, formatContractType(contract.ContractType))
+	introText := fmt.Sprintf("This Service Agreement is entered into as of %s between the following parties:",
+		contract.StartDate.Format("January 2, 2006"))
+	pdf.MultiCell(contentWidth, 6, introText, "", "L", false)
 
-	// Start Date
-	pdf.SetFont("Helvetica", "B", 9)
-	pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-	pdf.SetXY(metaLabelX, metaStartY+12)
-	pdf.Cell(40, 5, "Start Date")
-	pdf.SetFont("Helvetica", "", 9)
-	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.SetXY(metaValueX, metaStartY+12)
-	pdf.Cell(45, 5, contract.StartDate.Format("02 Jan 2006"))
+	pdf.Ln(8)
 
-	// End Date
-	if contract.EndDate != nil {
-		pdf.SetFont("Helvetica", "B", 9)
-		pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-		pdf.SetXY(metaLabelX, metaStartY+18)
-		pdf.Cell(40, 5, "End Date")
-		pdf.SetFont("Helvetica", "", 9)
-		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-		pdf.SetXY(metaValueX, metaStartY+18)
-		pdf.Cell(45, 5, contract.EndDate.Format("02 Jan 2006"))
-	}
+	// Parties section
+	currentY := pdf.GetY()
 
-	// Note: Status badge removed - not needed for professional contracts
-
-	// Two-column layout for Bill To/From
-	// Position below the metadata section to avoid overlap
-	currentY := 75.0
-
-	// Left column - Bill To (Client)
-	pdf.SetXY(leftMargin, currentY)
-	pdf.SetFont("Helvetica", "B", 10)
-	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.Cell(90, 6, cfg.Invoice.BillToLabel)
-
+	// Provider (Company)
 	pdf.SetFont("Helvetica", "B", 11)
 	pdf.SetTextColor(40, 40, 40)
-	pdf.SetXY(leftMargin, currentY+7)
-	pdf.Cell(90, 5, client.Name)
+	pdf.SetXY(leftMargin, currentY)
+	pdf.Cell(contentWidth/2-5, 6, "Service Provider:")
 
-	pdf.SetFont("Helvetica", "", 9)
+	pdf.SetFont("Helvetica", "", 10)
 	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	clientY := currentY + 13
-	if client.Email != "" {
-		pdf.SetXY(leftMargin, clientY)
-		pdf.Cell(90, 5, client.Email)
-		clientY += 5
+	providerY := currentY + 7
+	pdf.SetXY(leftMargin, providerY)
+	pdf.Cell(contentWidth/2-5, 5, company.Name)
+	providerY += 5
+	if company.Address != "" {
+		pdf.SetXY(leftMargin, providerY)
+		pdf.MultiCell(contentWidth/2-10, 5, company.Address, "", "L", false)
+		providerY = pdf.GetY()
 	}
+	if company.TaxID != "" {
+		pdf.SetXY(leftMargin, providerY)
+		pdf.Cell(contentWidth/2-5, 5, fmt.Sprintf("Tax ID: %s", company.TaxID))
+		providerY += 5
+	}
+
+	// Client
+	pdf.SetFont("Helvetica", "B", 11)
+	pdf.SetTextColor(40, 40, 40)
+	pdf.SetXY(pageWidth/2+5, currentY)
+	pdf.Cell(contentWidth/2-5, 6, "Client:")
+
+	pdf.SetFont("Helvetica", "", 10)
+	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
+	clientY := currentY + 7
+	pdf.SetXY(pageWidth/2+5, clientY)
+	pdf.Cell(contentWidth/2-5, 5, client.Name)
+	clientY += 5
 	if client.Address != "" {
-		pdf.SetXY(leftMargin, clientY)
-		pdf.MultiCell(85, 5, client.Address, "", "L", false)
+		pdf.SetXY(pageWidth/2+5, clientY)
+		pdf.MultiCell(contentWidth/2-10, 5, client.Address, "", "L", false)
 		clientY = pdf.GetY()
 	}
 	if client.TaxID != "" {
-		pdf.SetXY(leftMargin, clientY)
-		pdf.Cell(90, 5, fmt.Sprintf("Tax ID: %s", client.TaxID))
+		pdf.SetXY(pageWidth/2+5, clientY)
+		pdf.Cell(contentWidth/2-5, 5, fmt.Sprintf("Tax ID: %s", client.TaxID))
 		clientY += 5
 	}
 
-	leftColumnEndY := clientY
-
-	// Right column - From (Company)
-	pdf.SetXY(110, currentY)
-	pdf.SetFont("Helvetica", "B", 10)
-	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.Cell(85, 6, cfg.Invoice.FromLabel)
-
-	pdf.SetFont("Helvetica", "B", 11)
-	pdf.SetTextColor(40, 40, 40)
-	pdf.SetXY(110, currentY+7)
-	pdf.Cell(85, 5, company.Name)
-
-	pdf.SetFont("Helvetica", "", 9)
-	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	companyY := currentY + 13
-	if company.Email != "" {
-		pdf.SetXY(110, companyY)
-		pdf.Cell(85, 5, company.Email)
-		companyY += 5
-	}
-	if company.Phone != "" {
-		pdf.SetXY(110, companyY)
-		pdf.Cell(85, 5, company.Phone)
-		companyY += 5
-	}
-	if company.Address != "" {
-		pdf.SetXY(110, companyY)
-		pdf.MultiCell(80, 5, company.Address, "", "L", false)
-		companyY = pdf.GetY()
-	}
-	if company.TaxID != "" {
-		pdf.SetXY(110, companyY)
-		pdf.Cell(85, 5, fmt.Sprintf("Tax ID: %s", company.TaxID))
-		companyY += 5
-	}
-
-	// Bank details
-	if company.BankName != "" || company.BankAccount != "" {
-		pdf.SetXY(110, companyY+2)
-		pdf.SetFont("Helvetica", "B", 9)
-		pdf.SetTextColor(pdfCfg.SecondaryColor.R, pdfCfg.SecondaryColor.G, pdfCfg.SecondaryColor.B)
-		pdf.Cell(85, 5, "Bank Details:")
-		pdf.SetFont("Helvetica", "", 9)
-		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-		companyY += 7
-		if company.BankName != "" {
-			pdf.SetXY(110, companyY)
-			pdf.Cell(85, 5, company.BankName)
-			companyY += 5
-		}
-		if company.BankAccount != "" {
-			pdf.SetXY(110, companyY)
-			pdf.Cell(85, 5, fmt.Sprintf("Account: %s", company.BankAccount))
-			companyY += 5
-		}
-		if company.BankSWIFT != "" {
-			pdf.SetXY(110, companyY)
-			pdf.Cell(85, 5, fmt.Sprintf("SWIFT: %s", company.BankSWIFT))
-			companyY += 5
-		}
-	}
-
-	rightColumnEndY := companyY
-
 	// Move past both columns
-	maxY := leftColumnEndY
-	if rightColumnEndY > maxY {
-		maxY = rightColumnEndY
+	maxY := providerY
+	if clientY > maxY {
+		maxY = clientY
 	}
 	pdf.SetY(maxY + 10)
 
-	// Contract Details Section
-	pdf.SetX(leftMargin)
+	// Terms of Agreement section
 	pdf.SetFont("Helvetica", "B", 12)
-	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.Cell(190, 8, "Contract Details")
+	pdf.SetTextColor(40, 40, 40)
+	pdf.SetX(leftMargin)
+	pdf.Cell(contentWidth, 8, "Terms of Agreement")
 	pdf.Ln(10)
 
-	// Contract terms table with colored header
-	pdf.SetX(leftMargin)
-	pdf.SetFont("Helvetica", "B", 10)
-	pdf.SetFillColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.SetTextColor(255, 255, 255)
-	pdf.CellFormat(60, 8, "Term", "1", 0, "L", true, 0, "")
-	pdf.CellFormat(contentWidth-60, 8, "Value", "1", 1, "L", true, 0, "")
-
 	pdf.SetFont("Helvetica", "", 10)
 	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.SetFillColor(255, 255, 255)
 
-	// Contract Type
-	pdf.SetX(leftMargin)
-	pdf.CellFormat(60, 7, "Contract Type", "1", 0, "L", false, 0, "")
-	pdf.CellFormat(contentWidth-60, 7, formatContractType(contract.ContractType), "1", 1, "L", false, 0, "")
+	// Build terms text
+	termsItems := []string{}
 
-	// Rate/Price with currency formatting
+	// Contract type and rate
 	if contract.HourlyRate != nil {
-		pdf.SetX(leftMargin)
-		pdf.CellFormat(60, 7, "Hourly Rate", "1", 0, "L", false, 0, "")
-		pdf.SetFont("Helvetica", "B", 10)
-		pdf.CellFormat(contentWidth-60, 7, fmt.Sprintf("%s/hour", invoice.FormatCurrency(*contract.HourlyRate, contract.Currency)), "1", 1, "L", false, 0, "")
-		pdf.SetFont("Helvetica", "", 10)
+		termsItems = append(termsItems, fmt.Sprintf("The Service Provider agrees to provide services at an hourly rate of %s.",
+			invoice.FormatCurrency(*contract.HourlyRate, contract.Currency)))
 	}
 	if contract.FixedPrice != nil {
-		pdf.SetX(leftMargin)
-		pdf.CellFormat(60, 7, "Fixed Price", "1", 0, "L", false, 0, "")
-		pdf.SetFont("Helvetica", "B", 10)
-		pdf.CellFormat(contentWidth-60, 7, invoice.FormatCurrency(*contract.FixedPrice, contract.Currency), "1", 1, "L", false, 0, "")
-		pdf.SetFont("Helvetica", "", 10)
+		termsItems = append(termsItems, fmt.Sprintf("The total fixed price for services is %s.",
+			invoice.FormatCurrency(*contract.FixedPrice, contract.Currency)))
 	}
 
-	// Dates
-	pdf.SetX(leftMargin)
-	pdf.CellFormat(60, 7, "Start Date", "1", 0, "L", false, 0, "")
-	pdf.CellFormat(contentWidth-60, 7, contract.StartDate.Format("January 2, 2006"), "1", 1, "L", false, 0, "")
-
+	// Duration
 	if contract.EndDate != nil {
-		pdf.SetX(leftMargin)
-		pdf.CellFormat(60, 7, "End Date", "1", 0, "L", false, 0, "")
-		pdf.CellFormat(contentWidth-60, 7, contract.EndDate.Format("January 2, 2006"), "1", 1, "L", false, 0, "")
+		termsItems = append(termsItems, fmt.Sprintf("This agreement is effective from %s until %s.",
+			contract.StartDate.Format("January 2, 2006"), contract.EndDate.Format("January 2, 2006")))
+	} else {
+		termsItems = append(termsItems, fmt.Sprintf("This agreement is effective from %s and continues until terminated by either party.",
+			contract.StartDate.Format("January 2, 2006")))
 	}
 
-	// Note: Status row removed - not needed for professional contracts
+	// Render terms as numbered list
+	for i, term := range termsItems {
+		pdf.SetX(leftMargin)
+		pdf.MultiCell(contentWidth, 6, fmt.Sprintf("%d. %s", i+1, term), "", "L", false)
+		pdf.Ln(2)
+	}
 
-	pdf.Ln(5)
-
-	// Notes section
+	// Notes section (if any)
 	if contract.Notes != "" {
+		pdf.Ln(5)
+		pdf.SetFont("Helvetica", "B", 12)
+		pdf.SetTextColor(40, 40, 40)
 		pdf.SetX(leftMargin)
-		pdf.SetFont("Helvetica", "B", 11)
-		pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-		pdf.Cell(190, 8, cfg.Invoice.NotesLabel)
+		pdf.Cell(contentWidth, 8, "Additional Terms")
 		pdf.Ln(8)
-		pdf.SetX(leftMargin)
 		pdf.SetFont("Helvetica", "", 10)
 		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
+		pdf.SetX(leftMargin)
 		pdf.MultiCell(contentWidth, 5, contract.Notes, "", "L", false)
-		pdf.Ln(5)
 	}
 
-	// Terms & Conditions
-	pdf.SetX(leftMargin)
-	pdf.SetFont("Helvetica", "B", 11)
-	pdf.SetTextColor(pdfCfg.PrimaryColor.R, pdfCfg.PrimaryColor.G, pdfCfg.PrimaryColor.B)
-	pdf.Cell(190, 8, cfg.Invoice.TermsLabel)
-	pdf.Ln(8)
-	pdf.SetX(leftMargin)
+	// Payment Information
+	if company.BankAccount != "" {
+		pdf.Ln(8)
+		pdf.SetFont("Helvetica", "B", 12)
+		pdf.SetTextColor(40, 40, 40)
+		pdf.SetX(leftMargin)
+		pdf.Cell(contentWidth, 8, "Payment Information")
+		pdf.Ln(8)
+		pdf.SetFont("Helvetica", "", 10)
+		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
+		pdf.SetX(leftMargin)
+
+		bankInfo := ""
+		if company.BankName != "" {
+			bankInfo += fmt.Sprintf("Bank: %s\n", company.BankName)
+		}
+		bankInfo += fmt.Sprintf("Account: %s", company.BankAccount)
+		if company.BankSWIFT != "" {
+			bankInfo += fmt.Sprintf("\nSWIFT: %s", company.BankSWIFT)
+		}
+		pdf.MultiCell(contentWidth, 5, bankInfo, "", "L", false)
+	}
+
+	// General Terms
+	if cfg.Invoice.Terms != "" {
+		pdf.Ln(8)
+		pdf.SetFont("Helvetica", "B", 12)
+		pdf.SetTextColor(40, 40, 40)
+		pdf.SetX(leftMargin)
+		pdf.Cell(contentWidth, 8, "General Conditions")
+		pdf.Ln(8)
+		pdf.SetFont("Helvetica", "", 10)
+		pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
+		pdf.SetX(leftMargin)
+		pdf.MultiCell(contentWidth, 5, cfg.Invoice.Terms, "", "L", false)
+	}
+
+	// Signature section
+	pdf.Ln(15)
 	pdf.SetFont("Helvetica", "", 10)
 	pdf.SetTextColor(pdfCfg.TextColor.R, pdfCfg.TextColor.G, pdfCfg.TextColor.B)
-	pdf.MultiCell(contentWidth, 4, cfg.Invoice.Terms, "", "L", false)
+	pdf.SetX(leftMargin)
+	pdf.MultiCell(contentWidth, 5, "By signing below, both parties agree to the terms and conditions set forth in this agreement.", "", "L", false)
 
-	// Signature lines at bottom
-	pdf.Ln(15)
+	pdf.Ln(10)
 	drawSignatureLines(pdf, company.Name, client.Name, leftMargin, contentWidth, pdfCfg)
 
 	// Save PDF

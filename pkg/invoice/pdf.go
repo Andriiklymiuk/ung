@@ -95,8 +95,13 @@ func GeneratePDF(invoice models.Invoice, company models.Company, client models.C
 	// Company name (after logo or at start)
 	pdf.SetFont("Arial", "B", 18)
 	pdf.SetTextColor(40, 40, 40)
-	pdf.SetXY(logoEndX+5, headerY)
-	pdf.Cell(contentWidth/2-logoEndX, 10, company.Name)
+	// Only add offset if there's actually a logo
+	nameX := leftMargin
+	if logoEndX > leftMargin {
+		nameX = logoEndX + 5
+	}
+	pdf.SetXY(nameX, headerY)
+	pdf.Cell(contentWidth/2-nameX+leftMargin, 10, company.Name)
 
 	// INVOICE title on right with custom color
 	pdf.SetFont("Arial", "B", 28)

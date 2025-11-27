@@ -498,14 +498,10 @@
     "views": {
       "ung": [
         {
-          "id": "ungWelcome",
-          "name": "Get Started",
-          "when": "!ung.cliInstalled"
-        },
-        {
-          "id": "ungSetupRequired",
-          "name": "Setup Required",
-          "when": "ung.cliInstalled && !ung.isInitialized"
+          "id": "ungOnboarding",
+          "name": "Welcome",
+          "type": "webview",
+          "when": "!ung.cliInstalled || !ung.isInitialized"
         },
         {
           "id": "ungDashboard",
@@ -548,17 +544,12 @@
       "view/title": [
         {
           "command": "ung.recheckCli",
-          "when": "view == ungWelcome",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.refreshSetupRequired",
-          "when": "view == ungSetupRequired",
+          "when": "view == ungOnboarding",
           "group": "navigation@1"
         },
         {
           "command": "ung.openDocs",
-          "when": "view == ungSetupRequired",
+          "when": "view == ungOnboarding",
           "group": "navigation@2"
         },
         {

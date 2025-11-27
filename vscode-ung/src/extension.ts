@@ -15,13 +15,10 @@ import { DashboardProvider } from './views/dashboardProvider';
 import { ExpenseProvider } from './views/expenseProvider';
 import { InvoiceProvider } from './views/invoiceProvider';
 import { TrackingProvider } from './views/trackingProvider';
-import {
-  GettingStartedProvider,
-  SetupRequiredProvider,
-  WelcomeProvider,
-} from './views/welcomeProvider';
+import { GettingStartedProvider } from './views/welcomeProvider';
 import { ExportPanel } from './webview/exportPanel';
 import { MainDashboardPanel } from './webview/mainDashboardPanel';
+import { OnboardingWebviewProvider } from './webview/onboardingWebviewProvider';
 import { PomodoroPanel } from './webview/pomodoroPanel';
 import { StatisticsPanel } from './webview/statisticsPanel';
 import { TemplateEditorPanel } from './webview/templateEditorPanel';
@@ -39,13 +36,18 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize CLI wrapper
   const cli = new UngCli(outputChannel);
 
-  // Register Welcome provider for when CLI is not installed
-  const welcomeProvider = new WelcomeProvider();
-  const welcomeTree = vscode.window.createTreeView('ungWelcome', {
-    treeDataProvider: welcomeProvider,
-    showCollapseAll: false,
-  });
-  context.subscriptions.push(welcomeTree);
+  // Register Onboarding webview provider for sidebar
+  const onboardingProvider = new OnboardingWebviewProvider(
+    context.extensionUri,
+    async () => cli.isInstalled(),
+    async () => cli.isInitialized()
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      OnboardingWebviewProvider.viewType,
+      onboardingProvider
+    )
+  );
 
   // Register install commands (always available)
   context.subscriptions.push(
@@ -153,6 +155,8 @@ export async function activate(context: vscode.ExtensionContext) {
         'ung.cliInstalled',
         isNowInstalled
       );
+      // Refresh the onboarding webview
+      await onboardingProvider.refresh();
       if (isNowInstalled) {
         vscode.window
           .showInformationMessage(
@@ -310,14 +314,6 @@ export async function activate(context: vscode.ExtensionContext) {
     isInitialized
   );
 
-  // Register Setup Required provider (shown when CLI installed but not initialized)
-  const setupRequiredProvider = new SetupRequiredProvider();
-  const setupRequiredTree = vscode.window.createTreeView('ungSetupRequired', {
-    treeDataProvider: setupRequiredProvider,
-    showCollapseAll: false,
-  });
-  context.subscriptions.push(setupRequiredTree);
-
   // Register initialization commands
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.initializeGlobal', async () => {
@@ -387,7 +383,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand('ung.refreshSetupRequired', () =>
-      setupRequiredProvider.refresh()
+      onboardingProvider.refresh()
     )
   );
 

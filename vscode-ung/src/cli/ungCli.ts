@@ -4,6 +4,9 @@ import * as vscode from 'vscode';
 
 const execAsync = promisify(exec);
 
+// Environment variable name for database password
+const UNG_DB_PASSWORD_ENV = 'UNG_DB_PASSWORD';
+
 /**
  * Result from CLI execution
  */
@@ -55,10 +58,18 @@ export class UngCli {
    * By default, commands use the ung.useGlobalConfig setting to determine
    * whether to use global (~/.ung/) or local (.ung/) configuration.
    * Use options.useGlobal to explicitly override.
+   *
+   * If options.password is provided, it will be passed to the CLI via the
+   * UNG_DB_PASSWORD environment variable (not command-line args for security).
    */
   async exec<T = unknown>(
     args: string[],
-    options?: { parseJson?: boolean; cwd?: string; useGlobal?: boolean }
+    options?: {
+      parseJson?: boolean;
+      cwd?: string;
+      useGlobal?: boolean;
+      password?: string;
+    }
   ): Promise<CliResult<T>> {
     const parseJson = options?.parseJson ?? false;
     // Default to workspace folder for local config detection
@@ -73,10 +84,17 @@ export class UngCli {
     const command = `${this.CLI_COMMAND} ${commandArgs.join(' ')}`;
     this.outputChannel.appendLine(`> ${command}${cwd ? ` (cwd: ${cwd})` : ''}`);
 
+    // Build environment with optional password (more secure than command-line args)
+    const env = { ...process.env };
+    if (options?.password) {
+      env[UNG_DB_PASSWORD_ENV] = options.password;
+    }
+
     try {
       const { stdout, stderr } = await execAsync(command, {
         cwd,
         maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+        env,
       });
 
       if (stderr) {
@@ -686,14 +704,15 @@ export class UngCli {
 
   /**
    * Import data from SQLite database (encrypted or not)
+   * Password is passed via environment variable for security (not visible in process list)
    */
   async importDatabase(
     filePath: string,
     password?: string
   ): Promise<CliResult> {
     const args = ['import', 'db', filePath];
-    if (password) args.push('--password', password);
-    return this.exec(args);
+    // Pass password via env var (more secure than command-line args)
+    return this.exec(args, { password });
   }
 
   // ========== Database Commands ==========
@@ -859,5 +878,37 @@ export class UngCli {
    */
   async deleteTrackingSession(id: number): Promise<CliResult> {
     return this.exec(['track', 'delete', id.toString(), '--yes']);
+  }
+
+  // ========== Security Commands ==========
+
+  /**
+   * Get security status (encryption and keychain info)
+   */
+  async getSecurityStatus(): Promise<CliResult> {
+    return this.exec(['security', 'status']);
+  }
+
+  /**
+   * Check if database is encrypted
+   */
+  async isEncrypted(): Promise<boolean> {
+    const result = await this.exec(['security', 'status']);
+    if (result.success && result.stdout) {
+      return result.stdout.includes('Encrypted');
+    }
+    return false;
+  }
+
+  /**
+   * Execute a command with the provided password
+   * Useful for operations on encrypted databases
+   */
+  async execWithPassword<T = unknown>(
+    args: string[],
+    password: string,
+    options?: { parseJson?: boolean; cwd?: string; useGlobal?: boolean }
+  ): Promise<CliResult<T>> {
+    return this.exec<T>(args, { ...options, password });
   }
 }

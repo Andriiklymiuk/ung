@@ -86,9 +86,80 @@ export class ExportPanel {
     dateFrom: string;
     dateTo: string;
   }) {
-    // CLI is available via this.getCli() for future implementation
-    vscode.window.showInformationMessage(
-      `Export functionality will be implemented in a future version. Options: ${JSON.stringify(options)}`
+    const cli = this.getCli();
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Exporting ${options.type} to ${options.format.toUpperCase()}...`,
+        cancellable: false,
+      },
+      async () => {
+        // Build data types array based on selection
+        const dataTypes: string[] = [];
+        switch (options.type) {
+          case 'invoices':
+            dataTypes.push('invoices');
+            break;
+          case 'contracts':
+            dataTypes.push('contracts');
+            break;
+          case 'expenses':
+            dataTypes.push('expenses');
+            break;
+          case 'tracking':
+            dataTypes.push('time');
+            break;
+          case 'all':
+            dataTypes.push('invoices', 'expenses', 'time');
+            break;
+        }
+
+        // Determine year from dates if provided
+        let year: number | undefined;
+        if (options.dateFrom) {
+          const dateFromYear = new Date(options.dateFrom).getFullYear();
+          year = dateFromYear;
+        }
+
+        const result = await cli.exportData(options.format, dataTypes, {
+          year,
+        });
+
+        if (result.success) {
+          // Parse output to find file path
+          const output = result.stdout || '';
+          const pathMatch =
+            output.match(/exported to:\s*(.+\.(?:csv|pdf))/i) ||
+            output.match(/saved to:\s*(.+\.(?:csv|pdf))/i) ||
+            output.match(/(\/.+\.(?:csv|pdf))/);
+
+          if (pathMatch) {
+            const action = await vscode.window.showInformationMessage(
+              `Export completed: ${pathMatch[1]}`,
+              'Open File',
+              'Show in Folder'
+            );
+
+            if (action === 'Open File') {
+              await vscode.env.openExternal(vscode.Uri.file(pathMatch[1]));
+            } else if (action === 'Show in Folder') {
+              await vscode.commands.executeCommand(
+                'revealFileInOS',
+                vscode.Uri.file(pathMatch[1])
+              );
+            }
+          } else {
+            vscode.window.showInformationMessage(
+              `Export completed successfully!\n${output || 'Data exported.'}`
+            );
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Export failed: ${result.error || 'Unknown error'}`
+          );
+        }
+      }
     );
   }
 
@@ -165,28 +236,31 @@ export class ExportPanel {
                         <label for="type">Export Type:</label>
                         <select id="type">
                             <option value="invoices">Invoices</option>
-                            <option value="contracts">Contracts</option>
                             <option value="expenses">Expenses</option>
                             <option value="tracking">Time Tracking</option>
+                            <option value="all">All Data</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="dateFrom">Date From:</label>
+                        <label for="dateFrom">Date From (optional):</label>
                         <input type="date" id="dateFrom">
                     </div>
 
                     <div class="form-group">
-                        <label for="dateTo">Date To:</label>
+                        <label for="dateTo">Date To (optional):</label>
                         <input type="date" id="dateTo">
                     </div>
 
-                    <button type="submit">Export</button>
+                    <button type="submit">Export Data</button>
                 </form>
 
-                <p style="margin-top: 30px; color: var(--vscode-descriptionForeground);">
-                    <em>Note: This is a placeholder for the export wizard. Full functionality will be added in a future version.</em>
-                </p>
+                <div style="margin-top: 30px; padding: 16px; background: var(--vscode-textBlockQuote-background); border-radius: 4px; border-left: 4px solid var(--vscode-button-background);">
+                    <p style="margin: 0; color: var(--vscode-descriptionForeground); font-size: 13px;">
+                        <strong>Tip:</strong> CSV exports are great for spreadsheets and accounting software.
+                        Date filters help narrow down the export to a specific period.
+                    </p>
+                </div>
             </div>
 
             <script>

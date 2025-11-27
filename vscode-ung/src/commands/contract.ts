@@ -27,8 +27,191 @@ export class ContractCommands {
    * Create a new contract
    */
   async createContract(): Promise<void> {
-    vscode.window.showInformationMessage(
-      'Contract creation is interactive. Please use the CLI: ung contract add'
+    // Get clients for selection
+    const clientsResult = await this.cli.listClients();
+    if (!clientsResult.success || !clientsResult.stdout) {
+      vscode.window.showErrorMessage(
+        'Failed to fetch clients. Please create a client first.'
+      );
+      return;
+    }
+
+    // Parse clients
+    const clientLines = clientsResult.stdout.trim().split('\n');
+    if (clientLines.length < 2) {
+      vscode.window.showErrorMessage(
+        'No clients found. Please create a client first.'
+      );
+      return;
+    }
+
+    const clients: Array<{ id: number; name: string; email: string }> = [];
+    for (let i = 1; i < clientLines.length; i++) {
+      const parts = clientLines[i]
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 3) {
+        clients.push({
+          id: parseInt(parts[0], 10),
+          name: parts[1],
+          email: parts[2],
+        });
+      }
+    }
+
+    if (clients.length === 0) {
+      vscode.window.showErrorMessage(
+        'No clients found. Please create a client first.'
+      );
+      return;
+    }
+
+    // Step 1: Select client
+    const clientItems = clients.map((c) => ({
+      label: c.name,
+      description: c.email,
+      id: c.id,
+    }));
+
+    const selectedClient = await vscode.window.showQuickPick(clientItems, {
+      placeHolder: 'Select a client for this contract',
+      title: 'Create Contract - Step 1: Select Client',
+    });
+
+    if (!selectedClient) return;
+
+    // Step 2: Enter contract name
+    const contractName = await vscode.window.showInputBox({
+      prompt: 'Enter contract name',
+      placeHolder: 'e.g., Website Development Q1 2025',
+      title: 'Create Contract - Step 2: Contract Name',
+      validateInput: (v) => (v ? null : 'Contract name is required'),
+    });
+
+    if (!contractName) return;
+
+    // Step 3: Select contract type
+    const contractTypes = [
+      {
+        label: 'Hourly Rate',
+        description: 'Bill by the hour',
+        value: 'hourly' as const,
+      },
+      {
+        label: 'Fixed Price',
+        description: 'One-time fixed payment',
+        value: 'fixed_price' as const,
+      },
+      {
+        label: 'Retainer',
+        description: 'Monthly retainer fee',
+        value: 'retainer' as const,
+      },
+    ];
+
+    const selectedType = await vscode.window.showQuickPick(contractTypes, {
+      placeHolder: 'Select contract type',
+      title: 'Create Contract - Step 3: Contract Type',
+    });
+
+    if (!selectedType) return;
+
+    // Step 4: Enter rate/price based on type
+    let rate: number | undefined;
+    let price: number | undefined;
+
+    if (selectedType.value === 'hourly') {
+      const rateStr = await vscode.window.showInputBox({
+        prompt: 'Enter hourly rate',
+        placeHolder: 'e.g., 75.00',
+        title: 'Create Contract - Step 4: Hourly Rate',
+        validateInput: (v) => {
+          if (!v) return 'Hourly rate is required for hourly contracts';
+          const num = parseFloat(v);
+          return Number.isNaN(num) || num <= 0
+            ? 'Enter a valid positive number'
+            : null;
+        },
+      });
+
+      if (!rateStr) return;
+      rate = parseFloat(rateStr);
+    } else if (selectedType.value === 'fixed_price') {
+      const priceStr = await vscode.window.showInputBox({
+        prompt: 'Enter fixed price',
+        placeHolder: 'e.g., 5000.00',
+        title: 'Create Contract - Step 4: Fixed Price',
+        validateInput: (v) => {
+          if (!v) return 'Fixed price is required for fixed-price contracts';
+          const num = parseFloat(v);
+          return Number.isNaN(num) || num <= 0
+            ? 'Enter a valid positive number'
+            : null;
+        },
+      });
+
+      if (!priceStr) return;
+      price = parseFloat(priceStr);
+    } else {
+      // Retainer - ask for monthly price
+      const priceStr = await vscode.window.showInputBox({
+        prompt: 'Enter monthly retainer amount',
+        placeHolder: 'e.g., 2000.00',
+        title: 'Create Contract - Step 4: Retainer Amount',
+        validateInput: (v) => {
+          if (!v) return null; // Optional for retainer
+          const num = parseFloat(v);
+          return Number.isNaN(num) || num < 0
+            ? 'Enter a valid positive number'
+            : null;
+        },
+      });
+
+      if (priceStr) {
+        price = parseFloat(priceStr);
+      }
+    }
+
+    // Step 5: Select currency
+    const currencies = ['USD', 'EUR', 'GBP', 'CHF', 'PLN'];
+    const selectedCurrency = await vscode.window.showQuickPick(currencies, {
+      placeHolder: 'Select currency',
+      title: 'Create Contract - Step 5: Currency',
+    });
+
+    if (!selectedCurrency) return;
+
+    // Create the contract
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Creating contract...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.createContract({
+          clientId: selectedClient.id,
+          name: contractName,
+          type: selectedType.value,
+          rate,
+          price,
+          currency: selectedCurrency,
+        });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Contract "${contractName}" created successfully!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to create contract: ${result.error}`
+          );
+        }
+      }
     );
   }
 
@@ -428,12 +611,79 @@ export class ContractCommands {
    */
   async deleteContract(contractId?: number): Promise<void> {
     if (!contractId) {
-      vscode.window.showErrorMessage('No contract selected');
-      return;
+      // Let user select a contract to delete
+      const result = await this.cli.listContracts();
+      if (!result.success || !result.stdout) {
+        vscode.window.showErrorMessage('Failed to fetch contracts');
+        return;
+      }
+
+      const contracts = this.parseContractList(result.stdout);
+      if (contracts.length === 0) {
+        vscode.window.showInformationMessage('No contracts found.');
+        return;
+      }
+
+      const selected = await vscode.window.showQuickPick(
+        contracts.map((c) => ({
+          label: c.name,
+          description: `${c.type} • ${c.ratePrice}`,
+          detail: `${c.client} • ${c.active ? 'Active' : 'Inactive'}`,
+          id: c.id,
+          contractNum: c.contractNum,
+        })),
+        { placeHolder: 'Select a contract to delete' }
+      );
+
+      if (!selected) return;
+      contractId = selected.id;
     }
 
-    vscode.window.showInformationMessage(
-      'Contract deletion will be available in a future version. Use the CLI to manage contracts.'
+    // Get contract details for confirmation
+    const contractsResult = await this.cli.listContracts();
+    let contractName = `Contract #${contractId}`;
+    if (contractsResult.success && contractsResult.stdout) {
+      const contract = this.parseContractFromOutput(
+        contractsResult.stdout,
+        contractId
+      );
+      if (contract) {
+        contractName = `${contract.contractNum} - ${contract.name}`;
+      }
+    }
+
+    // Confirm deletion
+    const confirm = await vscode.window.showWarningMessage(
+      `Are you sure you want to delete "${contractName}"? This action cannot be undone.`,
+      { modal: true },
+      'Delete'
+    );
+
+    if (confirm !== 'Delete') return;
+
+    // Delete the contract
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Deleting contract...',
+        cancellable: false,
+      },
+      async () => {
+        const deleteResult = await this.cli.deleteContract(contractId!);
+
+        if (deleteResult.success) {
+          vscode.window.showInformationMessage(
+            `Contract "${contractName}" deleted successfully!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to delete contract: ${deleteResult.error}`
+          );
+        }
+      }
     );
   }
 

@@ -302,6 +302,35 @@ export class UngCli {
     return this.exec(args);
   }
 
+  /**
+   * Create a new contract
+   */
+  async createContract(data: {
+    clientId: number;
+    name: string;
+    type: 'hourly' | 'fixed_price' | 'retainer';
+    rate?: number;
+    price?: number;
+    currency?: string;
+  }): Promise<CliResult> {
+    const args = ['contract', 'add'];
+    args.push('--client', data.clientId.toString());
+    args.push('--name', `"${data.name}"`);
+    args.push('--type', data.type);
+    if (data.rate !== undefined) args.push('--rate', data.rate.toString());
+    if (data.price !== undefined) args.push('--price', data.price.toString());
+    if (data.currency) args.push('--currency', data.currency);
+
+    return this.exec(args);
+  }
+
+  /**
+   * Delete a contract
+   */
+  async deleteContract(id: number): Promise<CliResult> {
+    return this.exec(['contract', 'delete', id.toString(), '--yes']);
+  }
+
   // ========== Invoice Commands ==========
 
   /**

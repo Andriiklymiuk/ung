@@ -59,8 +59,22 @@ var contractEmailCmd = &cobra.Command{
 	RunE:  runContractEmail,
 }
 
+var contractDeleteCmd = &cobra.Command{
+	Use:   "delete <id>",
+	Short: "Delete a contract",
+	Long: `Delete a contract permanently.
+
+⚠️  This action cannot be undone!
+
+Examples:
+  ung contract delete 5      Delete contract #5`,
+	Args: cobra.ExactArgs(1),
+	RunE: runContractDelete,
+}
+
 var (
-	contractClientID int
+	contractDeleteYes bool
+	contractClientID  int
 	contractName     string
 	contractType     string
 	contractRate     float64
@@ -76,6 +90,7 @@ func init() {
 	contractCmd.AddCommand(contractEditCmd)
 	contractCmd.AddCommand(contractPDFCmd)
 	contractCmd.AddCommand(contractEmailCmd)
+	contractCmd.AddCommand(contractDeleteCmd)
 
 	// Add flags (optional - if not provided, will use interactive mode)
 	contractAddCmd.Flags().IntVar(&contractClientID, "client", 0, "Client ID")
@@ -92,6 +107,9 @@ func init() {
 	contractEditCmd.Flags().StringVar(&contractCurrency, "currency", "", "Currency")
 	contractEditCmd.Flags().BoolVar(&contractActive, "active", true, "Contract active status")
 	contractEditCmd.Flags().StringVar(&contractNotes, "notes", "", "Contract notes")
+
+	// Delete flags
+	contractDeleteCmd.Flags().BoolVarP(&contractDeleteYes, "yes", "y", false, "Skip confirmation prompt")
 }
 
 func getClients() ([]models.Client, error) {
@@ -760,5 +778,83 @@ func exportContractToGmail(subject, body, attachmentPath string) error {
 
 	fmt.Println("✓ Gmail compose opened in browser")
 	fmt.Printf("📎 Please manually attach the PDF: %s\n", attachmentPath)
+	return nil
+}
+
+// runContractDelete deletes a contract
+func runContractDelete(cmd *cobra.Command, args []string) error {
+	contractID, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid contract ID: %s", args[0])
+	}
+
+	// Get contract details first
+	var contractNum, name, clientName string
+	err = db.DB.QueryRow(`
+		SELECT c.contract_num, c.name, cl.name
+		FROM contracts c
+		JOIN clients cl ON c.client_id = cl.id
+		WHERE c.id = ?
+	`, contractID).Scan(&contractNum, &name, &clientName)
+	if err != nil {
+		return fmt.Errorf("contract not found: %w", err)
+	}
+
+	// Show contract info
+	fmt.Printf("\n📄 Contract: %s\n", contractNum)
+	fmt.Printf("   Name: %s\n", name)
+	fmt.Printf("   Client: %s\n\n", clientName)
+
+	// Confirm deletion unless --yes flag is set
+	if !contractDeleteYes {
+		// Confirmation
+		var confirm bool
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Are you sure you want to delete this contract?").
+					Description("This action cannot be undone!").
+					Affirmative("Yes, delete it").
+					Negative("Cancel").
+					Value(&confirm),
+			),
+		)
+
+		if err := form.Run(); err != nil || !confirm {
+			fmt.Println("❌ Deletion cancelled")
+			return nil
+		}
+	}
+
+	// Check for related time entries
+	var timeEntryCount int
+	db.DB.QueryRow("SELECT COUNT(*) FROM tracking_sessions WHERE contract_id = ?", contractID).Scan(&timeEntryCount)
+	if timeEntryCount > 0 {
+		fmt.Printf("⚠️  Warning: This contract has %d associated time entries. They will be orphaned.\n", timeEntryCount)
+		if !contractDeleteYes {
+			var confirmOrphan bool
+			form := huh.NewForm(
+				huh.NewGroup(
+					huh.NewConfirm().
+						Title("Continue with deletion?").
+						Affirmative("Yes, continue").
+						Negative("Cancel").
+						Value(&confirmOrphan),
+				),
+			)
+			if err := form.Run(); err != nil || !confirmOrphan {
+				fmt.Println("❌ Deletion cancelled")
+				return nil
+			}
+		}
+	}
+
+	// Delete contract from database
+	_, err = db.DB.Exec("DELETE FROM contracts WHERE id = ?", contractID)
+	if err != nil {
+		return fmt.Errorf("failed to delete contract: %w", err)
+	}
+
+	fmt.Printf("✓ Contract %s deleted successfully!\n", contractNum)
 	return nil
 }

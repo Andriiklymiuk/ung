@@ -1,6 +1,6 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import type * as vscode from 'vscode';
+import * as vscode from 'vscode';
 
 const execAsync = promisify(exec);
 
@@ -13,6 +13,18 @@ export interface CliResult<T = unknown> {
   error?: string;
   stdout?: string;
   stderr?: string;
+}
+
+/**
+ * Get the workspace folder path for CLI commands
+ * This enables the CLI to detect local .ung/ configuration
+ */
+function getWorkspaceCwd(): string | undefined {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    return workspaceFolders[0].uri.fsPath;
+  }
+  return undefined;
 }
 
 /**
@@ -31,16 +43,24 @@ export class UngCli {
    * @param args Command arguments
    * @param options Execution options
    * @returns Promise with result
+   *
+   * By default, commands are executed in the workspace folder (if available)
+   * to allow the CLI to detect local .ung/ configuration.
+   * Use options.cwd to override, or options.useGlobal to force global config.
    */
   async exec<T = unknown>(
     args: string[],
-    options?: { parseJson?: boolean; cwd?: string }
+    options?: { parseJson?: boolean; cwd?: string; useGlobal?: boolean }
   ): Promise<CliResult<T>> {
     const parseJson = options?.parseJson ?? false;
-    const cwd = options?.cwd ?? undefined;
+    // Default to workspace folder for local config detection
+    const cwd = options?.cwd ?? getWorkspaceCwd();
 
-    const command = `${this.CLI_COMMAND} ${args.join(' ')}`;
-    this.outputChannel.appendLine(`> ${command}`);
+    // If useGlobal is set, add the --global flag
+    const commandArgs = options?.useGlobal ? ['--global', ...args] : args;
+
+    const command = `${this.CLI_COMMAND} ${commandArgs.join(' ')}`;
+    this.outputChannel.appendLine(`> ${command}${cwd ? ` (cwd: ${cwd})` : ''}`);
 
     try {
       const { stdout, stderr } = await execAsync(command, {

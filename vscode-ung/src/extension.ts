@@ -23,6 +23,7 @@ import { ExportPanel } from './webview/exportPanel';
 import { MainDashboardPanel } from './webview/mainDashboardPanel';
 import { PomodoroPanel } from './webview/pomodoroPanel';
 import { StatisticsPanel } from './webview/statisticsPanel';
+import { TemplateEditorPanel } from './webview/templateEditorPanel';
 
 /**
  * Extension activation
@@ -541,6 +542,13 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.openStatistics', () =>
       StatisticsPanel.createOrShow(cli)
+    )
+  );
+
+  // Template Editor panel command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.openTemplateEditor', () =>
+      TemplateEditorPanel.createOrShow(cli)
     )
   );
 

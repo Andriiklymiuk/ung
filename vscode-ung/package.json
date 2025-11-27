@@ -317,6 +317,12 @@
         "icon": "$(graph)"
       },
       {
+        "command": "ung.openTemplateEditor",
+        "title": "Open Template Editor",
+        "category": "UNG",
+        "icon": "$(edit)"
+      },
+      {
         "command": "ung.openDashboard",
         "title": "Open Dashboard",
         "category": "UNG",

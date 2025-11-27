@@ -140,10 +140,10 @@ func runSecurityStatus(cmd *cobra.Command, args []string) {
 		fmt.Println("   ⚠️  OS keychain not available on this platform")
 	}
 
-	if encryptedExists {
+	if encryptedExists && !db.HasPasswordInKeychain() {
 		fmt.Println("\n💡 Password retrieval priority:")
-		fmt.Println("   1. OS Keychain (if saved)")
-		fmt.Println("   2. Environment variable: UNG_DB_PASSWORD")
+		fmt.Println("   1. OS Keychain (recommended - run 'ung security save-password')")
+		fmt.Println("   2. Environment variable: UNG_DB_PASSWORD (for CI/CD)")
 		fmt.Println("   3. Interactive prompt")
 	}
 
@@ -241,12 +241,14 @@ func runSecurityEnable(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	fmt.Println("\n💡 To use the database, you'll need to provide the password via:")
+	fmt.Println("\n💡 To use the database:")
 	if db.KeychainAvailable() {
-		fmt.Println("   - OS Keychain: run 'ung security save-password'")
+		fmt.Println("   Run 'ung security save-password' to save your password securely")
+		fmt.Println("   (or use UNG_DB_PASSWORD env var for CI/CD)")
+	} else {
+		fmt.Println("   - Set UNG_DB_PASSWORD environment variable, or")
+		fmt.Println("   - Enter password when prompted")
 	}
-	fmt.Println("   - Environment variable: export UNG_DB_PASSWORD=\"your-password\"")
-	fmt.Println("   - Interactive prompt (you'll be asked each time)")
 }
 
 func runSecurityDisable(cmd *cobra.Command, args []string) {

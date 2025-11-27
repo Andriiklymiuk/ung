@@ -134,9 +134,32 @@ export class BulkCommands extends BaseCommand {
    * Bulk delete invoices
    */
   async bulkDeleteInvoices(): Promise<void> {
-    // Invoice deletion is not yet supported in the CLI
-    NotificationManager.info(
-      'Invoice deletion will be available in a future version.'
+    const invoices = await this.selectInvoices('Select invoices to delete');
+    if (!invoices || invoices.length === 0) {
+      return;
+    }
+
+    const confirmed = await this.confirm(
+      `Delete ${invoices.length} invoice(s)?`,
+      {
+        detail:
+          'This will permanently delete all selected invoices. This action cannot be undone!',
+        confirmLabel: 'Delete',
+        cancelLabel: 'Cancel',
+      }
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await this.executeBulkOperation(
+      invoices,
+      async (invoice) => {
+        return await this.cli.deleteInvoice(invoice.id);
+      },
+      'Deleting invoices',
+      'Delete'
     );
   }
 

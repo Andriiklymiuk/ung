@@ -88,6 +88,7 @@ var (
 	trackEditHours   float64
 	trackEditProject string
 	trackEditNotes   string
+	trackDeleteYes   bool
 )
 
 func init() {
@@ -120,6 +121,9 @@ func init() {
 	trackEditCmd.Flags().Float64Var(&trackEditHours, "hours", 0, "New hours value")
 	trackEditCmd.Flags().StringVar(&trackEditProject, "project", "", "New project name")
 	trackEditCmd.Flags().StringVar(&trackEditNotes, "notes", "", "New notes")
+
+	// Delete flags
+	trackDeleteCmd.Flags().BoolVarP(&trackDeleteYes, "yes", "y", false, "Skip confirmation prompt")
 }
 
 func runTrackStart(cmd *cobra.Command, args []string) error {
@@ -675,32 +679,35 @@ func runTrackDelete(cmd *cobra.Command, args []string) error {
 		currentHours = float64(duration) / 3600.0
 	}
 
-	fmt.Println("⚠️  DELETE SESSION WARNING")
-	fmt.Println("==========================")
-	fmt.Printf("\nSession:  #%d\n", sessionID)
-	fmt.Printf("Date:     %s\n", startTime.Format("2006-01-02"))
-	if clientName != nil {
-		fmt.Printf("Client:   %s\n", *clientName)
-	}
-	fmt.Printf("Project:  %s\n", projectName)
-	fmt.Printf("Hours:    %.2f\n\n", currentHours)
+	// Skip confirmation if --yes flag is provided
+	if !trackDeleteYes {
+		fmt.Println("⚠️  DELETE SESSION WARNING")
+		fmt.Println("==========================")
+		fmt.Printf("\nSession:  #%d\n", sessionID)
+		fmt.Printf("Date:     %s\n", startTime.Format("2006-01-02"))
+		if clientName != nil {
+			fmt.Printf("Client:   %s\n", *clientName)
+		}
+		fmt.Printf("Project:  %s\n", projectName)
+		fmt.Printf("Hours:    %.2f\n\n", currentHours)
 
-	// Confirmation
-	var confirm bool
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Are you sure you want to delete this session?").
-				Description("This is a soft delete and can be recovered.").
-				Affirmative("Yes, delete it").
-				Negative("Cancel").
-				Value(&confirm),
-		),
-	)
+		// Confirmation
+		var confirm bool
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Are you sure you want to delete this session?").
+					Description("This is a soft delete and can be recovered.").
+					Affirmative("Yes, delete it").
+					Negative("Cancel").
+					Value(&confirm),
+			),
+		)
 
-	if err := form.Run(); err != nil || !confirm {
-		fmt.Println("\n✅ Deletion cancelled. Session is safe.")
-		return nil
+		if err := form.Run(); err != nil || !confirm {
+			fmt.Println("\n✅ Deletion cancelled. Session is safe.")
+			return nil
+		}
 	}
 
 	// Soft delete (set deleted_at)

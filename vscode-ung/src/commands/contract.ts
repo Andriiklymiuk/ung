@@ -642,9 +642,18 @@ export class ContractCommands {
       contractId = selected.id;
     }
 
-    // Get contract details for confirmation
+    // Get contract details for confirmation and potential revert
     const contractsResult = await this.cli.listContracts();
     let contractName = `Contract #${contractId}`;
+    let contractData: {
+      name: string;
+      client: string;
+      clientId?: number;
+      type: string;
+      ratePrice: string;
+      active: boolean;
+    } | null = null;
+
     if (contractsResult.success && contractsResult.stdout) {
       const contract = this.parseContractFromOutput(
         contractsResult.stdout,
@@ -652,6 +661,13 @@ export class ContractCommands {
       );
       if (contract) {
         contractName = `${contract.contractNum} - ${contract.name}`;
+        contractData = {
+          name: contract.name,
+          client: contract.client,
+          type: contract.type,
+          ratePrice: contract.ratePrice,
+          active: contract.active,
+        };
       }
     }
 
@@ -665,6 +681,7 @@ export class ContractCommands {
     if (confirm !== 'Delete') return;
 
     // Delete the contract
+    let deleteSuccess = false;
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -675,15 +692,124 @@ export class ContractCommands {
         const deleteResult = await this.cli.deleteContract(contractId!);
 
         if (deleteResult.success) {
-          vscode.window.showInformationMessage(
-            `Contract "${contractName}" deleted successfully!`
-          );
+          deleteSuccess = true;
           if (this.refreshCallback) {
             this.refreshCallback();
           }
         } else {
           vscode.window.showErrorMessage(
             `Failed to delete contract: ${deleteResult.error}`
+          );
+        }
+      }
+    );
+
+    // Show success message with revert option
+    if (deleteSuccess && contractData) {
+      const action = await vscode.window.showInformationMessage(
+        `Contract "${contractName}" deleted successfully!`,
+        'Revert'
+      );
+
+      if (action === 'Revert') {
+        await this.revertContractDeletion(contractData);
+      }
+    } else if (deleteSuccess) {
+      vscode.window.showInformationMessage(
+        `Contract "${contractName}" deleted successfully!`
+      );
+    }
+  }
+
+  /**
+   * Revert a contract deletion by re-creating the contract
+   */
+  private async revertContractDeletion(contractData: {
+    name: string;
+    client: string;
+    type: string;
+    ratePrice: string;
+    active: boolean;
+  }): Promise<void> {
+    // First, we need to find the client ID from the client name
+    const clientsResult = await this.cli.listClients();
+    if (!clientsResult.success || !clientsResult.stdout) {
+      vscode.window.showErrorMessage(
+        'Failed to revert: Could not fetch clients'
+      );
+      return;
+    }
+
+    // Parse clients to find the matching one
+    const clientLines = clientsResult.stdout.trim().split('\n');
+    let clientId: number | undefined;
+    for (let i = 1; i < clientLines.length; i++) {
+      const parts = clientLines[i]
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 2 && parts[1] === contractData.client) {
+        clientId = parseInt(parts[0], 10);
+        break;
+      }
+    }
+
+    if (!clientId) {
+      vscode.window.showErrorMessage(
+        `Failed to revert: Client "${contractData.client}" not found`
+      );
+      return;
+    }
+
+    // Parse rate and price from ratePrice string
+    const currencyPattern = CURRENCIES.join('|');
+    const rateMatch = contractData.ratePrice.match(/(\d+(?:\.\d+)?)\s*\/hr/i);
+    const priceMatch = contractData.ratePrice.match(
+      new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:${currencyPattern})`, 'i')
+    );
+    const currencyMatch = contractData.ratePrice.match(
+      new RegExp(`(${currencyPattern})`, 'i')
+    );
+
+    const rate = rateMatch ? parseFloat(rateMatch[1]) : undefined;
+    const price = priceMatch ? parseFloat(priceMatch[1]) : undefined;
+    const currency = currencyMatch ? currencyMatch[1] : 'USD';
+
+    // Map display type to CLI type
+    let contractType: 'hourly' | 'fixed_price' | 'retainer' = 'hourly';
+    const typeLower = contractData.type.toLowerCase();
+    if (typeLower.includes('fixed') || typeLower.includes('price')) {
+      contractType = 'fixed_price';
+    } else if (typeLower.includes('retainer')) {
+      contractType = 'retainer';
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Reverting contract deletion...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.createContract({
+          clientId,
+          name: contractData.name,
+          type: contractType,
+          rate,
+          price,
+          currency,
+        });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Contract "${contractData.name}" restored successfully!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to restore contract: ${result.error}`
           );
         }
       }

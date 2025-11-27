@@ -84,8 +84,32 @@ export class ClientCommands {
       return;
     }
 
+    // Get client details for confirmation and potential revert
+    const clientsResult = await this.cli.listClients();
+    let clientData: {
+      name: string;
+      email: string;
+      address?: string;
+      taxId?: string;
+    } | null = null;
+
+    if (clientsResult.success && clientsResult.stdout) {
+      const clients = this.parseClientList(clientsResult.stdout);
+      const client = clients.find((c) => c.id === clientId);
+      if (client) {
+        clientData = {
+          name: client.name,
+          email: client.email,
+          address: client.address,
+          taxId: client.taxId,
+        };
+      }
+    }
+
     const confirm = await vscode.window.showWarningMessage(
-      `Are you sure you want to delete this client?`,
+      clientData
+        ? `Are you sure you want to delete "${clientData.name}"?`
+        : `Are you sure you want to delete this client?`,
       { modal: true },
       'Yes',
       'No'
@@ -93,6 +117,7 @@ export class ClientCommands {
 
     if (confirm !== 'Yes') return;
 
+    let deleteSuccess = false;
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -103,13 +128,66 @@ export class ClientCommands {
         const result = await this.cli.deleteClient(clientId);
 
         if (result.success) {
-          vscode.window.showInformationMessage('Client deleted successfully!');
+          deleteSuccess = true;
           if (this.refreshCallback) {
             this.refreshCallback();
           }
         } else {
           vscode.window.showErrorMessage(
             `Failed to delete client: ${result.error}`
+          );
+        }
+      }
+    );
+
+    // Show success message with revert option
+    if (deleteSuccess && clientData) {
+      const action = await vscode.window.showInformationMessage(
+        `Client "${clientData.name}" deleted successfully!`,
+        'Revert'
+      );
+
+      if (action === 'Revert') {
+        await this.revertClientDeletion(clientData);
+      }
+    } else if (deleteSuccess) {
+      vscode.window.showInformationMessage('Client deleted successfully!');
+    }
+  }
+
+  /**
+   * Revert a client deletion by re-creating the client
+   */
+  private async revertClientDeletion(clientData: {
+    name: string;
+    email: string;
+    address?: string;
+    taxId?: string;
+  }): Promise<void> {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Reverting client deletion...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.createClient({
+          name: clientData.name,
+          email: clientData.email,
+          address: clientData.address,
+          taxId: clientData.taxId,
+        });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Client "${clientData.name}" restored successfully!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to restore client: ${result.error}`
           );
         }
       }

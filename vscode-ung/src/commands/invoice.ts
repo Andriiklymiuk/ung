@@ -672,7 +672,7 @@ export class InvoiceCommands {
       return;
     }
 
-    // Get invoice details for confirmation
+    // Get invoice details for confirmation and potential revert
     const invoicesResult = await this.cli.listInvoices();
     if (!invoicesResult.success || !invoicesResult.stdout) {
       vscode.window.showErrorMessage('Failed to fetch invoice details');
@@ -693,6 +693,7 @@ export class InvoiceCommands {
 
     if (confirm !== 'Yes, Delete') return;
 
+    let deleteSuccess = false;
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -703,13 +704,86 @@ export class InvoiceCommands {
         const result = await this.cli.deleteInvoice(invoiceId);
 
         if (result.success) {
-          vscode.window.showInformationMessage('Invoice deleted successfully!');
+          deleteSuccess = true;
           if (this.refreshCallback) {
             this.refreshCallback();
           }
         } else {
           vscode.window.showErrorMessage(
             `Failed to delete invoice: ${result.error}`
+          );
+        }
+      }
+    );
+
+    // Show success message with revert option
+    if (deleteSuccess && invoice) {
+      const action = await vscode.window.showInformationMessage(
+        `Invoice ${invoice.invoiceNum} deleted successfully!`,
+        'Revert'
+      );
+
+      if (action === 'Revert') {
+        await this.revertInvoiceDeletion(invoice);
+      }
+    } else if (deleteSuccess) {
+      vscode.window.showInformationMessage('Invoice deleted successfully!');
+    }
+  }
+
+  /**
+   * Revert an invoice deletion by re-creating the invoice
+   */
+  private async revertInvoiceDeletion(invoice: {
+    id: number;
+    invoiceNum: string;
+    client: string;
+    date: string;
+    amount: string;
+    status: string;
+  }): Promise<void> {
+    // Parse amount and currency from amount string
+    const currencyPattern = CURRENCIES.join('|');
+    const amountMatch = invoice.amount.match(/[\d,.]+/);
+    const currencyMatch = invoice.amount.match(
+      new RegExp(`(${currencyPattern})`, 'i')
+    );
+
+    const amount = amountMatch
+      ? parseFloat(amountMatch[0].replace(/,/g, ''))
+      : 0;
+    const currency = currencyMatch ? currencyMatch[1] : 'USD';
+
+    if (amount <= 0) {
+      vscode.window.showErrorMessage(
+        'Failed to revert: Could not parse invoice amount'
+      );
+      return;
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Reverting invoice deletion...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await this.cli.createInvoice({
+          clientName: invoice.client,
+          amount,
+          currency,
+        });
+
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Invoice for ${invoice.client} restored successfully!`
+          );
+          if (this.refreshCallback) {
+            this.refreshCallback();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to restore invoice: ${result.error}`
           );
         }
       }

@@ -709,6 +709,11 @@
     "configuration": {
       "title": "UNG",
       "properties": {
+        "ung.useGlobalConfig": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use global ~/.ung/ configuration. Set to false to use local .ung/ in workspace (will be created if needed)"
+        },
         "ung.autoRefresh": {
           "type": "boolean",
           "default": true,

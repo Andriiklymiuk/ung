@@ -291,18 +291,10 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   if (!isInstalled) {
-    // Show friendly welcome message for new users
-    const action = await vscode.window.showInformationMessage(
-      'Welcome to UNG! Install the CLI to start tracking time and managing invoices.',
-      'Install Now',
-      'Learn More'
-    );
-
-    if (action === 'Install Now') {
-      vscode.commands.executeCommand('ung.installCli');
-    } else if (action === 'Learn More') {
-      vscode.commands.executeCommand('ung.openDocs');
-    }
+    // CLI not installed - the onboarding webview will show installation options
+    // No blocking alert needed, the webview handles the UX
+    // Refresh the onboarding provider to ensure it has the correct state
+    await onboardingProvider.refresh();
     return;
   }
 
@@ -387,45 +379,11 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // If not initialized, show setup required view and stop here
+  // If not initialized, the onboarding webview will show setup options
+  // No blocking alert needed, the webview handles the UX
   if (!isInitialized) {
-    const action = await vscode.window.showInformationMessage(
-      'UNG CLI is installed but needs to be set up. Choose a setup option to get started.',
-      'Set Up Now',
-      'Learn More'
-    );
-
-    if (action === 'Set Up Now') {
-      // Show setup options
-      const setupChoice = await vscode.window.showQuickPick(
-        [
-          {
-            label: '$(home) Global Setup (Recommended)',
-            description: 'Store data in ~/.ung/',
-            detail: 'Your billing data will be accessible from any project',
-            value: 'global',
-          },
-          {
-            label: '$(folder) Project-Specific Setup',
-            description: 'Store data in .ung/',
-            detail: 'Create a separate database for this workspace',
-            value: 'local',
-          },
-        ],
-        {
-          placeHolder: 'Where would you like to store your UNG data?',
-          title: 'UNG Setup',
-        }
-      );
-
-      if (setupChoice?.value === 'global') {
-        vscode.commands.executeCommand('ung.initializeGlobal');
-      } else if (setupChoice?.value === 'local') {
-        vscode.commands.executeCommand('ung.initializeLocal');
-      }
-    } else if (action === 'Learn More') {
-      vscode.commands.executeCommand('ung.openDocs');
-    }
+    // Refresh the onboarding provider to ensure it has the correct state
+    await onboardingProvider.refresh();
     return;
   }
 

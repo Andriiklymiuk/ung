@@ -214,7 +214,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           const durationMatch = result.stdout.match(/(\d+):(\d+)/);
           if (durationMatch) {
             this._todayHours =
-              parseInt(durationMatch[1]) + parseInt(durationMatch[2]) / 60;
+              parseInt(durationMatch[1], 10) +
+              parseInt(durationMatch[2], 10) / 60;
           }
         }
       }

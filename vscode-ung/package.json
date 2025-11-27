@@ -305,6 +305,24 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "ung.initializeGlobal",
+        "title": "Initialize UNG (Global)",
+        "category": "UNG",
+        "icon": "$(home)"
+      },
+      {
+        "command": "ung.initializeLocal",
+        "title": "Initialize UNG (Workspace)",
+        "category": "UNG",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "ung.refreshSetupRequired",
+        "title": "Refresh Setup",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "ung.refreshGettingStarted",
         "title": "Refresh Quick Setup",
         "category": "UNG",
@@ -485,39 +503,44 @@
           "when": "!ung.cliInstalled"
         },
         {
+          "id": "ungSetupRequired",
+          "name": "Setup Required",
+          "when": "ung.cliInstalled && !ung.isInitialized"
+        },
+        {
           "id": "ungDashboard",
           "name": "Dashboard",
-          "when": "ung.cliInstalled"
+          "when": "ung.cliInstalled && ung.isInitialized"
         },
         {
           "id": "ungGettingStarted",
           "name": "Quick Setup",
-          "when": "ung.cliInstalled"
+          "when": "ung.cliInstalled && ung.isInitialized"
         },
         {
           "id": "ungInvoices",
           "name": "Invoices",
-          "when": "ung.cliInstalled"
+          "when": "ung.cliInstalled && ung.isInitialized"
         },
         {
           "id": "ungContracts",
           "name": "Contracts",
-          "when": "ung.cliInstalled"
+          "when": "ung.cliInstalled && ung.isInitialized"
         },
         {
           "id": "ungClients",
           "name": "Clients",
-          "when": "ung.cliInstalled"
+          "when": "ung.cliInstalled && ung.isInitialized"
         },
         {
           "id": "ungExpenses",
           "name": "Expenses",
-          "when": "ung.cliInstalled"
+          "when": "ung.cliInstalled && ung.isInitialized"
         },
         {
           "id": "ungTracking",
           "name": "Time Tracking",
-          "when": "ung.cliInstalled"
+          "when": "ung.cliInstalled && ung.isInitialized"
         }
       ]
     },
@@ -527,6 +550,16 @@
           "command": "ung.recheckCli",
           "when": "view == ungWelcome",
           "group": "navigation"
+        },
+        {
+          "command": "ung.refreshSetupRequired",
+          "when": "view == ungSetupRequired",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ung.openDocs",
+          "when": "view == ungSetupRequired",
+          "group": "navigation@2"
         },
         {
           "command": "ung.checkForUpdates",

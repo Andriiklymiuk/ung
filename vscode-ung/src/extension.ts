@@ -17,6 +17,7 @@ import { InvoiceProvider } from './views/invoiceProvider';
 import { TrackingProvider } from './views/trackingProvider';
 import {
   GettingStartedProvider,
+  SetupRequiredProvider,
   WelcomeProvider,
 } from './views/welcomeProvider';
 import { ExportPanel } from './webview/exportPanel';
@@ -295,6 +296,125 @@ export async function activate(context: vscode.ExtensionContext) {
 
     if (action === 'Install Now') {
       vscode.commands.executeCommand('ung.installCli');
+    } else if (action === 'Learn More') {
+      vscode.commands.executeCommand('ung.openDocs');
+    }
+    return;
+  }
+
+  // Check if UNG is initialized
+  const isInitialized = await cli.isInitialized();
+  vscode.commands.executeCommand(
+    'setContext',
+    'ung.isInitialized',
+    isInitialized
+  );
+
+  // Register Setup Required provider (shown when CLI installed but not initialized)
+  const setupRequiredProvider = new SetupRequiredProvider();
+  const setupRequiredTree = vscode.window.createTreeView('ungSetupRequired', {
+    treeDataProvider: setupRequiredProvider,
+    showCollapseAll: false,
+  });
+  context.subscriptions.push(setupRequiredTree);
+
+  // Register initialization commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.initializeGlobal', async () => {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Setting up UNG globally...',
+        },
+        async () => {
+          const result = await cli.initialize(true);
+          if (result.success) {
+            vscode.commands.executeCommand('setContext', 'ung.isInitialized', true);
+            vscode.window
+              .showInformationMessage(
+                'UNG is now set up! Your data will be stored in ~/.ung/',
+                'Get Started'
+              )
+              .then((choice) => {
+                if (choice === 'Get Started') {
+                  vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+              });
+          } else {
+            vscode.window.showErrorMessage(`Setup failed: ${result.error}`);
+          }
+        }
+      );
+    }),
+
+    vscode.commands.registerCommand('ung.initializeLocal', async () => {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Setting up UNG for this workspace...',
+        },
+        async () => {
+          const result = await cli.initialize(false);
+          if (result.success) {
+            vscode.commands.executeCommand('setContext', 'ung.isInitialized', true);
+            vscode.window
+              .showInformationMessage(
+                'UNG is now set up! Your data will be stored in .ung/ folder',
+                'Get Started'
+              )
+              .then((choice) => {
+                if (choice === 'Get Started') {
+                  vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+              });
+          } else {
+            vscode.window.showErrorMessage(`Setup failed: ${result.error}`);
+          }
+        }
+      );
+    }),
+
+    vscode.commands.registerCommand('ung.refreshSetupRequired', () =>
+      setupRequiredProvider.refresh()
+    )
+  );
+
+  // If not initialized, show setup required view and stop here
+  if (!isInitialized) {
+    const action = await vscode.window.showInformationMessage(
+      'UNG CLI is installed but needs to be set up. Choose a setup option to get started.',
+      'Set Up Now',
+      'Learn More'
+    );
+
+    if (action === 'Set Up Now') {
+      // Show setup options
+      const setupChoice = await vscode.window.showQuickPick(
+        [
+          {
+            label: '$(home) Global Setup (Recommended)',
+            description: 'Store data in ~/.ung/',
+            detail: 'Your billing data will be accessible from any project',
+            value: 'global',
+          },
+          {
+            label: '$(folder) Project-Specific Setup',
+            description: 'Store data in .ung/',
+            detail: 'Create a separate database for this workspace',
+            value: 'local',
+          },
+        ],
+        {
+          placeHolder: 'Where would you like to store your UNG data?',
+          title: 'UNG Setup',
+        }
+      );
+
+      if (setupChoice?.value === 'global') {
+        vscode.commands.executeCommand('ung.initializeGlobal');
+      } else if (setupChoice?.value === 'local') {
+        vscode.commands.executeCommand('ung.initializeLocal');
+      }
     } else if (action === 'Learn More') {
       vscode.commands.executeCommand('ung.openDocs');
     }

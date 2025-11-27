@@ -484,6 +484,30 @@
         "title": "Business Insights",
         "category": "UNG",
         "icon": "$(graph)"
+      },
+      {
+        "command": "ung.securityStatus",
+        "title": "Security Status",
+        "category": "UNG",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "ung.savePassword",
+        "title": "Save Database Password",
+        "category": "UNG",
+        "icon": "$(key)"
+      },
+      {
+        "command": "ung.clearPassword",
+        "title": "Clear Saved Password",
+        "category": "UNG",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "ung.securitySettings",
+        "title": "Security Settings",
+        "category": "UNG",
+        "icon": "$(lock)"
       }
     ],
     "viewsContainers": {

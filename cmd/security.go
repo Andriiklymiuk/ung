@@ -19,7 +19,9 @@ Examples:
   ung security status              # Show encryption status
   ung security enable              # Enable database encryption
   ung security disable             # Disable database encryption
-  ung security change-password     # Change encryption password`,
+  ung security change-password     # Change encryption password
+  ung security save-password       # Save password to OS keychain
+  ung security forget-password     # Remove password from OS keychain`,
 }
 
 var securityStatusCmd = &cobra.Command{
@@ -65,11 +67,38 @@ You'll need to provide both the current password and the new password.`,
 	Run: runSecurityChangePassword,
 }
 
+var securitySavePasswordCmd = &cobra.Command{
+	Use:   "save-password",
+	Short: "Save password to OS keychain",
+	Long: `Save the database encryption password to your operating system's secure credential storage.
+
+On macOS: Keychain
+On Windows: Credential Manager
+On Linux: Secret Service (requires libsecret)
+
+Once saved, ung will automatically retrieve the password when needed, so you won't need
+to enter it manually or set an environment variable.`,
+	Run: runSecuritySavePassword,
+}
+
+var securityForgetPasswordCmd = &cobra.Command{
+	Use:     "forget-password",
+	Aliases: []string{"clear-password", "remove-password"},
+	Short:   "Remove password from OS keychain",
+	Long: `Remove the saved database password from your operating system's secure credential storage.
+
+After running this command, you'll need to enter the password manually or use the
+UNG_DB_PASSWORD environment variable.`,
+	Run: runSecurityForgetPassword,
+}
+
 func init() {
 	securityCmd.AddCommand(securityStatusCmd)
 	securityCmd.AddCommand(securityEnableCmd)
 	securityCmd.AddCommand(securityDisableCmd)
 	securityCmd.AddCommand(securityChangePasswordCmd)
+	securityCmd.AddCommand(securitySavePasswordCmd)
+	securityCmd.AddCommand(securityForgetPasswordCmd)
 	rootCmd.AddCommand(securityCmd)
 }
 
@@ -88,9 +117,6 @@ func runSecurityStatus(cmd *cobra.Command, args []string) {
 		fmt.Println("Status:    ✅ Encrypted")
 		fmt.Printf("File:      %s\n", encryptedPath)
 		fmt.Println("Algorithm: AES-256-GCM with PBKDF2")
-		fmt.Println("\n💡 Password can be provided via:")
-		fmt.Println("   - Interactive prompt (default)")
-		fmt.Println("   - Environment variable: UNG_DB_PASSWORD")
 	} else if plainExists {
 		fmt.Println("Status:    ⚠️  Not Encrypted (Plain Text)")
 		fmt.Printf("File:      %s\n", dbPath)
@@ -98,6 +124,27 @@ func runSecurityStatus(cmd *cobra.Command, args []string) {
 		fmt.Println("   Run 'ung security enable' to encrypt it.")
 	} else {
 		fmt.Println("Status:    Database not created yet")
+	}
+
+	// Show keychain status
+	fmt.Println("\n🔑 Password Storage:")
+	if db.KeychainAvailable() {
+		keychainName := db.GetKeychainPlatformName()
+		if db.HasPasswordInKeychain() {
+			fmt.Printf("   ✅ Password saved in %s\n", keychainName)
+		} else {
+			fmt.Printf("   ❌ No password saved in %s\n", keychainName)
+			fmt.Println("      Run 'ung security save-password' to save it")
+		}
+	} else {
+		fmt.Println("   ⚠️  OS keychain not available on this platform")
+	}
+
+	if encryptedExists {
+		fmt.Println("\n💡 Password retrieval priority:")
+		fmt.Println("   1. OS Keychain (if saved)")
+		fmt.Println("   2. Environment variable: UNG_DB_PASSWORD")
+		fmt.Println("   3. Interactive prompt")
 	}
 
 	if cfg.Security.EncryptDatabase {
@@ -177,9 +224,29 @@ func runSecurityEnable(cmd *cobra.Command, args []string) {
 
 	fmt.Println("✅ Database encrypted successfully")
 	fmt.Printf("   Encrypted: %s\n", encryptedPath)
+
+	// Offer to save password to keychain
+	if db.KeychainAvailable() {
+		fmt.Printf("\n💡 Would you like to save the password to %s? (yes/no): ", db.GetKeychainPlatformName())
+		var response string
+		fmt.Scanln(&response)
+		if response == "yes" {
+			if err := db.SavePasswordToKeychain(password); err != nil {
+				fmt.Printf("⚠️  Failed to save to keychain: %v\n", err)
+			} else {
+				fmt.Printf("✅ Password saved to %s\n", db.GetKeychainPlatformName())
+				fmt.Println("   Your password will be retrieved automatically from now on")
+				return
+			}
+		}
+	}
+
 	fmt.Println("\n💡 To use the database, you'll need to provide the password via:")
-	fmt.Println("   - Interactive prompt (you'll be asked each time)")
+	if db.KeychainAvailable() {
+		fmt.Println("   - OS Keychain: run 'ung security save-password'")
+	}
 	fmt.Println("   - Environment variable: export UNG_DB_PASSWORD=\"your-password\"")
+	fmt.Println("   - Interactive prompt (you'll be asked each time)")
 }
 
 func runSecurityDisable(cmd *cobra.Command, args []string) {
@@ -318,7 +385,27 @@ func runSecurityChangePassword(cmd *cobra.Command, args []string) {
 	os.Remove(tempPath)
 
 	fmt.Println("✅ Password changed successfully")
-	fmt.Println("   Use the new password for future access")
+
+	// Update keychain if password was stored there
+	if db.KeychainAvailable() && db.HasPasswordInKeychain() {
+		if err := db.SavePasswordToKeychain(newPassword); err != nil {
+			fmt.Printf("⚠️  Failed to update keychain: %v\n", err)
+			fmt.Println("   Run 'ung security save-password' to save the new password")
+		} else {
+			fmt.Printf("✅ Updated password in %s\n", db.GetKeychainPlatformName())
+		}
+	} else if db.KeychainAvailable() {
+		fmt.Printf("\n💡 Would you like to save the new password to %s? (yes/no): ", db.GetKeychainPlatformName())
+		var response string
+		fmt.Scanln(&response)
+		if response == "yes" {
+			if err := db.SavePasswordToKeychain(newPassword); err != nil {
+				fmt.Printf("⚠️  Failed to save to keychain: %v\n", err)
+			} else {
+				fmt.Printf("✅ Password saved to %s\n", db.GetKeychainPlatformName())
+			}
+		}
+	}
 }
 
 func readPassword() (string, error) {
@@ -334,4 +421,96 @@ func readPassword() (string, error) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func runSecuritySavePassword(cmd *cobra.Command, args []string) {
+	fmt.Printf("🔑 Save Password to %s\n\n", db.GetKeychainPlatformName())
+
+	// Check if keychain is available
+	if !db.KeychainAvailable() {
+		fmt.Println("❌ OS keychain is not available on this platform")
+		fmt.Println("   You can use the UNG_DB_PASSWORD environment variable instead")
+		return
+	}
+
+	// Check if database is encrypted
+	dbPath := db.GetDBPath()
+	encryptedPath := dbPath + ".encrypted"
+	if !fileExists(encryptedPath) {
+		fmt.Println("⚠️  Database is not encrypted")
+		fmt.Println("   Enable encryption first with 'ung security enable'")
+		return
+	}
+
+	// Check if password is already saved
+	if db.HasPasswordInKeychain() {
+		fmt.Println("A password is already saved in the keychain.")
+		fmt.Print("Do you want to replace it? (yes/no): ")
+		var response string
+		fmt.Scanln(&response)
+		if response != "yes" {
+			fmt.Println("Cancelled")
+			return
+		}
+	}
+
+	// Get the password
+	fmt.Print("Enter database password to save: ")
+	password, err := readPassword()
+	if err != nil {
+		fmt.Printf("\n❌ Failed to read password: %v\n", err)
+		return
+	}
+
+	// Verify the password by trying to decrypt
+	fmt.Println("\n🔄 Verifying password...")
+	tempPath := dbPath + ".verify"
+	if err := db.DecryptDatabase(encryptedPath, tempPath, password); err != nil {
+		fmt.Printf("❌ Invalid password: %v\n", err)
+		return
+	}
+	os.Remove(tempPath)
+
+	// Save to keychain
+	if err := db.SavePasswordToKeychain(password); err != nil {
+		fmt.Printf("❌ Failed to save password: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ Password saved to %s\n", db.GetKeychainPlatformName())
+	fmt.Println("   Your password will be retrieved automatically from now on")
+}
+
+func runSecurityForgetPassword(cmd *cobra.Command, args []string) {
+	fmt.Printf("🔑 Remove Password from %s\n\n", db.GetKeychainPlatformName())
+
+	// Check if keychain is available
+	if !db.KeychainAvailable() {
+		fmt.Println("❌ OS keychain is not available on this platform")
+		return
+	}
+
+	// Check if password is saved
+	if !db.HasPasswordInKeychain() {
+		fmt.Println("No password is saved in the keychain")
+		return
+	}
+
+	// Confirm action
+	fmt.Print("Are you sure you want to remove the saved password? (yes/no): ")
+	var response string
+	fmt.Scanln(&response)
+	if response != "yes" {
+		fmt.Println("Cancelled")
+		return
+	}
+
+	// Delete from keychain
+	if err := db.DeletePasswordFromKeychain(); err != nil {
+		fmt.Printf("❌ Failed to remove password: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ Password removed from %s\n", db.GetKeychainPlatformName())
+	fmt.Println("   You'll need to enter your password manually or set UNG_DB_PASSWORD")
 }

@@ -10,11 +10,26 @@ import (
 
 var passwordCache string
 
-// GetDatabasePassword retrieves the database password from cache, environment, or prompt
+// GetDatabasePassword retrieves the database password from cache, keychain, environment, or prompt
+// Priority order:
+// 1. In-memory cache (fastest, already validated)
+// 2. OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+// 3. UNG_DB_PASSWORD environment variable
+// 4. Interactive terminal prompt
 func GetDatabasePassword() (string, error) {
 	// Check cache first
 	if passwordCache != "" {
 		return passwordCache, nil
+	}
+
+	// Check OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+	if KeychainAvailable() {
+		keychainPassword, err := GetPasswordFromKeychain()
+		if err == nil && keychainPassword != "" {
+			passwordCache = keychainPassword
+			return passwordCache, nil
+		}
+		// If error or empty, fall through to other methods
 	}
 
 	// Check environment variable

@@ -7,7 +7,9 @@ import { ContractCommands } from './commands/contract';
 import { ExpenseCommands } from './commands/expense';
 import { InvoiceCommands } from './commands/invoice';
 import { SearchCommands } from './commands/search';
+import { SecurityCommands } from './commands/security';
 import { TrackingCommands } from './commands/tracking';
+import { getSecureStorage, initSecureStorage } from './utils/secureStorage';
 import { StatusBarManager } from './utils/statusBar';
 import { ClientProvider } from './views/clientProvider';
 import { ContractProvider } from './views/contractProvider';
@@ -31,6 +33,9 @@ export async function activate(context: vscode.ExtensionContext) {
   // Create output channel
   const outputChannel = vscode.window.createOutputChannel('UNG Operations');
   context.subscriptions.push(outputChannel);
+
+  // Initialize secure storage for password management
+  initSecureStorage(context);
 
   // Initialize CLI wrapper
   const cli = new UngCli(outputChannel);
@@ -423,6 +428,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const trackingCommands = new TrackingCommands(cli, statusBar, () =>
     trackingProvider.refresh()
   );
+  const securityCommands = new SecurityCommands(cli, outputChannel);
 
   // Register all commands
 
@@ -978,10 +984,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
         let password: string | undefined;
         if (isEncrypted.value) {
-          password = await vscode.window.showInputBox({
-            prompt: 'Enter database password',
-            password: true,
-            title: 'Database Password',
+          // Try to get password from secure storage first
+          const secureStorage = getSecureStorage();
+          password = await secureStorage.getOrPromptPassword({
+            title: 'Import Database Password',
+            prompt: 'Enter the password for the encrypted database',
+            offerToSave: false, // Don't offer to save import passwords
           });
           if (!password) return;
         }
@@ -1235,6 +1243,22 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand(selected.command);
       }
     })
+  );
+
+  // Security commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.securityStatus', () =>
+      securityCommands.showSecurityStatus()
+    ),
+    vscode.commands.registerCommand('ung.savePassword', () =>
+      securityCommands.savePassword()
+    ),
+    vscode.commands.registerCommand('ung.clearPassword', () =>
+      securityCommands.clearPassword()
+    ),
+    vscode.commands.registerCommand('ung.securitySettings', () =>
+      securityCommands.manageSecuritySettings()
+    )
   );
 }
 

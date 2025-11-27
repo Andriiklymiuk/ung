@@ -108,19 +108,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           vscode.commands.executeCommand('ung.createCompany');
           break;
         case 'openInvoices':
-          vscode.commands.executeCommand('ungInvoices.focus');
+          vscode.commands.executeCommand('ung.searchInvoices');
           break;
         case 'openClients':
-          vscode.commands.executeCommand('ungClients.focus');
+          vscode.commands.executeCommand('ung.searchClients');
           break;
         case 'openContracts':
-          vscode.commands.executeCommand('ungContracts.focus');
+          vscode.commands.executeCommand('ung.searchContracts');
           break;
         case 'openExpenses':
-          vscode.commands.executeCommand('ungExpenses.focus');
+          vscode.commands.executeCommand('ung.viewExpenseReport');
           break;
         case 'openTracking':
-          vscode.commands.executeCommand('ungTracking.focus');
+          vscode.commands.executeCommand('ung.viewActiveSession');
           break;
         case 'openStatistics':
           vscode.commands.executeCommand('ung.openStatistics');
@@ -883,14 +883,23 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     </div>
 
     <script>
-        const vscode = acquireVsCodeApi();
+        (function() {
+            const vscode = acquireVsCodeApi();
 
-        document.querySelectorAll('[data-command]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const command = btn.getAttribute('data-command');
-                vscode.postMessage({ command });
+            // Use event delegation - attach to document body
+            // This handles all current and future elements with data-command
+            document.body.addEventListener('click', function(e) {
+                const target = e.target.closest('[data-command]');
+                if (target) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const command = target.getAttribute('data-command');
+                    if (command) {
+                        vscode.postMessage({ command: command });
+                    }
+                }
             });
-        });
+        })();
     </script>
 </body>
 </html>`;

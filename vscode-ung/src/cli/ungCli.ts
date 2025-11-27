@@ -908,7 +908,23 @@ export class UngCli {
   async isEncrypted(): Promise<boolean> {
     const result = await this.exec(['security', 'status']);
     if (result.success && result.stdout) {
-      return result.stdout.includes('Encrypted');
+      const output = result.stdout.toLowerCase();
+      // Make sure we're checking for actual encryption, not "not encrypted"
+      // Look for patterns like "encrypted: yes" or "encryption: enabled"
+      // and exclude patterns like "not encrypted" or "encryption: no"
+      if (
+        output.includes('not encrypted') ||
+        output.includes('encryption: no')
+      ) {
+        return false;
+      }
+      // Check for positive encryption indicators
+      return (
+        output.includes('encrypted: yes') ||
+        output.includes('encryption: yes') ||
+        output.includes('encryption: enabled') ||
+        (output.includes('encrypted') && !output.includes('not '))
+      );
     }
     return false;
   }

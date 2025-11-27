@@ -23,12 +23,8 @@
     "accounting"
   ],
   "activationEvents": [
-    "onView:ungInvoices",
-    "onView:ungContracts",
-    "onView:ungClients",
-    "onView:ungExpenses",
-    "onView:ungTracking",
-    "onView:ungDashboard"
+    "onView:ungDashboard",
+    "onView:ungOnboarding"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -532,31 +528,6 @@
           "name": "Dashboard",
           "type": "webview",
           "when": "ung.cliInstalled && ung.isInitialized"
-        },
-        {
-          "id": "ungInvoices",
-          "name": "Invoices",
-          "when": "ung.cliInstalled && ung.isInitialized"
-        },
-        {
-          "id": "ungContracts",
-          "name": "Contracts",
-          "when": "ung.cliInstalled && ung.isInitialized"
-        },
-        {
-          "id": "ungClients",
-          "name": "Clients",
-          "when": "ung.cliInstalled && ung.isInitialized"
-        },
-        {
-          "id": "ungExpenses",
-          "name": "Expenses",
-          "when": "ung.cliInstalled && ung.isInitialized"
-        },
-        {
-          "id": "ungTracking",
-          "name": "Time Tracking",
-          "when": "ung.cliInstalled && ung.isInitialized"
         }
       ]
     },
@@ -581,173 +552,6 @@
           "command": "ung.refreshDashboard",
           "when": "view == ungDashboard",
           "group": "navigation@2"
-        },
-        {
-          "command": "ung.createInvoice",
-          "when": "view == ungInvoices",
-          "group": "navigation@1"
-        },
-        {
-          "command": "ung.generateAllInvoices",
-          "when": "view == ungInvoices",
-          "group": "navigation@2"
-        },
-        {
-          "command": "ung.sendAllInvoices",
-          "when": "view == ungInvoices",
-          "group": "navigation@3"
-        },
-        {
-          "command": "ung.refreshInvoices",
-          "when": "view == ungInvoices",
-          "group": "navigation@4"
-        },
-        {
-          "command": "ung.createContract",
-          "when": "view == ungContracts",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.refreshContracts",
-          "when": "view == ungContracts",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.createClient",
-          "when": "view == ungClients",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.refreshClients",
-          "when": "view == ungClients",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.logExpense",
-          "when": "view == ungExpenses",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.refreshExpenses",
-          "when": "view == ungExpenses",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.logTimeManually",
-          "when": "view == ungTracking",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.startTracking",
-          "when": "view == ungTracking",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.refreshTracking",
-          "when": "view == ungTracking",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "ung.viewInvoice",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "inline"
-        },
-        {
-          "command": "ung.exportInvoice",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "1_actions"
-        },
-        {
-          "command": "ung.emailInvoice",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "1_actions"
-        },
-        {
-          "command": "ung.markInvoicePaid",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "1_actions"
-        },
-        {
-          "command": "ung.markInvoiceSent",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "1_actions"
-        },
-        {
-          "command": "ung.changeInvoiceStatus",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "2_modify"
-        },
-        {
-          "command": "ung.editInvoice",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "2_modify"
-        },
-        {
-          "command": "ung.duplicateInvoice",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "2_modify"
-        },
-        {
-          "command": "ung.deleteInvoice",
-          "when": "view == ungInvoices && viewItem == invoice",
-          "group": "3_delete"
-        },
-        {
-          "command": "ung.viewContract",
-          "when": "view == ungContracts && viewItem == contract",
-          "group": "inline"
-        },
-        {
-          "command": "ung.generateContractPDF",
-          "when": "view == ungContracts && viewItem == contract",
-          "group": "1_actions"
-        },
-        {
-          "command": "ung.editContract",
-          "when": "view == ungContracts && viewItem == contract",
-          "group": "2_modify"
-        },
-        {
-          "command": "ung.deleteContract",
-          "when": "view == ungContracts && viewItem == contract",
-          "group": "3_delete"
-        },
-        {
-          "command": "ung.editClient",
-          "when": "view == ungClients && viewItem == client",
-          "group": "1_modify"
-        },
-        {
-          "command": "ung.deleteClient",
-          "when": "view == ungClients && viewItem == client",
-          "group": "2_delete"
-        },
-        {
-          "command": "ung.editExpense",
-          "when": "view == ungExpenses && viewItem == expense",
-          "group": "1_modify"
-        },
-        {
-          "command": "ung.deleteExpense",
-          "when": "view == ungExpenses && viewItem == expense",
-          "group": "2_delete"
-        },
-        {
-          "command": "ung.viewTrackingSession",
-          "when": "view == ungTracking && viewItem == tracking",
-          "group": "inline"
-        },
-        {
-          "command": "ung.editTrackingSession",
-          "when": "view == ungTracking && viewItem == tracking",
-          "group": "1_modify"
-        },
-        {
-          "command": "ung.deleteTrackingSession",
-          "when": "view == ungTracking && viewItem == tracking",
-          "group": "2_delete"
         }
       ]
     },

@@ -32,13 +32,25 @@ class TrackingSectionItem extends vscode.TreeItem {
  * Tracking summary item
  */
 class TrackingSummaryItem extends vscode.TreeItem {
-  constructor(label: string, value: string, icon: string, colorId?: string) {
+  constructor(
+    label: string,
+    value: string,
+    icon: string,
+    colorId?: string,
+    commandId?: string
+  ) {
     super(label, vscode.TreeItemCollapsibleState.None);
     this.description = value;
     this.iconPath = colorId
       ? new vscode.ThemeIcon(icon, new vscode.ThemeColor(colorId))
       : new vscode.ThemeIcon(icon);
     this.contextValue = 'tracking_summary';
+    if (commandId) {
+      this.command = {
+        command: commandId,
+        title: label,
+      };
+    }
   }
 }
 
@@ -103,6 +115,13 @@ export class TrackingItem extends vscode.TreeItem {
     this.iconPath = billable
       ? new vscode.ThemeIcon('clock', new vscode.ThemeColor('charts.green'))
       : new vscode.ThemeIcon('clock', new vscode.ThemeColor('charts.gray'));
+
+    // Make clickable to edit
+    this.command = {
+      command: 'ung.editTrackingSession',
+      title: 'Edit Tracking Session',
+      arguments: [{ itemId }],
+    };
   }
 }
 
@@ -252,7 +271,8 @@ export class TrackingProvider
           'Today',
           this.formatMinutes(todayMinutes),
           'calendar',
-          'charts.purple'
+          'charts.purple',
+          'ung.openStatistics'
         )
       );
 
@@ -262,7 +282,8 @@ export class TrackingProvider
             'Billable Today',
             this.formatMinutes(todayBillable),
             'credit-card',
-            'charts.green'
+            'charts.green',
+            'ung.openStatistics'
           )
         );
       }
@@ -284,7 +305,8 @@ export class TrackingProvider
           'This Week',
           this.formatMinutes(weekMinutes),
           'calendar',
-          'charts.blue'
+          'charts.blue',
+          'ung.openStatistics'
         )
       );
     }
@@ -358,7 +380,8 @@ export class TrackingProvider
           client,
           `${clientSessions.length} sessions • ${this.formatMinutes(totalMinutes)}`,
           'person',
-          'charts.blue'
+          'charts.blue',
+          'ung.openStatistics'
         );
       });
     }

@@ -27,7 +27,6 @@ type ConfigSource int
 const (
 	SourceDefault ConfigSource = iota
 	SourceLocal                // .ung/config.yaml in current directory
-	SourceLocalLegacy          // .ung.yaml (legacy local config)
 	SourceGlobal               // ~/.ung/config.yaml
 )
 
@@ -162,8 +161,6 @@ func GetConfigSourceString() string {
 	switch configSource {
 	case SourceLocal:
 		return "local (.ung/config.yaml)"
-	case SourceLocalLegacy:
-		return "local legacy (.ung.yaml)"
 	case SourceGlobal:
 		return "global (~/.ung/config.yaml)"
 	default:
@@ -179,33 +176,20 @@ func Reload() (*Config, error) {
 
 // Load loads configuration with priority:
 // 1. Local .ung/config.yaml (if not --global)
-// 2. Legacy .ung.yaml (if not --global)
-// 3. Global ~/.ung/config.yaml
-// 4. Default config (uses local .ung/ paths if in workspace, otherwise global)
+// 2. Global ~/.ung/config.yaml
+// 3. Default config (uses local .ung/ paths if in workspace, otherwise global)
 func Load() (*Config, error) {
 	if currentConfig != nil {
 		return currentConfig, nil
 	}
 
-	// If not forcing global, try local configs first
+	// If not forcing global, try local config first
 	if !forceGlobal {
-		// Try new local config structure: .ung/config.yaml
 		localConfigPath := filepath.Join(LocalUngDir, "config.yaml")
 		if _, err := os.Stat(localConfigPath); err == nil {
 			cfg, err := loadFromFile(localConfigPath)
 			if err == nil {
 				configSource = SourceLocal
-				currentConfig = cfg
-				return currentConfig, nil
-			}
-		}
-
-		// Try legacy local config: .ung.yaml
-		legacyLocalConfig := ".ung.yaml"
-		if _, err := os.Stat(legacyLocalConfig); err == nil {
-			cfg, err := loadFromFile(legacyLocalConfig)
-			if err == nil {
-				configSource = SourceLocalLegacy
 				currentConfig = cfg
 				return currentConfig, nil
 			}
@@ -486,11 +470,7 @@ func MigrateLocalToGlobal() error {
 	localConfigPath := filepath.Join(LocalUngDir, "config.yaml")
 	cfg, err := loadFromFile(localConfigPath)
 	if err != nil {
-		// Try legacy local config
-		cfg, err = loadFromFile(".ung.yaml")
-		if err != nil {
-			return fmt.Errorf("no local config found to migrate")
-		}
+		return fmt.Errorf("no local config found to migrate: %w", err)
 	}
 
 	// Update paths to use global directory
@@ -543,7 +523,7 @@ func GetContractsDir() string {
 
 // IsUsingLocalConfig returns true if the current config is from local .ung directory
 func IsUsingLocalConfig() bool {
-	return configSource == SourceLocal || configSource == SourceLocalLegacy
+	return configSource == SourceLocal
 }
 
 // GetActiveConfigPath returns the path to the currently active config file
@@ -551,9 +531,6 @@ func GetActiveConfigPath() string {
 	switch configSource {
 	case SourceLocal:
 		absPath, _ := filepath.Abs(filepath.Join(LocalUngDir, "config.yaml"))
-		return absPath
-	case SourceLocalLegacy:
-		absPath, _ := filepath.Abs(".ung.yaml")
 		return absPath
 	case SourceGlobal:
 		return filepath.Join(GetGlobalUngDir(), "config.yaml")

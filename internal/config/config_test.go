@@ -113,54 +113,6 @@ func TestExpandPath(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
-	// Create a temporary config file using legacy format
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, ".ung.yaml")
-
-	configContent := `language: "uk"
-invoice:
-  invoice_label: "РАХУНОК"
-  from_label: "Від"
-  bill_to_label: "Кому"
-`
-
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
-	}
-
-	// Change to temp directory
-	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
-
-	// Reset state
-	currentConfig = nil
-	forceGlobal = false
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("failed to load config: %v", err)
-	}
-
-	if cfg.Language != "uk" {
-		t.Errorf("expected language 'uk', got '%s'", cfg.Language)
-	}
-
-	if cfg.Invoice.InvoiceLabel != "РАХУНОК" {
-		t.Errorf("expected invoice label 'РАХУНОК', got '%s'", cfg.Invoice.InvoiceLabel)
-	}
-
-	if cfg.Invoice.FromLabel != "Від" {
-		t.Errorf("expected from label 'Від', got '%s'", cfg.Invoice.FromLabel)
-	}
-
-	// Test that it's recognized as legacy local config
-	if configSource != SourceLocalLegacy {
-		t.Errorf("expected config source to be SourceLocalLegacy, got %d", configSource)
-	}
-}
-
-func TestLoadConfigNewLocalStructure(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create new .ung/config.yaml structure
@@ -256,7 +208,7 @@ invoice:
 	}
 
 	// Config source should not be local
-	if configSource == SourceLocal || configSource == SourceLocalLegacy {
+	if configSource == SourceLocal {
 		t.Errorf("expected non-local config source, got %d", configSource)
 	}
 }

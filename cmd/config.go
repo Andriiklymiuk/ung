@@ -17,8 +17,7 @@ var configCmd = &cobra.Command{
 
 Configuration priority (highest to lowest):
 1. Local workspace: .ung/config.yaml (in current directory)
-2. Legacy local: .ung.yaml (deprecated, for backwards compatibility)
-3. Global: ~/.ung/config.yaml
+2. Global: ~/.ung/config.yaml
 
 Use local workspace config for project-specific databases.
 Use global config for your default settings.
@@ -315,7 +314,6 @@ func runConfigPath(cmd *cobra.Command, args []string) {
 	globalDir := config.GetGlobalUngDir()
 	globalConfig := filepath.Join(globalDir, "config.yaml")
 	localConfig := filepath.Join(config.LocalUngDir, "config.yaml")
-	legacyLocalConfig := ".ung.yaml"
 
 	fmt.Println("📂 Configuration File Paths")
 	fmt.Println()
@@ -323,43 +321,32 @@ func runConfigPath(cmd *cobra.Command, args []string) {
 	// Determine active config
 	activeSource := config.GetConfigSource()
 
-	// Check new local config (.ung/config.yaml)
+	// Check local config (.ung/config.yaml)
 	localAbsPath, _ := filepath.Abs(localConfig)
 	if _, err := os.Stat(localConfig); err == nil {
 		if activeSource == config.SourceLocal {
-			fmt.Printf("✅ Local:        %s (active)\n", localAbsPath)
+			fmt.Printf("✅ Local:  %s (active)\n", localAbsPath)
 		} else {
-			fmt.Printf("⚪ Local:        %s (exists)\n", localAbsPath)
+			fmt.Printf("⚪ Local:  %s (exists)\n", localAbsPath)
 		}
 	} else {
-		fmt.Printf("⚪ Local:        %s (not found)\n", localAbsPath)
-	}
-
-	// Check legacy local config (.ung.yaml)
-	legacyAbsPath, _ := filepath.Abs(legacyLocalConfig)
-	if _, err := os.Stat(legacyLocalConfig); err == nil {
-		if activeSource == config.SourceLocalLegacy {
-			fmt.Printf("✅ Local legacy: %s (active)\n", legacyAbsPath)
-		} else {
-			fmt.Printf("⚠️  Local legacy: %s (deprecated, consider migrating)\n", legacyAbsPath)
-		}
+		fmt.Printf("⚪ Local:  %s (not found)\n", localAbsPath)
 	}
 
 	// Check global config
 	if _, err := os.Stat(globalConfig); err == nil {
 		if activeSource == config.SourceGlobal {
-			fmt.Printf("✅ Global:       %s (active)\n", globalConfig)
+			fmt.Printf("✅ Global: %s (active)\n", globalConfig)
 		} else {
-			fmt.Printf("⚪ Global:       %s (overridden by local)\n", globalConfig)
+			fmt.Printf("⚪ Global: %s (overridden by local)\n", globalConfig)
 		}
 	} else {
-		fmt.Printf("⚪ Global:       %s (not found)\n", globalConfig)
+		fmt.Printf("⚪ Global: %s (not found)\n", globalConfig)
 	}
 
 	fmt.Println("\n💡 Priority (highest to lowest):")
 	fmt.Println("   1. Local:  .ung/config.yaml")
-	fmt.Println("   2. Legacy: .ung.yaml (deprecated)")
-	fmt.Println("   3. Global: ~/.ung/config.yaml")
+	fmt.Println("   2. Global: ~/.ung/config.yaml")
 
 	if activeSource == config.SourceDefault {
 		fmt.Println("\n⚠️  No config file found, using defaults.")

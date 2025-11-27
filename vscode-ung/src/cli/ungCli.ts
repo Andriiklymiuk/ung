@@ -772,6 +772,37 @@ export class UngCli {
     return this.exec(['dashboard']);
   }
 
+  /**
+   * Check if UNG is initialized (has a valid .ung directory with database or config)
+   * Returns true if either local or global .ung exists with content
+   */
+  async isInitialized(): Promise<boolean> {
+    try {
+      // Run a simple command that requires initialization
+      // If it succeeds, we're initialized
+      const result = await this.exec(['company', 'list']);
+      // Check if the output indicates the onboarding message
+      if (result.stdout?.includes("hasn't been set up yet")) {
+        return false;
+      }
+      return result.success;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Initialize UNG with config init
+   * @param global Whether to use global config
+   */
+  async initialize(global: boolean = true): Promise<CliResult> {
+    const args = ['config', 'init'];
+    if (global) {
+      args.push('--global');
+    }
+    return this.exec(args, { useGlobal: false }); // Don't add --global flag twice
+  }
+
   // ========== Invoice Edit/Delete Commands ==========
 
   /**

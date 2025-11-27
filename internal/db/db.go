@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+// ErrNotInitialized is returned when UNG has not been initialized yet
+var ErrNotInitialized = errors.New("ung not initialized")
 
 var DB *sql.DB
 var GormDB *gorm.DB
@@ -31,10 +35,16 @@ func GetInvoicesDir() string {
 }
 
 // Initialize opens the database and runs migrations
+// Returns ErrNotInitialized if UNG has not been set up yet
 func Initialize() error {
+	// Check if UNG is initialized before creating any directories
+	if !config.IsInitialized() {
+		return ErrNotInitialized
+	}
+
 	dbPath := GetDBPath()
 
-	// Create .ung directory if it doesn't exist
+	// Create .ung directory if it doesn't exist (only if we're initialized)
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)

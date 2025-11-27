@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 /**
  * Welcome item types
  */
-type WelcomeItemType = 'header' | 'feature' | 'action' | 'info' | 'separator';
+type WelcomeItemType = 'header' | 'feature' | 'action' | 'info' | 'separator' | 'step' | 'benefit';
 
 /**
  * Welcome tree item with rich formatting
@@ -15,7 +15,9 @@ export class WelcomeItem extends vscode.TreeItem {
     public readonly icon?: string,
     public readonly command?: vscode.Command,
     collapsibleState: vscode.TreeItemCollapsibleState = vscode
-      .TreeItemCollapsibleState.None
+      .TreeItemCollapsibleState.None,
+    description?: string,
+    tooltip?: string
   ) {
     super(label, collapsibleState);
 
@@ -25,6 +27,14 @@ export class WelcomeItem extends vscode.TreeItem {
 
     if (command) {
       this.command = command;
+    }
+
+    if (description) {
+      this.description = description;
+    }
+
+    if (tooltip) {
+      this.tooltip = tooltip;
     }
 
     this.contextValue = itemType;
@@ -333,5 +343,257 @@ export class GettingStartedProvider
     );
 
     return items;
+  }
+}
+
+/**
+ * Setup Required provider shown when CLI is installed but not initialized
+ * Provides a professional onboarding experience to set up UNG
+ */
+export class SetupRequiredProvider
+  implements vscode.TreeDataProvider<WelcomeItem>
+{
+  private _onDidChangeTreeData: vscode.EventEmitter<
+    WelcomeItem | undefined | null | undefined
+  > = new vscode.EventEmitter<WelcomeItem | undefined | null | undefined>();
+  readonly onDidChangeTreeData: vscode.Event<
+    WelcomeItem | undefined | null | undefined
+  > = this._onDidChangeTreeData.event;
+
+  refresh(): void {
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  getTreeItem(element: WelcomeItem): vscode.TreeItem {
+    return element;
+  }
+
+  async getChildren(element?: WelcomeItem): Promise<WelcomeItem[]> {
+    if (element) {
+      // Children based on parent type
+      if (element.label === 'Choose Your Setup') {
+        return this.getSetupOptions();
+      }
+      if (element.label === 'What You Can Do') {
+        return this.getCapabilities();
+      }
+      if (element.label === 'Why UNG?') {
+        return this.getBenefits();
+      }
+      return [];
+    }
+
+    // Root level items - professional onboarding flow
+    return [
+      new WelcomeItem(
+        'Welcome to UNG!',
+        'header',
+        'rocket',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Universal Next-Gen Billing',
+        'Your all-in-one freelance business toolkit'
+      ),
+      new WelcomeItem(
+        '',
+        'separator',
+        undefined,
+        undefined,
+        vscode.TreeItemCollapsibleState.None
+      ),
+      new WelcomeItem(
+        'Choose Your Setup',
+        'header',
+        'settings-gear',
+        undefined,
+        vscode.TreeItemCollapsibleState.Expanded,
+        'Quick Start',
+        'Select how you want to use UNG'
+      ),
+      new WelcomeItem(
+        'What You Can Do',
+        'header',
+        'checklist',
+        undefined,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        'Features',
+        'Explore UNG capabilities'
+      ),
+      new WelcomeItem(
+        'Why UNG?',
+        'header',
+        'lightbulb',
+        undefined,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        'Benefits',
+        'See what makes UNG special'
+      ),
+    ];
+  }
+
+  private getSetupOptions(): WelcomeItem[] {
+    return [
+      new WelcomeItem(
+        'Global Setup (Recommended)',
+        'action',
+        'home',
+        {
+          command: 'ung.initializeGlobal',
+          title: 'Initialize Global Config',
+        },
+        vscode.TreeItemCollapsibleState.None,
+        '~/.ung/',
+        'Store all your billing data in your home folder. Perfect for personal use across all projects.'
+      ),
+      new WelcomeItem(
+        'Project-Specific Setup',
+        'action',
+        'folder',
+        {
+          command: 'ung.initializeLocal',
+          title: 'Initialize Local Config',
+        },
+        vscode.TreeItemCollapsibleState.None,
+        '.ung/',
+        'Create a local .ung folder in this workspace. Great for project-specific billing.'
+      ),
+      new WelcomeItem(
+        '',
+        'separator',
+        undefined,
+        undefined,
+        vscode.TreeItemCollapsibleState.None
+      ),
+      new WelcomeItem(
+        'Need Help Deciding?',
+        'info',
+        'question',
+        {
+          command: 'ung.openDocs',
+          title: 'Open Documentation',
+        },
+        vscode.TreeItemCollapsibleState.None,
+        'Learn more',
+        'Read our documentation to understand the differences'
+      ),
+    ];
+  }
+
+  private getCapabilities(): WelcomeItem[] {
+    return [
+      new WelcomeItem(
+        'Track Time',
+        'feature',
+        'clock',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Start/stop timer',
+        'Track billable hours with one click'
+      ),
+      new WelcomeItem(
+        'Create Invoices',
+        'feature',
+        'file-pdf',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Auto-generate from time',
+        'Beautiful PDF invoices from tracked time'
+      ),
+      new WelcomeItem(
+        'Manage Clients',
+        'feature',
+        'organization',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Unlimited clients',
+        'Store client details and history'
+      ),
+      new WelcomeItem(
+        'Handle Contracts',
+        'feature',
+        'file-text',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Hourly & fixed-price',
+        'Multiple contract types per client'
+      ),
+      new WelcomeItem(
+        'Track Expenses',
+        'feature',
+        'credit-card',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'With receipts',
+        'Log and categorize business expenses'
+      ),
+      new WelcomeItem(
+        'View Reports',
+        'feature',
+        'graph',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Revenue & profit',
+        'Insights into your business performance'
+      ),
+    ];
+  }
+
+  private getBenefits(): WelcomeItem[] {
+    return [
+      new WelcomeItem(
+        'Privacy First',
+        'benefit',
+        'shield',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Local storage',
+        'Your data stays on your machine, encrypted at rest'
+      ),
+      new WelcomeItem(
+        'Works Offline',
+        'benefit',
+        'plug',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'No internet needed',
+        'Full functionality without cloud dependency'
+      ),
+      new WelcomeItem(
+        'Multi-Currency',
+        'benefit',
+        'globe',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'USD, EUR, GBP...',
+        'Bill clients in any currency'
+      ),
+      new WelcomeItem(
+        'VS Code Native',
+        'benefit',
+        'symbol-color',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Built for devs',
+        'Seamless integration with your workflow'
+      ),
+      new WelcomeItem(
+        'Open Source',
+        'benefit',
+        'github',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Free forever',
+        'MIT licensed, community-driven'
+      ),
+      new WelcomeItem(
+        'Fast CLI',
+        'benefit',
+        'terminal',
+        undefined,
+        vscode.TreeItemCollapsibleState.None,
+        'Built in Go',
+        'Lightning-fast commands for power users'
+      ),
+    ];
   }
 }

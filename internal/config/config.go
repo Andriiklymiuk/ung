@@ -555,3 +555,66 @@ func GetInvoicesDir() string {
 	cfg, _ := Load()
 	return cfg.InvoicesDir
 }
+
+// IsInitialized checks if UNG has been initialized (either local or global .ung directory exists with content)
+func IsInitialized() bool {
+	// Check local .ung directory first
+	if isDirectoryInitialized(LocalUngDir) {
+		return true
+	}
+
+	// Check global ~/.ung directory
+	globalDir := GetGlobalUngDir()
+	if globalDir != "" && isDirectoryInitialized(globalDir) {
+		return true
+	}
+
+	return false
+}
+
+// isDirectoryInitialized checks if a .ung directory is properly initialized
+// A directory is considered initialized if it contains either a database file or config file
+func isDirectoryInitialized(dir string) bool {
+	// Check if directory exists
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+
+	// Check for database file
+	dbPath := filepath.Join(dir, "ung.db")
+	if _, err := os.Stat(dbPath); err == nil {
+		return true
+	}
+
+	// Check for encrypted database file
+	encryptedDBPath := filepath.Join(dir, "ung.db.encrypted")
+	if _, err := os.Stat(encryptedDBPath); err == nil {
+		return true
+	}
+
+	// Check for config file
+	configPath := filepath.Join(dir, "config.yaml")
+	if _, err := os.Stat(configPath); err == nil {
+		return true
+	}
+
+	return false
+}
+
+// GetInitializedDir returns the path to the initialized .ung directory, or empty string if not initialized
+func GetInitializedDir() string {
+	// Check local first
+	if isDirectoryInitialized(LocalUngDir) {
+		absPath, _ := filepath.Abs(LocalUngDir)
+		return absPath
+	}
+
+	// Check global
+	globalDir := GetGlobalUngDir()
+	if globalDir != "" && isDirectoryInitialized(globalDir) {
+		return globalDir
+	}
+
+	return ""
+}

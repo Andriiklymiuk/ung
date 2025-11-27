@@ -321,6 +321,14 @@ export async function activate(context: vscode.ExtensionContext) {
           title: 'Setting up UNG for this workspace...',
         },
         async () => {
+          // Update the setting to use local config BEFORE initialization
+          const config = vscode.workspace.getConfiguration('ung');
+          await config.update(
+            'useGlobalConfig',
+            false,
+            vscode.ConfigurationTarget.Workspace
+          );
+
           const result = await cli.initialize(false);
           if (result.success) {
             vscode.commands.executeCommand(
@@ -408,37 +416,13 @@ export async function activate(context: vscode.ExtensionContext) {
   pomodoroStatusBar.command = 'ung.startPomodoro';
   context.subscriptions.push(pomodoroStatusBar);
 
-  // Initialize tree view providers
+  // Initialize providers for command refresh callbacks
+  // Note: Tree views have been consolidated into the single dashboard view
   const invoiceProvider = new InvoiceProvider(cli);
   const contractProvider = new ContractProvider(cli);
   const clientProvider = new ClientProvider(cli);
   const expenseProvider = new ExpenseProvider(cli);
   const trackingProvider = new TrackingProvider(cli);
-
-  // Register tree views
-  const invoicesTree = vscode.window.createTreeView('ungInvoices', {
-    treeDataProvider: invoiceProvider,
-  });
-  const contractsTree = vscode.window.createTreeView('ungContracts', {
-    treeDataProvider: contractProvider,
-  });
-  const clientsTree = vscode.window.createTreeView('ungClients', {
-    treeDataProvider: clientProvider,
-  });
-  const expensesTree = vscode.window.createTreeView('ungExpenses', {
-    treeDataProvider: expenseProvider,
-  });
-  const trackingTree = vscode.window.createTreeView('ungTracking', {
-    treeDataProvider: trackingProvider,
-  });
-
-  context.subscriptions.push(
-    invoicesTree,
-    contractsTree,
-    clientsTree,
-    expensesTree,
-    trackingTree
-  );
 
   // Initialize command handlers
   const companyCommands = new CompanyCommands(cli);

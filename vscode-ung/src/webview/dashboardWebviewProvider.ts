@@ -18,6 +18,16 @@ interface DashboardMetrics {
 }
 
 /**
+ * Counts for navigation badges
+ */
+interface EntityCounts {
+  invoices: number;
+  clients: number;
+  contracts: number;
+  expenses: number;
+}
+
+/**
  * Dashboard webview provider for the sidebar
  * Shows a professional dashboard with metrics, quick actions, and navigation
  */
@@ -27,6 +37,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _extensionUri: vscode.Uri;
   private _metrics: DashboardMetrics | null = null;
+  private _counts: EntityCounts = {
+    invoices: 0,
+    clients: 0,
+    contracts: 0,
+    expenses: 0,
+  };
+  private _todayHours: number = 0;
+  private _isLoading: boolean = true;
   private _activeTracking: {
     project: string;
     client: string;
@@ -62,6 +80,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     };
 
     // Set initial HTML with loading state
+    this._isLoading = true;
     webviewView.webview.html = this._getHtmlForWebview();
 
     // Handle messages from the webview
@@ -109,6 +128,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'openTemplateEditor':
           vscode.commands.executeCommand('ung.openTemplateEditor');
           break;
+        case 'openPomodoro':
+          vscode.commands.executeCommand('ung.startPomodoro');
+          break;
         case 'refresh':
           await this.refresh();
           break;
@@ -124,13 +146,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    // Load all data in parallel
+    this._isLoading = true;
+    this._view.webview.html = this._getHtmlForWebview();
+
+    // Load all data in parallel for speed
     await Promise.all([
       this._loadMetrics(),
       this._checkActiveTracking(),
       this._checkSetupStatus(),
+      this._loadCounts(),
+      this._loadTodayHours(),
     ]);
 
+    this._isLoading = false;
     this._view.webview.html = this._getHtmlForWebview();
   }
 
@@ -142,6 +170,56 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
     } catch {
       this._metrics = null;
+    }
+  }
+
+  private async _loadCounts(): Promise<void> {
+    try {
+      const [invoiceResult, clientResult, contractResult, expenseResult] =
+        await Promise.all([
+          this.cli.exec(['invoice', 'list']),
+          this.cli.exec(['client', 'list']),
+          this.cli.exec(['contract', 'list']),
+          this.cli.exec(['expense', 'list']),
+        ]);
+
+      this._counts = {
+        invoices: this._countLines(invoiceResult.stdout),
+        clients: this._countLines(clientResult.stdout),
+        contracts: this._countLines(contractResult.stdout),
+        expenses: this._countLines(expenseResult.stdout),
+      };
+    } catch {
+      this._counts = { invoices: 0, clients: 0, contracts: 0, expenses: 0 };
+    }
+  }
+
+  private _countLines(output: string | undefined): number {
+    if (!output) return 0;
+    const lines = output
+      .split('\n')
+      .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+    return Math.max(0, lines.length - 1); // Subtract header
+  }
+
+  private async _loadTodayHours(): Promise<void> {
+    try {
+      const result = await this.cli.exec(['track', 'today']);
+      if (result.success && result.stdout) {
+        const match = result.stdout.match(/(\d+\.?\d*)\s*h/i);
+        if (match) {
+          this._todayHours = parseFloat(match[1]);
+        } else {
+          // Try to parse duration format like "2:30"
+          const durationMatch = result.stdout.match(/(\d+):(\d+)/);
+          if (durationMatch) {
+            this._todayHours =
+              parseInt(durationMatch[1]) + parseInt(durationMatch[2]) / 60;
+          }
+        }
+      }
+    } catch {
+      this._todayHours = 0;
     }
   }
 
@@ -327,37 +405,66 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             max-width: 100%;
         }
 
+        /* Loading State */
+        .loading-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--vscode-input-background);
+            border-top: 3px solid var(--vscode-textLink-foreground);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 12px;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+        }
+
         /* Header */
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
             border-bottom: 1px solid var(--vscode-panel-border);
         }
 
         .header-left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .logo {
-            width: 36px;
-            height: 36px;
+            width: 32px;
+            height: 32px;
             background: linear-gradient(135deg, var(--vscode-textLink-foreground), var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground)));
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             color: white;
         }
 
         .header-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
         }
 
@@ -376,21 +483,57 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-list-hoverBackground);
         }
 
+        .refresh-btn.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background-color: color-mix(in srgb, var(--vscode-charts-red, #f44336) 15%, var(--vscode-sideBar-background));
+            border: 1px solid var(--vscode-charts-red, #f44336);
+            border-radius: 8px;
+            margin-bottom: 14px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .alert-banner:hover {
+            background-color: color-mix(in srgb, var(--vscode-charts-red, #f44336) 25%, var(--vscode-sideBar-background));
+        }
+
+        .alert-icon {
+            font-size: 16px;
+        }
+
+        .alert-text {
+            flex: 1;
+        }
+
+        .alert-value {
+            font-weight: 600;
+            color: var(--vscode-charts-red, #f44336);
+        }
+
         /* Active Tracking Banner */
         .tracking-banner {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            background: linear-gradient(135deg, color-mix(in srgb, var(--vscode-charts-green, #4caf50) 20%, var(--vscode-sideBar-background)), var(--vscode-sideBar-background));
+            gap: 10px;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, color-mix(in srgb, var(--vscode-charts-green, #4caf50) 15%, var(--vscode-sideBar-background)), var(--vscode-sideBar-background));
             border: 1px solid var(--vscode-charts-green, #4caf50);
-            border-radius: 10px;
-            margin-bottom: 16px;
+            border-radius: 8px;
+            margin-bottom: 14px;
         }
 
         .tracking-indicator {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             background-color: var(--vscode-charts-green, #4caf50);
             border-radius: 50%;
             animation: pulse 2s infinite;
@@ -398,25 +541,29 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            50% { opacity: 0.4; }
         }
 
         .tracking-info {
             flex: 1;
+            min-width: 0;
         }
 
         .tracking-project {
             font-weight: 600;
-            font-size: 13px;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .tracking-meta {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--vscode-descriptionForeground);
         }
 
         .tracking-duration {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             font-family: monospace;
             color: var(--vscode-charts-green, #4caf50);
@@ -426,10 +573,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
             border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
             color: var(--vscode-errorForeground, #f48771);
-            padding: 6px 12px;
-            border-radius: 6px;
+            padding: 5px 10px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             transition: all 0.15s;
         }
@@ -443,62 +590,67 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .metrics-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 16px;
         }
 
         .metric-card {
             background-color: var(--vscode-input-background);
             border-radius: 8px;
-            padding: 14px;
-            transition: background-color 0.15s;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid transparent;
         }
 
         .metric-card:hover {
             background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--vscode-focusBorder);
         }
 
-        .metric-card.wide {
-            grid-column: span 2;
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
         }
 
         .metric-icon {
-            font-size: 16px;
-            margin-bottom: 6px;
-        }
-
-        .metric-value {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 2px;
+            font-size: 14px;
         }
 
         .metric-label {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--vscode-descriptionForeground);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 600;
         }
 
         .metric-value.green { color: var(--vscode-charts-green, #4caf50); }
         .metric-value.blue { color: var(--vscode-charts-blue, #2196f3); }
         .metric-value.orange { color: var(--vscode-charts-orange, #ff9800); }
         .metric-value.red { color: var(--vscode-charts-red, #f44336); }
+        .metric-value.purple { color: var(--vscode-charts-purple, #9c27b0); }
 
         /* Section */
         .section {
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .section-header {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
+            gap: 6px;
+            margin-bottom: 10px;
         }
 
         .section-title {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             color: var(--vscode-descriptionForeground);
             text-transform: uppercase;
@@ -509,19 +661,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .quick-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
         }
 
         .action-btn {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 12px;
+            gap: 8px;
+            padding: 10px;
             background-color: var(--vscode-input-background);
             border: 1px solid transparent;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
             transition: all 0.15s;
@@ -544,8 +696,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .action-icon {
-            font-size: 16px;
-            width: 24px;
+            font-size: 14px;
+            width: 20px;
             text-align: center;
         }
 
@@ -556,69 +708,87 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         /* Navigation */
         .nav-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
         }
 
         .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
-            padding: 14px 8px;
+            gap: 4px;
+            padding: 12px 6px;
             background-color: var(--vscode-input-background);
             border: 1px solid transparent;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 10px;
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
             transition: all 0.15s;
+            position: relative;
         }
 
         .nav-item:hover {
             background-color: var(--vscode-list-hoverBackground);
             border-color: var(--vscode-focusBorder);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }
 
         .nav-icon {
-            font-size: 20px;
+            font-size: 18px;
         }
 
         .nav-label {
             font-weight: 500;
         }
 
+        .nav-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         /* Setup Section */
         .setup-section {
             background-color: color-mix(in srgb, var(--vscode-textLink-foreground) 8%, var(--vscode-input-background));
-            border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground) 30%, transparent);
-            border-radius: 10px;
-            padding: 16px;
-            margin-bottom: 20px;
+            border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground) 25%, transparent);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
         }
 
         .setup-title {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .setup-steps {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         .setup-step {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
+            gap: 8px;
+            padding: 8px 10px;
             background-color: var(--vscode-sideBar-background);
             border-radius: 6px;
             cursor: pointer;
@@ -630,17 +800,17 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .setup-step.completed {
-            opacity: 0.6;
+            opacity: 0.5;
         }
 
         .step-icon {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 10px;
             flex-shrink: 0;
         }
 
@@ -660,12 +830,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .step-label {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
         }
 
         .step-desc {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--vscode-descriptionForeground);
         }
 
@@ -673,40 +843,78 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .divider {
             height: 1px;
             background: linear-gradient(to right, transparent, var(--vscode-panel-border), transparent);
-            margin: 20px 0;
+            margin: 14px 0;
         }
 
         /* Tools Grid */
         .tools-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
         }
 
         .tool-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
+            gap: 8px;
+            padding: 8px 10px;
             background-color: var(--vscode-input-background);
             border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             transition: all 0.15s;
+            border: 1px solid transparent;
         }
 
         .tool-item:hover {
             background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--vscode-focusBorder);
         }
 
         .tool-icon {
-            font-size: 14px;
-            opacity: 0.8;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        ${this._isLoading ? this._getLoadingHtml() : this._getContentHtml(needsSetup)}
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        document.querySelectorAll('[data-command]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const command = btn.getAttribute('data-command');
+                vscode.postMessage({ command });
+            });
+        });
+    </script>
+</body>
+</html>`;
+  }
+
+  private _getLoadingHtml(): string {
+    return `
+        <div class="header">
+            <div class="header-left">
+                <div class="logo">U</div>
+                <span class="header-title">Dashboard</span>
+            </div>
+        </div>
+        <div class="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading dashboard...</div>
+        </div>
+    `;
+  }
+
+  private _getContentHtml(needsSetup: boolean): string {
+    const m = this._metrics;
+    const hasUnpaid = m && m.unpaidAmount > 0;
+
+    return `
         <!-- Header -->
         <div class="header">
             <div class="header-left">
@@ -720,12 +928,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         ${this._activeTracking ? this._getActiveTrackingHtml() : ''}
 
+        ${hasUnpaid ? this._getAlertBannerHtml() : ''}
+
         ${needsSetup ? this._getSetupSectionHtml() : ''}
 
         <!-- Metrics -->
         <div class="section">
             <div class="section-header">
-                <span class="section-title">This Month</span>
+                <span class="section-title">Overview</span>
             </div>
             <div class="metrics-grid">
                 ${this._getMetricsHtml()}
@@ -753,18 +963,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 <button class="nav-item" data-command="openInvoices">
                     <span class="nav-icon">📄</span>
                     <span class="nav-label">Invoices</span>
+                    ${this._counts.invoices > 0 ? `<span class="nav-badge">${this._counts.invoices}</span>` : ''}
                 </button>
                 <button class="nav-item" data-command="openClients">
                     <span class="nav-icon">👥</span>
                     <span class="nav-label">Clients</span>
+                    ${this._counts.clients > 0 ? `<span class="nav-badge">${this._counts.clients}</span>` : ''}
                 </button>
                 <button class="nav-item" data-command="openContracts">
                     <span class="nav-icon">📝</span>
                     <span class="nav-label">Contracts</span>
+                    ${this._counts.contracts > 0 ? `<span class="nav-badge">${this._counts.contracts}</span>` : ''}
                 </button>
                 <button class="nav-item" data-command="openExpenses">
                     <span class="nav-icon">💳</span>
                     <span class="nav-label">Expenses</span>
+                    ${this._counts.expenses > 0 ? `<span class="nav-badge">${this._counts.expenses}</span>` : ''}
                 </button>
                 <button class="nav-item" data-command="openTracking">
                     <span class="nav-icon">⏱️</span>
@@ -787,28 +1001,29 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             <div class="tools-grid">
                 <button class="tool-item" data-command="openTemplateEditor">
                     <span class="tool-icon">🎨</span>
-                    <span>Template Editor</span>
+                    <span>Templates</span>
                 </button>
-                <button class="tool-item" data-command="openStatistics">
-                    <span class="tool-icon">📈</span>
-                    <span>Statistics</span>
+                <button class="tool-item" data-command="openPomodoro">
+                    <span class="tool-icon">🍅</span>
+                    <span>Pomodoro</span>
                 </button>
             </div>
         </div>
-    </div>
+    `;
+  }
 
-    <script>
-        const vscode = acquireVsCodeApi();
+  private _getAlertBannerHtml(): string {
+    const m = this._metrics;
+    if (!m || m.unpaidAmount <= 0) return '';
 
-        document.querySelectorAll('[data-command]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const command = btn.getAttribute('data-command');
-                vscode.postMessage({ command });
-            });
-        });
-    </script>
-</body>
-</html>`;
+    return `
+        <div class="alert-banner" data-command="openInvoices">
+            <span class="alert-icon">⚠️</span>
+            <span class="alert-text">
+                <span class="alert-value">${this._formatCurrency(m.unpaidAmount, m.currency)}</span> unpaid
+            </span>
+        </div>
+    `;
   }
 
   private _getActiveTrackingHtml(): string {
@@ -832,7 +1047,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         <div class="setup-section">
             <div class="setup-title">
                 <span>🚀</span>
-                <span>Quick Setup</span>
+                <span>Get Started</span>
             </div>
             <div class="setup-steps">
                 <div class="setup-step ${this._setupStatus.hasCompany ? 'completed' : ''}" data-command="createCompany">
@@ -840,8 +1055,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                         ${this._setupStatus.hasCompany ? '✓' : '1'}
                     </div>
                     <div class="step-content">
-                        <div class="step-label">${this._setupStatus.hasCompany ? 'Company Added' : 'Add Your Company'}</div>
-                        <div class="step-desc">Your business details for invoices</div>
+                        <div class="step-label">${this._setupStatus.hasCompany ? 'Company Added' : 'Add Company'}</div>
+                        <div class="step-desc">Your business details</div>
                     </div>
                 </div>
                 <div class="setup-step ${this._setupStatus.hasClient ? 'completed' : ''}" data-command="createClient">
@@ -849,8 +1064,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                         ${this._setupStatus.hasClient ? '✓' : '2'}
                     </div>
                     <div class="step-content">
-                        <div class="step-label">${this._setupStatus.hasClient ? 'Client Added' : 'Add Your First Client'}</div>
-                        <div class="step-desc">Who you're working with</div>
+                        <div class="step-label">${this._setupStatus.hasClient ? 'Client Added' : 'Add Client'}</div>
+                        <div class="step-desc">Who you work with</div>
                     </div>
                 </div>
                 <div class="setup-step ${this._setupStatus.hasContract ? 'completed' : ''}" data-command="createContract">
@@ -858,8 +1073,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                         ${this._setupStatus.hasContract ? '✓' : '3'}
                     </div>
                     <div class="step-content">
-                        <div class="step-label">${this._setupStatus.hasContract ? 'Contract Created' : 'Create a Contract'}</div>
-                        <div class="step-desc">Define rates and terms</div>
+                        <div class="step-label">${this._setupStatus.hasContract ? 'Contract Created' : 'Create Contract'}</div>
+                        <div class="step-desc">Rates and terms</div>
                     </div>
                 </div>
             </div>
@@ -875,29 +1090,38 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       unpaidAmount: 0,
       totalClients: 0,
       activeContracts: 0,
+      averageHourlyRate: 0,
       currency: 'USD',
     };
 
     return `
-        <div class="metric-card">
-            <div class="metric-icon">💰</div>
+        <div class="metric-card" data-command="openStatistics">
+            <div class="metric-header">
+                <span class="metric-icon">💰</span>
+                <span class="metric-label">Revenue</span>
+            </div>
             <div class="metric-value green">${this._formatCurrency(m.totalMonthlyRevenue, m.currency)}</div>
-            <div class="metric-label">Revenue</div>
         </div>
-        <div class="metric-card">
-            <div class="metric-icon">⏱️</div>
-            <div class="metric-value blue">${m.projectedHours.toFixed(1)}h</div>
-            <div class="metric-label">Hours</div>
+        <div class="metric-card" data-command="openTracking">
+            <div class="metric-header">
+                <span class="metric-icon">📅</span>
+                <span class="metric-label">Today</span>
+            </div>
+            <div class="metric-value blue">${this._todayHours.toFixed(1)}h</div>
         </div>
-        <div class="metric-card">
-            <div class="metric-icon">📄</div>
+        <div class="metric-card" data-command="openInvoices">
+            <div class="metric-header">
+                <span class="metric-icon">📄</span>
+                <span class="metric-label">Pending</span>
+            </div>
             <div class="metric-value ${m.pendingInvoices > 0 ? 'orange' : ''}">${m.pendingInvoices}</div>
-            <div class="metric-label">Pending</div>
         </div>
-        <div class="metric-card">
-            <div class="metric-icon">⚠️</div>
-            <div class="metric-value ${m.unpaidAmount > 0 ? 'red' : ''}">${this._formatCurrency(m.unpaidAmount, m.currency)}</div>
-            <div class="metric-label">Unpaid</div>
+        <div class="metric-card" data-command="openStatistics">
+            <div class="metric-header">
+                <span class="metric-icon">💵</span>
+                <span class="metric-label">Avg Rate</span>
+            </div>
+            <div class="metric-value purple">${m.averageHourlyRate > 0 ? `$${m.averageHourlyRate.toFixed(0)}/h` : '-'}</div>
         </div>
     `;
   }
@@ -907,11 +1131,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       return `
             <button class="action-btn" data-command="createInvoice">
                 <span class="action-icon">📄</span>
-                <span class="action-label">Create Invoice</span>
+                <span class="action-label">New Invoice</span>
             </button>
             <button class="action-btn" data-command="logExpense">
                 <span class="action-icon">💳</span>
                 <span class="action-label">Log Expense</span>
+            </button>
+            <button class="action-btn" data-command="createClient">
+                <span class="action-icon">👤</span>
+                <span class="action-label">Add Client</span>
+            </button>
+            <button class="action-btn" data-command="createContract">
+                <span class="action-icon">📝</span>
+                <span class="action-label">New Contract</span>
             </button>
         `;
     }
@@ -919,11 +1151,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     return `
         <button class="action-btn primary" data-command="startTracking">
             <span class="action-icon">▶️</span>
-            <span class="action-label">Start Time Tracking</span>
+            <span class="action-label">Start Tracking</span>
         </button>
         <button class="action-btn" data-command="createInvoice">
             <span class="action-icon">📄</span>
-            <span class="action-label">Create Invoice</span>
+            <span class="action-label">New Invoice</span>
         </button>
         <button class="action-btn" data-command="logExpense">
             <span class="action-icon">💳</span>

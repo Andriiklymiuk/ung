@@ -1,6 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as vscode from 'vscode';
+import { getSecureStorage } from '../utils/secureStorage';
 
 const execAsync = promisify(exec);
 
@@ -86,8 +87,20 @@ export class UngCli {
 
     // Build environment with optional password (more secure than command-line args)
     const env = { ...process.env };
-    if (options?.password) {
-      env[UNG_DB_PASSWORD_ENV] = options.password;
+
+    // Use password from options, or try VSCode secure storage
+    let password = options?.password;
+    if (!password) {
+      try {
+        const secureStorage = getSecureStorage();
+        password = await secureStorage.getPassword();
+      } catch {
+        // Secure storage not initialized yet, ignore
+      }
+    }
+
+    if (password) {
+      env[UNG_DB_PASSWORD_ENV] = password;
     }
 
     try {
@@ -910,5 +923,34 @@ export class UngCli {
     options?: { parseJson?: boolean; cwd?: string; useGlobal?: boolean }
   ): Promise<CliResult<T>> {
     return this.exec<T>(args, { ...options, password });
+  }
+
+  /**
+   * Check if database requires a password and if one is available
+   * Returns true if DB is not encrypted OR if password is available in keychain
+   */
+  async isPasswordAvailable(): Promise<boolean> {
+    // Run security status to check encryption and keychain status
+    const result = await this.exec(['security', 'status']);
+    if (!result.success || !result.stdout) {
+      return true; // Assume OK if we can't check
+    }
+
+    const output = result.stdout;
+    const isEncrypted = output.includes('Encrypted');
+    const hasKeychainPassword = output.includes('Password saved in');
+
+    // If not encrypted, no password needed
+    if (!isEncrypted) {
+      return true;
+    }
+
+    // If encrypted and password is in keychain, we're good
+    if (hasKeychainPassword) {
+      return true;
+    }
+
+    // Encrypted but no password in keychain - need VSCode to provide it
+    return false;
   }
 }

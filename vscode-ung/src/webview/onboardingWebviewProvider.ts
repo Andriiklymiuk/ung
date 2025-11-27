@@ -9,7 +9,7 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 
   private _view?: vscode.WebviewView;
   private _extensionUri: vscode.Uri;
-  private _state: 'not-installed' | 'not-initialized' | 'ready';
+  private _state: 'loading' | 'not-installed' | 'not-initialized' | 'ready';
 
   constructor(
     extensionUri: vscode.Uri,
@@ -17,7 +17,7 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
     private readonly checkIsInitialized: () => Promise<boolean>
   ) {
     this._extensionUri = extensionUri;
-    this._state = 'not-installed';
+    this._state = 'loading';
   }
 
   public resolveWebviewView(
@@ -31,6 +31,10 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this._extensionUri],
     };
+
+    // Set initial HTML immediately to avoid blank screen
+    // Shows loading state while async checks run
+    webviewView.webview.html = this._getHtmlForWebview();
 
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
@@ -68,6 +72,7 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
       }
     });
 
+    // Run async refresh to update state based on actual CLI checks
     this.refresh();
   }
 
@@ -108,57 +113,141 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
             background-color: var(--vscode-sideBar-background);
-            padding: 16px;
-            line-height: 1.5;
+            padding: 20px;
+            line-height: 1.6;
         }
 
         .container {
             max-width: 100%;
         }
 
+        /* Loading Spinner */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--vscode-input-background);
+            border-top: 3px solid var(--vscode-textLink-foreground);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 16px;
+            color: var(--vscode-descriptionForeground);
+            font-size: 13px;
+        }
+
         /* Header Section */
         .header {
             text-align: center;
-            padding: 24px 0;
-            border-bottom: 1px solid var(--vscode-panel-border);
-            margin-bottom: 20px;
+            padding: 20px 0 24px;
+            margin-bottom: 24px;
         }
 
-        .logo {
-            font-size: 32px;
-            margin-bottom: 8px;
+        .logo-container {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, var(--vscode-textLink-foreground), var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground)));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .logo-icon {
+            font-size: 28px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
         }
 
         .title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 600;
             color: var(--vscode-foreground);
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            letter-spacing: -0.3px;
         }
 
         .subtitle {
             font-size: 13px;
             color: var(--vscode-descriptionForeground);
+            max-width: 280px;
+            margin: 0 auto;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .status-badge.warning {
+            background-color: color-mix(in srgb, var(--vscode-editorWarning-foreground) 15%, transparent);
+            color: var(--vscode-editorWarning-foreground);
+            border: 1px solid color-mix(in srgb, var(--vscode-editorWarning-foreground) 30%, transparent);
+        }
+
+        .status-badge.success {
+            background-color: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 15%, transparent);
+            color: var(--vscode-charts-green, #4caf50);
+            border: 1px solid color-mix(in srgb, var(--vscode-charts-green, #4caf50) 30%, transparent);
+        }
+
+        .status-badge.info {
+            background-color: color-mix(in srgb, var(--vscode-textLink-foreground) 15%, transparent);
+            color: var(--vscode-textLink-foreground);
+            border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground) 30%, transparent);
         }
 
         /* Section Styles */
         .section {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .section-icon {
+            font-size: 14px;
+            opacity: 0.8;
         }
 
         .section-title {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
-            color: var(--vscode-foreground);
-            margin-bottom: 12px;
+            color: var(--vscode-descriptionForeground);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
         }
 
         .section-description {
-            font-size: 12px;
+            font-size: 13px;
             color: var(--vscode-descriptionForeground);
-            margin-bottom: 12px;
+            margin-bottom: 14px;
         }
 
         /* Button Styles */
@@ -166,156 +255,233 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: center;
             width: 100%;
-            padding: 10px 12px;
-            margin-bottom: 8px;
-            border: none;
-            border-radius: 4px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            border: 1px solid transparent;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 13px;
             font-family: var(--vscode-font-family);
-            transition: background-color 0.15s ease;
+            transition: all 0.15s ease;
             text-align: left;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        .btn:hover::before {
+            opacity: 1;
         }
 
         .btn-primary {
             background-color: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
+            border-color: var(--vscode-button-background);
         }
 
         .btn-primary:hover {
             background-color: var(--vscode-button-hoverBackground);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .btn-secondary {
-            background-color: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-foreground);
+            border-color: var(--vscode-input-border, var(--vscode-input-background));
         }
 
         .btn-secondary:hover {
-            background-color: var(--vscode-button-secondaryHoverBackground);
+            background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--vscode-focusBorder);
         }
 
         .btn-icon {
-            margin-right: 10px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            border-radius: 6px;
+            background-color: rgba(255, 255, 255, 0.1);
             font-size: 16px;
-            width: 20px;
-            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .btn-secondary .btn-icon {
+            background-color: var(--vscode-badge-background);
         }
 
         .btn-content {
             flex: 1;
+            min-width: 0;
         }
 
         .btn-label {
             display: block;
             font-weight: 500;
+            margin-bottom: 2px;
         }
 
         .btn-description {
             display: block;
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
-            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-primary .btn-description {
+            color: rgba(255, 255, 255, 0.75);
         }
 
         .btn-badge {
             font-size: 10px;
-            padding: 2px 6px;
-            background-color: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-            border-radius: 10px;
+            padding: 3px 8px;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: inherit;
+            border-radius: 12px;
+            font-weight: 500;
+            flex-shrink: 0;
             margin-left: 8px;
         }
 
-        /* Feature List */
-        .features {
+        .btn-secondary .btn-badge {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+        }
+
+        /* Feature Cards */
+        .features-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
-            margin-top: 12px;
+            margin-top: 16px;
         }
 
-        .feature {
+        .feature-card {
             display: flex;
             align-items: center;
-            padding: 8px;
+            gap: 8px;
+            padding: 10px 12px;
             background-color: var(--vscode-input-background);
-            border-radius: 4px;
-            font-size: 11px;
+            border-radius: 6px;
+            font-size: 12px;
+            transition: background-color 0.15s ease;
+        }
+
+        .feature-card:hover {
+            background-color: var(--vscode-list-hoverBackground);
         }
 
         .feature-icon {
-            margin-right: 8px;
-            opacity: 0.8;
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        .feature-text {
+            color: var(--vscode-foreground);
+            font-weight: 450;
         }
 
         /* Info Box */
         .info-box {
-            padding: 12px;
-            background-color: var(--vscode-textBlockQuote-background);
+            display: flex;
+            gap: 12px;
+            padding: 14px;
+            background-color: color-mix(in srgb, var(--vscode-textLink-foreground) 8%, var(--vscode-input-background));
             border-left: 3px solid var(--vscode-textLink-foreground);
-            border-radius: 0 4px 4px 0;
-            margin: 16px 0;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
         }
 
-        .info-box p {
+        .info-box-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .info-box-content {
+            flex: 1;
+        }
+
+        .info-box-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--vscode-foreground);
+            margin-bottom: 4px;
+        }
+
+        .info-box-text {
             font-size: 12px;
             color: var(--vscode-descriptionForeground);
+            line-height: 1.5;
         }
 
         /* Divider */
         .divider {
             height: 1px;
-            background-color: var(--vscode-panel-border);
-            margin: 20px 0;
+            background: linear-gradient(to right, transparent, var(--vscode-panel-border), transparent);
+            margin: 24px 0;
         }
 
         /* Link Styles */
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
         .link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             color: var(--vscode-textLink-foreground);
             text-decoration: none;
             cursor: pointer;
             font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            transition: all 0.15s ease;
         }
 
         .link:hover {
-            text-decoration: underline;
+            background-color: color-mix(in srgb, var(--vscode-textLink-foreground) 10%, transparent);
         }
 
-        /* Warning Box */
-        .warning-box {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            background-color: var(--vscode-inputValidation-warningBackground);
-            border: 1px solid var(--vscode-inputValidation-warningBorder);
-            border-radius: 4px;
-            margin-bottom: 16px;
-        }
-
-        .warning-icon {
-            margin-right: 10px;
-            font-size: 18px;
-        }
-
-        .warning-text {
-            font-size: 12px;
+        .link-icon {
+            font-size: 14px;
         }
 
         /* Collapsible sections */
         .collapsible {
             margin-bottom: 8px;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: var(--vscode-input-background);
         }
 
         .collapsible-header {
             display: flex;
             align-items: center;
-            padding: 8px 12px;
-            background-color: var(--vscode-input-background);
-            border-radius: 4px;
+            padding: 12px 14px;
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
+            transition: background-color 0.15s ease;
         }
 
         .collapsible-header:hover {
@@ -323,12 +489,18 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .collapsible-icon {
-            margin-right: 8px;
+            margin-right: 10px;
+            font-size: 10px;
             transition: transform 0.2s ease;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .collapsible-title {
+            flex: 1;
         }
 
         .collapsible-content {
-            padding: 12px;
+            padding: 0 14px 14px;
             display: none;
         }
 
@@ -339,10 +511,65 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
         .collapsible.open .collapsible-icon {
             transform: rotate(90deg);
         }
+
+        /* Highlight Points */
+        .highlights {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .highlight-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background-color: var(--vscode-input-background);
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .highlight-icon {
+            font-size: 12px;
+        }
+
+        /* Success State */
+        .success-container {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, var(--vscode-charts-green, #4caf50), color-mix(in srgb, var(--vscode-charts-green, #4caf50) 70%, black));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 8px 24px rgba(76, 175, 80, 0.25);
+        }
+
+        .success-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .success-message {
+            color: var(--vscode-descriptionForeground);
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        ${this._state === 'loading' ? this._getLoadingHtml() : ''}
         ${this._state === 'not-installed' ? this._getNotInstalledHtml(platform) : ''}
         ${this._state === 'not-initialized' ? this._getNotInitializedHtml() : ''}
         ${this._state === 'ready' ? this._getReadyHtml() : ''}
@@ -371,6 +598,15 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 
+  private _getLoadingHtml(): string {
+    return `
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <div class="loading-text">Checking UNG CLI status...</div>
+        </div>
+    `;
+  }
+
   private _getNotInstalledHtml(platform: string): string {
     const isMac = platform === 'darwin';
     const isWindows = platform === 'win32';
@@ -378,19 +614,24 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 
     return `
         <div class="header">
-            <div class="logo">🚀</div>
-            <h1 class="title">Welcome to UNG!</h1>
-            <p class="subtitle">Your all-in-one freelance business toolkit</p>
+            <div class="logo-container">
+                <span class="logo-icon">U</span>
+            </div>
+            <h1 class="title">Welcome to UNG</h1>
+            <p class="subtitle">Professional billing and time tracking for freelancers</p>
         </div>
 
-        <div class="warning-box">
-            <span class="warning-icon">⚠️</span>
-            <span class="warning-text">UNG CLI is required to use this extension</span>
+        <div style="text-align: center;">
+            <span class="status-badge warning">
+                <span>CLI Required</span>
+            </span>
         </div>
 
         <div class="section">
-            <h2 class="section-title">Install UNG CLI</h2>
-            <p class="section-description">Choose your preferred installation method:</p>
+            <div class="section-header">
+                <span class="section-icon">1</span>
+                <h2 class="section-title">Install UNG CLI</h2>
+            </div>
 
             ${
               isMac || isLinux
@@ -399,7 +640,7 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
                 <span class="btn-icon">🍺</span>
                 <span class="btn-content">
                     <span class="btn-label">Install via Homebrew</span>
-                    <span class="btn-description">brew tap Andriiklymiuk/tools && brew install ung</span>
+                    <span class="btn-description">brew install ung</span>
                 </span>
                 <span class="btn-badge">Recommended</span>
             </button>
@@ -411,10 +652,10 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
               isWindows
                 ? `
             <button class="btn btn-primary" data-command="installScoop">
-                <span class="btn-icon">🥄</span>
+                <span class="btn-icon">🪣</span>
                 <span class="btn-content">
                     <span class="btn-label">Install via Scoop</span>
-                    <span class="btn-description">scoop bucket add ung && scoop install ung</span>
+                    <span class="btn-description">scoop install ung</span>
                 </span>
                 <span class="btn-badge">Recommended</span>
             </button>
@@ -445,18 +686,40 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             <div class="collapsible">
                 <div class="collapsible-header">
                     <span class="collapsible-icon">▶</span>
-                    <span>✨ Features</span>
+                    <span class="collapsible-title">What you'll get</span>
                 </div>
                 <div class="collapsible-content">
-                    <div class="features">
-                        <div class="feature"><span class="feature-icon">📄</span> Invoice Generation</div>
-                        <div class="feature"><span class="feature-icon">⏱️</span> Time Tracking</div>
-                        <div class="feature"><span class="feature-icon">👥</span> Client Management</div>
-                        <div class="feature"><span class="feature-icon">📝</span> Contracts</div>
-                        <div class="feature"><span class="feature-icon">💳</span> Expense Tracking</div>
-                        <div class="feature"><span class="feature-icon">📊</span> Revenue Reports</div>
-                        <div class="feature"><span class="feature-icon">🌍</span> Multi-Currency</div>
-                        <div class="feature"><span class="feature-icon">📧</span> Email Integration</div>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <span class="feature-icon">📄</span>
+                            <span class="feature-text">Invoices</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">⏱️</span>
+                            <span class="feature-text">Time Tracking</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">👥</span>
+                            <span class="feature-text">Clients</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">📝</span>
+                            <span class="feature-text">Contracts</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">💳</span>
+                            <span class="feature-text">Expenses</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">📊</span>
+                            <span class="feature-text">Reports</span>
+                        </div>
+                    </div>
+                    <div class="highlights">
+                        <span class="highlight-tag"><span class="highlight-icon">🔒</span> Privacy First</span>
+                        <span class="highlight-tag"><span class="highlight-icon">📴</span> Offline</span>
+                        <span class="highlight-tag"><span class="highlight-icon">🌍</span> Multi-Currency</span>
+                        <span class="highlight-tag"><span class="highlight-icon">⚡</span> Fast</span>
                     </div>
                 </div>
             </div>
@@ -464,10 +727,15 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 
         <div class="divider"></div>
 
-        <div style="text-align: center;">
-            <a class="link" data-command="openDocs">📚 View Documentation</a>
-            <span style="margin: 0 8px; color: var(--vscode-descriptionForeground);">•</span>
-            <a class="link" data-command="recheckCli">🔄 Recheck Installation</a>
+        <div class="footer-links">
+            <a class="link" data-command="openDocs">
+                <span class="link-icon">📚</span>
+                Documentation
+            </a>
+            <a class="link" data-command="recheckCli">
+                <span class="link-icon">🔄</span>
+                Recheck
+            </a>
         </div>
     `;
   }
@@ -475,20 +743,30 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
   private _getNotInitializedHtml(): string {
     return `
         <div class="header">
-            <div class="logo">🎉</div>
-            <h1 class="title">UNG CLI Installed!</h1>
-            <p class="subtitle">Let's set up your workspace</p>
+            <div class="logo-container">
+                <span class="logo-icon">U</span>
+            </div>
+            <h1 class="title">Almost There!</h1>
+            <p class="subtitle">UNG CLI detected. Let's set up your workspace.</p>
+        </div>
+
+        <div style="text-align: center;">
+            <span class="status-badge success">
+                <span>CLI Installed</span>
+            </span>
         </div>
 
         <div class="section">
-            <h2 class="section-title">Choose Your Setup</h2>
-            <p class="section-description">Select where to store your billing data:</p>
+            <div class="section-header">
+                <span class="section-icon">2</span>
+                <h2 class="section-title">Choose Setup Type</h2>
+            </div>
 
             <button class="btn btn-primary" data-command="initGlobal">
                 <span class="btn-icon">🏠</span>
                 <span class="btn-content">
                     <span class="btn-label">Global Setup</span>
-                    <span class="btn-description">Store data in ~/.ung/ - Perfect for personal use across all projects</span>
+                    <span class="btn-description">Store data in ~/.ung/ - Access from any project</span>
                 </span>
                 <span class="btn-badge">Recommended</span>
             </button>
@@ -496,15 +774,20 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             <button class="btn btn-secondary" data-command="initLocal">
                 <span class="btn-icon">📁</span>
                 <span class="btn-content">
-                    <span class="btn-label">Project-Specific Setup</span>
-                    <span class="btn-description">Create .ung/ in this workspace - Great for project-specific billing</span>
+                    <span class="btn-label">Project Setup</span>
+                    <span class="btn-description">Store data in .ung/ - Isolated to this workspace</span>
                 </span>
             </button>
         </div>
 
         <div class="info-box">
-            <p><strong>💡 Not sure which to choose?</strong><br>
-            Global setup is best for most freelancers. Use project-specific if you need separate billing per project.</p>
+            <span class="info-box-icon">💡</span>
+            <div class="info-box-content">
+                <div class="info-box-title">Which should I choose?</div>
+                <div class="info-box-text">
+                    Global setup is ideal for most freelancers. Choose project setup only if you need completely separate billing data per project.
+                </div>
+            </div>
         </div>
 
         <div class="divider"></div>
@@ -513,33 +796,34 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             <div class="collapsible open">
                 <div class="collapsible-header">
                     <span class="collapsible-icon">▶</span>
-                    <span>🎯 What You Can Do</span>
+                    <span class="collapsible-title">What you can do</span>
                 </div>
                 <div class="collapsible-content">
-                    <div class="features">
-                        <div class="feature"><span class="feature-icon">⏱️</span> Track Time</div>
-                        <div class="feature"><span class="feature-icon">📄</span> Create Invoices</div>
-                        <div class="feature"><span class="feature-icon">👥</span> Manage Clients</div>
-                        <div class="feature"><span class="feature-icon">📝</span> Handle Contracts</div>
-                        <div class="feature"><span class="feature-icon">💳</span> Track Expenses</div>
-                        <div class="feature"><span class="feature-icon">📊</span> View Reports</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <span class="collapsible-icon">▶</span>
-                    <span>💎 Why UNG?</span>
-                </div>
-                <div class="collapsible-content">
-                    <div class="features">
-                        <div class="feature"><span class="feature-icon">🔒</span> Privacy First</div>
-                        <div class="feature"><span class="feature-icon">📴</span> Works Offline</div>
-                        <div class="feature"><span class="feature-icon">🌍</span> Multi-Currency</div>
-                        <div class="feature"><span class="feature-icon">💻</span> VS Code Native</div>
-                        <div class="feature"><span class="feature-icon">🔓</span> Open Source</div>
-                        <div class="feature"><span class="feature-icon">⚡</span> Fast CLI</div>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <span class="feature-icon">⏱️</span>
+                            <span class="feature-text">Track Time</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">📄</span>
+                            <span class="feature-text">Create Invoices</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">👥</span>
+                            <span class="feature-text">Manage Clients</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">📝</span>
+                            <span class="feature-text">Handle Contracts</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">💳</span>
+                            <span class="feature-text">Track Expenses</span>
+                        </div>
+                        <div class="feature-card">
+                            <span class="feature-icon">📊</span>
+                            <span class="feature-text">View Reports</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -547,22 +831,44 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 
         <div class="divider"></div>
 
-        <div style="text-align: center;">
-            <a class="link" data-command="openDocs">📚 View Documentation</a>
+        <div class="footer-links">
+            <a class="link" data-command="openDocs">
+                <span class="link-icon">📚</span>
+                Documentation
+            </a>
+            <a class="link" data-command="recheckCli">
+                <span class="link-icon">🔄</span>
+                Recheck
+            </a>
         </div>
     `;
   }
 
   private _getReadyHtml(): string {
     return `
-        <div class="header">
-            <div class="logo">✅</div>
-            <h1 class="title">All Set!</h1>
-            <p class="subtitle">UNG is ready to use</p>
+        <div class="success-container">
+            <div class="success-icon">✓</div>
+            <h1 class="success-title">All Set!</h1>
+            <p class="success-message">UNG is ready. Check out the sidebar views to get started.</p>
         </div>
 
         <div class="info-box">
-            <p>You're all set! Check out the dashboard and other views in the sidebar to get started.</p>
+            <span class="info-box-icon">🚀</span>
+            <div class="info-box-content">
+                <div class="info-box-title">Quick Start</div>
+                <div class="info-box-text">
+                    Use the Dashboard, Invoices, Clients, and Time Tracking views in the sidebar to manage your freelance business.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="footer-links">
+            <a class="link" data-command="openDocs">
+                <span class="link-icon">📚</span>
+                Documentation
+            </a>
         </div>
     `;
   }

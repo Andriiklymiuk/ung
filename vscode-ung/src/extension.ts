@@ -366,6 +366,35 @@ export async function activate(context: vscode.ExtensionContext) {
     outputChannel.appendLine(`UNG CLI version: ${version}`);
   }
 
+  // Check if database is encrypted and password is available
+  // If encrypted but no password in keychain, prompt user to save it
+  const checkEncryptedDatabase = async () => {
+    const isEncrypted = await cli.isEncrypted();
+    if (!isEncrypted) {
+      return; // Not encrypted, no password needed
+    }
+
+    const secureStorage = getSecureStorage();
+    const hasVSCodePassword = await secureStorage.hasPassword();
+    const passwordAvailable = await cli.isPasswordAvailable();
+
+    if (!passwordAvailable && !hasVSCodePassword) {
+      // Database is encrypted but no password is saved anywhere
+      const action = await vscode.window.showWarningMessage(
+        'Your database is encrypted but no password is saved. Save your password for seamless access.',
+        'Save Password',
+        'Later'
+      );
+
+      if (action === 'Save Password') {
+        vscode.commands.executeCommand('ung.savePassword');
+      }
+    }
+  };
+
+  // Run the check (non-blocking)
+  checkEncryptedDatabase();
+
   // Initialize status bar
   const statusBar = new StatusBarManager(cli);
   context.subscriptions.push(statusBar);

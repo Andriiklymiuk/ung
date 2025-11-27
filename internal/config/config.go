@@ -126,11 +126,6 @@ func SetForceGlobal(force bool) {
 	currentConfig = nil
 }
 
-// IsForceGlobal returns whether global config is being forced
-func IsForceGlobal() bool {
-	return forceGlobal
-}
-
 // GetLocalUngDir returns the path to the local .ung directory
 func GetLocalUngDir() string {
 	return LocalUngDir
@@ -143,12 +138,6 @@ func GetGlobalUngDir() string {
 		return ""
 	}
 	return filepath.Join(home, ".ung")
-}
-
-// LocalUngDirExists checks if local .ung directory exists
-func LocalUngDirExists() bool {
-	info, err := os.Stat(LocalUngDir)
-	return err == nil && info.IsDir()
 }
 
 // GetConfigSource returns where the current config was loaded from
@@ -302,16 +291,6 @@ func getDefaultConfig(useGlobal bool) *Config {
 	}
 }
 
-// GetDefaultConfigForLocal returns the default configuration with local .ung/ paths
-func GetDefaultConfigForLocal() *Config {
-	return getDefaultConfig(false)
-}
-
-// GetDefaultConfigForGlobal returns the default configuration with global ~/.ung/ paths
-func GetDefaultConfigForGlobal() *Config {
-	return getDefaultConfig(true)
-}
-
 // GetDefaultPDFConfig returns the default PDF configuration
 func GetDefaultPDFConfig() PDFConfig {
 	return PDFConfig{
@@ -379,25 +358,6 @@ func Save(cfg *Config, global bool) error {
 		path = filepath.Join(LocalUngDir, "config.yaml")
 	}
 
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
-	}
-
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	return nil
-}
-
-// SaveToPath saves the configuration to a specific path
-func SaveToPath(cfg *Config, path string) error {
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err

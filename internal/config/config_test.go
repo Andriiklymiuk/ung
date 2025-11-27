@@ -213,26 +213,3 @@ invoice:
 	}
 }
 
-func TestLocalUngDirExists(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Change to temp directory
-	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
-
-	// Should not exist initially
-	if LocalUngDirExists() {
-		t.Error("expected local .ung dir to not exist")
-	}
-
-	// Create .ung directory
-	if err := os.MkdirAll(LocalUngDir, 0755); err != nil {
-		t.Fatalf("failed to create .ung directory: %v", err)
-	}
-
-	// Should exist now
-	if !LocalUngDirExists() {
-		t.Error("expected local .ung dir to exist")
-	}
-}

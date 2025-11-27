@@ -4,7 +4,7 @@ import type { UngCli } from '../cli/ungCli';
 /**
  * Client tree item types
  */
-type ClientItemType = 'summary' | 'action' | 'client' | 'header';
+type ClientItemType = 'summary' | 'action' | 'client';
 
 /**
  * Client tree item
@@ -29,9 +29,6 @@ export class ClientItem extends vscode.TreeItem {
         break;
       case 'action':
         this.contextValue = 'action';
-        break;
-      case 'header':
-        this.contextValue = 'header';
         break;
       case 'client':
         this.tooltip = this.buildTooltip();
@@ -115,7 +112,7 @@ export class ClientProvider implements vscode.TreeDataProvider<ClientItem> {
   private buildTreeItems(clients: ClientItem[]): ClientItem[] {
     const items: ClientItem[] = [];
 
-    // Summary section
+    // Summary section - clickable to refresh
     const summaryItem = new ClientItem(
       'summary',
       0,
@@ -128,6 +125,11 @@ export class ClientProvider implements vscode.TreeDataProvider<ClientItem> {
       new vscode.ThemeColor('charts.green')
     );
     summaryItem.description = 'Total';
+    summaryItem.tooltip = 'Click to refresh clients list';
+    summaryItem.command = {
+      command: 'ung.refreshClients',
+      title: 'Refresh Clients',
+    };
     items.push(summaryItem);
 
     // Quick actions
@@ -147,20 +149,6 @@ export class ClientProvider implements vscode.TreeDataProvider<ClientItem> {
       title: 'Add Client',
     };
     items.push(addClientItem);
-
-    // Separator-like header with better formatting
-    const clientsHeader = new ClientItem(
-      'header',
-      -2,
-      '── Clients ──',
-      '',
-      vscode.TreeItemCollapsibleState.None
-    );
-    clientsHeader.iconPath = new vscode.ThemeIcon(
-      'account',
-      new vscode.ThemeColor('charts.gray')
-    );
-    items.push(clientsHeader);
 
     // Add all clients
     items.push(...clients);

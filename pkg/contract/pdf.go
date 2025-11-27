@@ -474,13 +474,12 @@ func truncateString(s string, maxLen int) string {
 
 // getContractsDir returns the contracts directory path
 func getContractsDir() string {
-	invoicesDir := db.GetInvoicesDir()
-	contractsDir := filepath.Join(filepath.Dir(invoicesDir), "contracts")
+	contractsDir := config.GetContractsDir()
 
 	// Ensure directory exists
 	if err := os.MkdirAll(contractsDir, 0755); err != nil {
 		// Fallback to invoices dir if we can't create contracts dir
-		return invoicesDir
+		return db.GetInvoicesDir()
 	}
 
 	return contractsDir

@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Andriiklymiuk/ung/internal/config"
 	"github.com/spf13/cobra"
 )
+
+// globalFlag indicates whether to use global config
+var globalFlag bool
 
 var rootCmd = &cobra.Command{
 	Use:   "ung",
@@ -13,8 +17,17 @@ var rootCmd = &cobra.Command{
 	Long: `UNG is a fast, cross-platform CLI tool for managing company details,
 clients, invoices, and time tracking.
 
-All data is stored locally in ~/.ung/ung.db`,
+Data storage (similar to VS Code settings):
+- Local:  .ung/ folder in current directory (project-specific)
+- Global: ~/.ung/ folder (default when no local config exists)
+
+Use 'ung config init' to create a local workspace configuration.
+Use --global flag to explicitly use global configuration.`,
 	Version: Version,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Set global flag in config package
+		config.SetForceGlobal(globalFlag)
+	},
 }
 
 func Execute() {
@@ -25,6 +38,9 @@ func Execute() {
 }
 
 func init() {
+	// Add global flag to root command (applies to all subcommands)
+	rootCmd.PersistentFlags().BoolVarP(&globalFlag, "global", "G", false, "Use global ~/.ung/ configuration instead of local")
+
 	// Register subcommands
 	rootCmd.AddCommand(companyCmd)
 	rootCmd.AddCommand(clientCmd)

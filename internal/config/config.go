@@ -12,13 +12,30 @@ import (
 type Config struct {
 	DatabasePath string           `yaml:"database_path"`
 	InvoicesDir  string           `yaml:"invoices_dir"`
-	Language     string           `yaml:"language"`      // e.g., "en", "uk", "de"
+	ContractsDir string           `yaml:"contracts_dir,omitempty"` // Path to contracts directory
+	Language     string           `yaml:"language"`                // e.g., "en", "uk", "de"
 	Invoice      InvoiceConfig    `yaml:"invoice"`
 	PDF          PDFConfig        `yaml:"pdf"`
 	Templates    TemplateConfig   `yaml:"templates"`
 	Email        EmailConfig      `yaml:"email"`
 	Security     SecurityConfig   `yaml:"security"`
 }
+
+// ConfigSource indicates where the config was loaded from
+type ConfigSource int
+
+const (
+	SourceDefault ConfigSource = iota
+	SourceLocal                // .ung/config.yaml in current directory
+	SourceLocalLegacy          // .ung.yaml (legacy local config)
+	SourceGlobal               // ~/.ung/config.yaml
+)
+
+// LocalUngDir is the name of the local ung directory
+const LocalUngDir = ".ung"
+
+// configSource tracks where the current config was loaded from
+var configSource ConfigSource
 
 // PDFConfig represents PDF generation configuration
 type PDFConfig struct {
@@ -100,39 +117,122 @@ type SecurityConfig struct {
 
 var currentConfig *Config
 
-// Load loads configuration from local (.ung.yaml) or global (~/.ung/config.yaml)
+// forceGlobal forces using global config when true
+var forceGlobal bool
+
+// SetForceGlobal sets whether to force using global configuration
+func SetForceGlobal(force bool) {
+	forceGlobal = force
+	// Reset cached config so it will be reloaded
+	currentConfig = nil
+}
+
+// IsForceGlobal returns whether global config is being forced
+func IsForceGlobal() bool {
+	return forceGlobal
+}
+
+// GetLocalUngDir returns the path to the local .ung directory
+func GetLocalUngDir() string {
+	return LocalUngDir
+}
+
+// GetGlobalUngDir returns the path to the global .ung directory
+func GetGlobalUngDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".ung")
+}
+
+// LocalUngDirExists checks if local .ung directory exists
+func LocalUngDirExists() bool {
+	info, err := os.Stat(LocalUngDir)
+	return err == nil && info.IsDir()
+}
+
+// GetConfigSource returns where the current config was loaded from
+func GetConfigSource() ConfigSource {
+	return configSource
+}
+
+// GetConfigSourceString returns a human-readable string for the config source
+func GetConfigSourceString() string {
+	switch configSource {
+	case SourceLocal:
+		return "local (.ung/config.yaml)"
+	case SourceLocalLegacy:
+		return "local legacy (.ung.yaml)"
+	case SourceGlobal:
+		return "global (~/.ung/config.yaml)"
+	default:
+		return "default"
+	}
+}
+
+// Reload clears the cached config and reloads it
+func Reload() (*Config, error) {
+	currentConfig = nil
+	return Load()
+}
+
+// Load loads configuration with priority:
+// 1. Local .ung/config.yaml (if not --global)
+// 2. Legacy .ung.yaml (if not --global)
+// 3. Global ~/.ung/config.yaml
+// 4. Default config (uses local .ung/ paths if in workspace, otherwise global)
 func Load() (*Config, error) {
 	if currentConfig != nil {
 		return currentConfig, nil
 	}
 
-	// Try local config first
-	localConfig := ".ung.yaml"
-	if _, err := os.Stat(localConfig); err == nil {
-		cfg, err := loadFromFile(localConfig)
-		if err == nil {
-			currentConfig = cfg
-			return currentConfig, nil
+	// If not forcing global, try local configs first
+	if !forceGlobal {
+		// Try new local config structure: .ung/config.yaml
+		localConfigPath := filepath.Join(LocalUngDir, "config.yaml")
+		if _, err := os.Stat(localConfigPath); err == nil {
+			cfg, err := loadFromFile(localConfigPath)
+			if err == nil {
+				configSource = SourceLocal
+				currentConfig = cfg
+				return currentConfig, nil
+			}
+		}
+
+		// Try legacy local config: .ung.yaml
+		legacyLocalConfig := ".ung.yaml"
+		if _, err := os.Stat(legacyLocalConfig); err == nil {
+			cfg, err := loadFromFile(legacyLocalConfig)
+			if err == nil {
+				configSource = SourceLocalLegacy
+				currentConfig = cfg
+				return currentConfig, nil
+			}
 		}
 	}
 
 	// Try global config
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return getDefaultConfig(), nil
+		currentConfig = getDefaultConfig(false)
+		configSource = SourceDefault
+		return currentConfig, nil
 	}
 
 	globalConfig := filepath.Join(home, ".ung", "config.yaml")
 	if _, err := os.Stat(globalConfig); err == nil {
 		cfg, err := loadFromFile(globalConfig)
 		if err == nil {
+			configSource = SourceGlobal
 			currentConfig = cfg
 			return currentConfig, nil
 		}
 	}
 
-	// Return default config
-	currentConfig = getDefaultConfig()
+	// Return default config - use global paths if forcing global, otherwise local
+	currentConfig = getDefaultConfig(forceGlobal)
+	configSource = SourceDefault
 	return currentConfig, nil
 }
 
@@ -160,15 +260,25 @@ func loadFromFile(path string) (*Config, error) {
 }
 
 // getDefaultConfig returns the default configuration
-func getDefaultConfig() *Config {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
+// If useGlobal is true, uses global ~/.ung/ paths, otherwise uses local .ung/ paths
+func getDefaultConfig(useGlobal bool) *Config {
+	var basePath string
+
+	if useGlobal {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			panic(err)
+		}
+		basePath = filepath.Join(home, ".ung")
+	} else {
+		// Use local .ung directory
+		basePath = LocalUngDir
 	}
 
 	return &Config{
-		DatabasePath: filepath.Join(home, ".ung", "ung.db"),
-		InvoicesDir:  filepath.Join(home, ".ung", "invoices"),
+		DatabasePath: filepath.Join(basePath, "ung.db"),
+		InvoicesDir:  filepath.Join(basePath, "invoices"),
+		ContractsDir: filepath.Join(basePath, "contracts"),
 		Language:     "en",
 		Invoice: InvoiceConfig{
 			Terms:            "Please make the payment by the due date.",
@@ -186,26 +296,36 @@ func getDefaultConfig() *Config {
 			AmountLabel:      "Amount",
 		},
 		PDF: PDFConfig{
-			PrimaryColor:   ColorRGB{R: 232, G: 119, B: 34},  // Orange #E87722
-			SecondaryColor: ColorRGB{R: 80, G: 80, B: 80},    // Gray
-			TextColor:      ColorRGB{R: 60, G: 60, B: 60},    // Dark gray
-			ShowWatermark:  true,
-			ShowLogo:       true,
-			ShowQRCode:     false, // Disabled by default until library is added
-			ShowPageNumber: true,
+			PrimaryColor:     ColorRGB{R: 232, G: 119, B: 34}, // Orange #E87722
+			SecondaryColor:   ColorRGB{R: 80, G: 80, B: 80},   // Gray
+			TextColor:        ColorRGB{R: 60, G: 60, B: 60},   // Dark gray
+			ShowWatermark:    true,
+			ShowLogo:         true,
+			ShowQRCode:       false, // Disabled by default until library is added
+			ShowPageNumber:   true,
 			ShowTaxBreakdown: false,
-			TaxRate:        0.0,
-			TaxLabel:       "VAT",
-			TaxInclusive:   false,
-			SubtotalLabel:   "Subtotal",
-			DiscountLabel:   "Discount",
-			TaxAmountLabel:  "VAT",
-			BalanceDueLabel: "Balance Due",
-			PaidLabel:       "PAID",
-			DraftLabel:      "DRAFT",
-			OverdueLabel:    "OVERDUE",
+			TaxRate:          0.0,
+			TaxLabel:         "VAT",
+			TaxInclusive:     false,
+			SubtotalLabel:    "Subtotal",
+			DiscountLabel:    "Discount",
+			TaxAmountLabel:   "VAT",
+			BalanceDueLabel:  "Balance Due",
+			PaidLabel:        "PAID",
+			DraftLabel:       "DRAFT",
+			OverdueLabel:     "OVERDUE",
 		},
 	}
+}
+
+// GetDefaultConfigForLocal returns the default configuration with local .ung/ paths
+func GetDefaultConfigForLocal() *Config {
+	return getDefaultConfig(false)
+}
+
+// GetDefaultConfigForGlobal returns the default configuration with global ~/.ung/ paths
+func GetDefaultConfigForGlobal() *Config {
+	return getDefaultConfig(true)
 }
 
 // GetDefaultPDFConfig returns the default PDF configuration
@@ -260,6 +380,8 @@ func expandPath(path string) string {
 }
 
 // Save saves the current configuration to a file
+// If global is true, saves to ~/.ung/config.yaml
+// If global is false, saves to .ung/config.yaml (local directory)
 func Save(cfg *Config, global bool) error {
 	var path string
 	if global {
@@ -268,12 +390,14 @@ func Save(cfg *Config, global bool) error {
 			return err
 		}
 		path = filepath.Join(home, ".ung", "config.yaml")
-		// Ensure directory exists
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			return err
-		}
 	} else {
-		path = ".ung.yaml"
+		// Use new local structure: .ung/config.yaml
+		path = filepath.Join(LocalUngDir, "config.yaml")
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
 	}
 
 	data, err := yaml.Marshal(cfg)
@@ -286,6 +410,156 @@ func Save(cfg *Config, global bool) error {
 	}
 
 	return nil
+}
+
+// SaveToPath saves the configuration to a specific path
+func SaveToPath(cfg *Config, path string) error {
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+// InitLocalDirectory creates the local .ung directory structure with default config
+func InitLocalDirectory() error {
+	// Create main .ung directory
+	if err := os.MkdirAll(LocalUngDir, 0755); err != nil {
+		return fmt.Errorf("failed to create .ung directory: %w", err)
+	}
+
+	// Create subdirectories
+	dirs := []string{
+		filepath.Join(LocalUngDir, "invoices"),
+		filepath.Join(LocalUngDir, "contracts"),
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+
+	return nil
+}
+
+// InitGlobalDirectory creates the global ~/.ung directory structure with default config
+func InitGlobalDirectory() error {
+	globalDir := GetGlobalUngDir()
+	if globalDir == "" {
+		return fmt.Errorf("could not determine home directory")
+	}
+
+	// Create main .ung directory
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		return fmt.Errorf("failed to create global .ung directory: %w", err)
+	}
+
+	// Create subdirectories
+	dirs := []string{
+		filepath.Join(globalDir, "invoices"),
+		filepath.Join(globalDir, "contracts"),
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+
+	return nil
+}
+
+// MigrateLocalToGlobal copies the local config to global
+func MigrateLocalToGlobal() error {
+	// Load current local config
+	localConfigPath := filepath.Join(LocalUngDir, "config.yaml")
+	cfg, err := loadFromFile(localConfigPath)
+	if err != nil {
+		// Try legacy local config
+		cfg, err = loadFromFile(".ung.yaml")
+		if err != nil {
+			return fmt.Errorf("no local config found to migrate")
+		}
+	}
+
+	// Update paths to use global directory
+	globalDir := GetGlobalUngDir()
+	cfg.DatabasePath = filepath.Join(globalDir, "ung.db")
+	cfg.InvoicesDir = filepath.Join(globalDir, "invoices")
+	cfg.ContractsDir = filepath.Join(globalDir, "contracts")
+
+	// Ensure global directory exists
+	if err := InitGlobalDirectory(); err != nil {
+		return err
+	}
+
+	// Save to global
+	return Save(cfg, true)
+}
+
+// MigrateGlobalToLocal copies the global config to local
+func MigrateGlobalToLocal() error {
+	// Load global config
+	globalConfigPath := filepath.Join(GetGlobalUngDir(), "config.yaml")
+	cfg, err := loadFromFile(globalConfigPath)
+	if err != nil {
+		return fmt.Errorf("no global config found to migrate: %w", err)
+	}
+
+	// Update paths to use local directory
+	cfg.DatabasePath = filepath.Join(LocalUngDir, "ung.db")
+	cfg.InvoicesDir = filepath.Join(LocalUngDir, "invoices")
+	cfg.ContractsDir = filepath.Join(LocalUngDir, "contracts")
+
+	// Ensure local directory exists
+	if err := InitLocalDirectory(); err != nil {
+		return err
+	}
+
+	// Save to local
+	return Save(cfg, false)
+}
+
+// GetContractsDir returns the configured contracts directory
+func GetContractsDir() string {
+	cfg, _ := Load()
+	if cfg.ContractsDir != "" {
+		return expandPath(cfg.ContractsDir)
+	}
+	// Fallback: derive from invoices dir
+	return filepath.Join(filepath.Dir(cfg.InvoicesDir), "contracts")
+}
+
+// IsUsingLocalConfig returns true if the current config is from local .ung directory
+func IsUsingLocalConfig() bool {
+	return configSource == SourceLocal || configSource == SourceLocalLegacy
+}
+
+// GetActiveConfigPath returns the path to the currently active config file
+func GetActiveConfigPath() string {
+	switch configSource {
+	case SourceLocal:
+		absPath, _ := filepath.Abs(filepath.Join(LocalUngDir, "config.yaml"))
+		return absPath
+	case SourceLocalLegacy:
+		absPath, _ := filepath.Abs(".ung.yaml")
+		return absPath
+	case SourceGlobal:
+		return filepath.Join(GetGlobalUngDir(), "config.yaml")
+	default:
+		return "(using defaults)"
+	}
 }
 
 // GetDatabasePath returns the configured database path

@@ -45,6 +45,11 @@ export class ExpenseItem extends vscode.TreeItem {
         this.description = `${Formatter.formatCurrency(amount, currency)} • ${Formatter.formatDate(date)}`;
         this.contextValue = 'expense';
         this.iconPath = new vscode.ThemeIcon('credit-card');
+        this.command = {
+          command: 'ung.editExpense',
+          title: 'Edit Expense',
+          arguments: [{ itemId }],
+        };
         break;
     }
   }

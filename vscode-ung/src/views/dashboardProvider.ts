@@ -79,11 +79,6 @@ interface DashboardMetrics {
   pendingInvoices: number;
   unpaidAmount: number;
   currency: string;
-  topContracts: Array<{
-    clientName: string;
-    monthlyRevenue: number;
-    currency: string;
-  }>;
 }
 
 /**
@@ -145,13 +140,7 @@ export class DashboardProvider
           vscode.TreeItemCollapsibleState.Expanded
         ),
         new DashboardSectionItem('Revenue Overview', 'revenue', 'graph-line'),
-        new DashboardSectionItem('Business Summary', 'stats', 'dashboard'),
-        new DashboardSectionItem(
-          'Top Contracts',
-          'contracts',
-          'briefcase',
-          vscode.TreeItemCollapsibleState.Collapsed
-        )
+        new DashboardSectionItem('Business Summary', 'stats', 'dashboard')
       );
 
       return sections;
@@ -165,8 +154,6 @@ export class DashboardProvider
           return this.getQuickActions();
         case 'revenue':
           return this.getRevenueMetrics();
-        case 'contracts':
-          return this.getContractMetrics();
         case 'stats':
           return this.getStatsMetrics();
         default:
@@ -275,15 +262,6 @@ export class DashboardProvider
 
     actions.push(
       new DashboardActionItem(
-        'Generate from Time',
-        'combine',
-        'ung.generateFromTime',
-        'charts.purple'
-      )
-    );
-
-    actions.push(
-      new DashboardActionItem(
         'Log Expense',
         'credit-card',
         'ung.logExpense',
@@ -297,6 +275,15 @@ export class DashboardProvider
 
     actions.push(
       new DashboardActionItem('New Contract', 'file-add', 'ung.createContract')
+    );
+
+    actions.push(
+      new DashboardActionItem(
+        'Edit PDF Template',
+        'file-code',
+        'ung.openTemplateEditor',
+        'charts.yellow'
+      )
     );
 
     return actions;
@@ -369,52 +356,6 @@ export class DashboardProvider
         new DashboardMetricItem(
           'Error',
           'Failed to load revenue',
-          'error',
-          'errorForeground'
-        ),
-      ];
-    }
-  }
-
-  private async getContractMetrics(): Promise<DashboardMetricItem[]> {
-    try {
-      const metrics = await this.getDashboardMetrics();
-      const items: DashboardMetricItem[] = [];
-
-      items.push(
-        new DashboardMetricItem(
-          'Active Contracts',
-          String(metrics.activeContracts || 0),
-          'briefcase',
-          'charts.blue'
-        )
-      );
-
-      // Show top contracts if available
-      if (metrics.topContracts && metrics.topContracts.length > 0) {
-        const colors = ['charts.green', 'charts.purple', 'charts.orange'];
-        for (let i = 0; i < Math.min(3, metrics.topContracts.length); i++) {
-          const contract = metrics.topContracts[i];
-          items.push(
-            new DashboardMetricItem(
-              contract.clientName,
-              Formatter.formatCurrency(
-                contract.monthlyRevenue || 0,
-                contract.currency || 'USD'
-              ),
-              'organization',
-              colors[i]
-            )
-          );
-        }
-      }
-
-      return items;
-    } catch (_error) {
-      return [
-        new DashboardMetricItem(
-          'Error',
-          'Failed to load contracts',
           'error',
           'errorForeground'
         ),
@@ -516,7 +457,6 @@ export class DashboardProvider
       pendingInvoices: 0,
       unpaidAmount: 0,
       currency: 'USD',
-      topContracts: [],
     };
 
     const lines = output.split('\n');
@@ -587,7 +527,6 @@ export class DashboardProvider
       pendingInvoices: 0,
       unpaidAmount: 0,
       currency: 'USD',
-      topContracts: [],
     };
   }
 }

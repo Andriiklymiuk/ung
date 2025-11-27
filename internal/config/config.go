@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -164,31 +165,38 @@ func Reload() (*Config, error) {
 }
 
 // Load loads configuration with priority:
-// 1. Local .ung/config.yaml (if not --global)
+// 1. Local .ung/config.yaml (if not --global and local .ung/ exists)
 // 2. Global ~/.ung/config.yaml
-// 3. Default config (uses local .ung/ paths if in workspace, otherwise global)
+// 3. Default config (uses global ~/.ung/ paths unless local .ung/ already exists)
 func Load() (*Config, error) {
 	if currentConfig != nil {
 		return currentConfig, nil
 	}
 
-	// If not forcing global, try local config first
+	// If not forcing global, try local config first (only if .ung directory exists)
 	if !forceGlobal {
-		localConfigPath := filepath.Join(LocalUngDir, "config.yaml")
-		if _, err := os.Stat(localConfigPath); err == nil {
-			cfg, err := loadFromFile(localConfigPath)
-			if err == nil {
-				configSource = SourceLocal
-				currentConfig = cfg
-				return currentConfig, nil
+		// Check if local .ung directory exists
+		if _, err := os.Stat(LocalUngDir); err == nil {
+			localConfigPath := filepath.Join(LocalUngDir, "config.yaml")
+			if _, err := os.Stat(localConfigPath); err == nil {
+				cfg, err := loadFromFile(localConfigPath)
+				if err == nil {
+					configSource = SourceLocal
+					currentConfig = cfg
+					return currentConfig, nil
+				}
 			}
+			// Local .ung/ exists but no config - use local defaults
+			currentConfig = getDefaultConfig(false)
+			configSource = SourceLocal
+			return currentConfig, nil
 		}
 	}
 
 	// Try global config
 	home, err := os.UserHomeDir()
 	if err != nil {
-		currentConfig = getDefaultConfig(false)
+		currentConfig = getDefaultConfig(true) // Use global paths
 		configSource = SourceDefault
 		return currentConfig, nil
 	}
@@ -203,9 +211,9 @@ func Load() (*Config, error) {
 		}
 	}
 
-	// Return default config - use global paths if forcing global, otherwise local
-	currentConfig = getDefaultConfig(forceGlobal)
-	configSource = SourceDefault
+	// Return default config - use global paths (don't create local .ung/ automatically)
+	currentConfig = getDefaultConfig(true)
+	configSource = SourceGlobal
 	return currentConfig, nil
 }
 
@@ -394,7 +402,44 @@ func InitLocalDirectory() error {
 		}
 	}
 
+	// Add .ung to .gitignore if not already present
+	addToGitignore(".ung")
+
 	return nil
+}
+
+// addToGitignore adds an entry to .gitignore if it doesn't already exist
+func addToGitignore(entry string) {
+	gitignorePath := ".gitignore"
+
+	// Read existing .gitignore
+	content, err := os.ReadFile(gitignorePath)
+	if err != nil && !os.IsNotExist(err) {
+		return // Can't read file, skip
+	}
+
+	// Check if entry already exists
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == entry || strings.TrimSpace(line) == entry+"/" {
+			return // Already present
+		}
+	}
+
+	// Append entry to .gitignore
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return // Can't open file, skip
+	}
+	defer f.Close()
+
+	// Add newline before entry if file doesn't end with one
+	prefix := ""
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		prefix = "\n"
+	}
+
+	f.WriteString(prefix + entry + "/\n")
 }
 
 // InitGlobalDirectory creates the global ~/.ung directory structure with default config

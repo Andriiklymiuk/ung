@@ -1,4 +1,33 @@
 /**
+ * Supported currencies with their symbols
+ */
+export const CURRENCIES = [
+  'USD',
+  'EUR',
+  'GBP',
+  'CHF',
+  'PLN',
+  'UAH',
+  'CAD',
+  'AUD',
+] as const;
+export type Currency = (typeof CURRENCIES)[number];
+
+/**
+ * Currency symbols mapping
+ */
+export const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  CHF: 'CHF',
+  PLN: 'zł',
+  UAH: '₴',
+  CAD: 'C$',
+  AUD: 'A$',
+};
+
+/**
  * Formatting utilities
  */
 export class Formatter {
@@ -17,16 +46,7 @@ export class Formatter {
    * Format a currency amount
    */
   static formatCurrency(amount: number, currency: string = 'USD'): string {
-    const currencySymbols: Record<string, string> = {
-      USD: '$',
-      EUR: '€',
-      GBP: '£',
-      UAH: '₴',
-      CAD: 'C$',
-      AUD: 'A$',
-    };
-
-    const symbol = currencySymbols[currency] || currency;
+    const symbol = CURRENCY_SYMBOLS[currency] || currency;
     return `${symbol}${amount.toFixed(2)}`;
   }
 
@@ -96,5 +116,19 @@ export class Formatter {
       return text;
     }
     return `${text.substring(0, maxLength - 3)}...`;
+  }
+
+  /**
+   * Get platform-specific text for "Show in File Manager"
+   */
+  static getRevealInFileManagerText(): string {
+    switch (process.platform) {
+      case 'darwin':
+        return 'Show in Finder';
+      case 'win32':
+        return 'Show in Explorer';
+      default:
+        return 'Show in File Manager';
+    }
   }
 }

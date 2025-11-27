@@ -583,6 +583,21 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  // Open invoice PDF command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.openInvoicePDF', (item) =>
+      invoiceCommands.openInvoicePDF(item?.invoiceNum)
+    )
+  );
+
+  // Quick start tracking - simplified start tracking
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.quickStart', async () => {
+      await trackingCommands.startTracking();
+      await statusBar.forceUpdate();
+    })
+  );
+
   // Toggle tracking command (for status bar)
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.toggleTracking', async () => {

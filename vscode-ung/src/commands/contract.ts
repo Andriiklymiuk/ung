@@ -2,6 +2,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { UngCli } from '../cli/ungCli';
+import { CURRENCIES, Formatter } from '../utils/formatting';
 
 /**
  * Contract command handlers
@@ -174,7 +175,7 @@ export class ContractCommands {
     }
 
     // Step 5: Select currency
-    const currencies = ['USD', 'EUR', 'GBP', 'CHF', 'PLN'];
+    const currencies = [...CURRENCIES];
     const selectedCurrency = await vscode.window.showQuickPick(currencies, {
       placeHolder: 'Select currency',
       title: 'Create Contract - Step 5: Currency',
@@ -366,11 +367,14 @@ export class ContractCommands {
     }
 
     // Parse rate and price from ratePrice string
+    const currencyPattern = CURRENCIES.join('|');
     const rateMatch = contract.ratePrice.match(/(\d+(?:\.\d+)?)\s*\/hr/i);
     const priceMatch = contract.ratePrice.match(
-      /(\d+(?:\.\d+)?)\s*(?:USD|EUR|GBP|CHF|PLN)/i
+      new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:${currencyPattern})`, 'i')
     );
-    const currencyMatch = contract.ratePrice.match(/(USD|EUR|GBP|CHF|PLN)/i);
+    const currencyMatch = contract.ratePrice.match(
+      new RegExp(`(${currencyPattern})`, 'i')
+    );
 
     const currentRate = rateMatch ? parseFloat(rateMatch[1]) : undefined;
     const currentPrice = priceMatch ? parseFloat(priceMatch[1]) : undefined;
@@ -455,10 +459,10 @@ export class ContractCommands {
       if (newPrice && parseFloat(newPrice) !== currentPrice)
         updates.price = parseFloat(newPrice);
 
-      const newCurrency = await vscode.window.showQuickPick(
-        ['USD', 'EUR', 'GBP', 'CHF', 'PLN'],
-        { placeHolder: 'Select currency', title: `Current: ${currentCurrency}` }
-      );
+      const newCurrency = await vscode.window.showQuickPick([...CURRENCIES], {
+        placeHolder: 'Select currency',
+        title: `Current: ${currentCurrency}`,
+      });
       if (newCurrency === undefined) return;
       if (newCurrency !== currentCurrency) updates.currency = newCurrency;
 
@@ -505,10 +509,9 @@ export class ContractCommands {
       if (parseFloat(newPrice) !== currentPrice)
         updates.price = parseFloat(newPrice);
     } else if (editField.field === 'currency') {
-      const newCurrency = await vscode.window.showQuickPick(
-        ['USD', 'EUR', 'GBP', 'CHF', 'PLN'],
-        { placeHolder: 'Select currency' }
-      );
+      const newCurrency = await vscode.window.showQuickPick([...CURRENCIES], {
+        placeHolder: 'Select currency',
+      });
       if (newCurrency === undefined) return;
       if (newCurrency !== currentCurrency) updates.currency = newCurrency;
     } else if (editField.field === 'name') {
@@ -722,15 +725,16 @@ export class ContractCommands {
       await vscode.env.openExternal(vscode.Uri.file(pdfPath));
 
       // Also show notification with buttons
+      const revealText = Formatter.getRevealInFileManagerText();
       const action = await vscode.window.showInformationMessage(
         `Contract PDF: ${pdfPath}`,
         'Open Again',
-        'Show in Finder'
+        revealText
       );
 
       if (action === 'Open Again') {
         await vscode.env.openExternal(vscode.Uri.file(pdfPath));
-      } else if (action === 'Show in Finder') {
+      } else if (action === revealText) {
         await vscode.commands.executeCommand(
           'revealFileInOS',
           vscode.Uri.file(pdfPath)

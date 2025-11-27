@@ -2,6 +2,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { UngCli } from '../cli/ungCli';
+import { CURRENCIES, Formatter } from '../utils/formatting';
 
 /**
  * Invoice command handlers
@@ -345,7 +346,10 @@ export class InvoiceCommands {
     if (!amountStr) return;
 
     // Parse currency from original
-    const currencyMatch = originalInvoice.amount.match(/(USD|EUR|GBP|CHF|PLN)/);
+    const currencyPattern = CURRENCIES.join('|');
+    const currencyMatch = originalInvoice.amount.match(
+      new RegExp(`(${currencyPattern})`)
+    );
     const currency = currencyMatch ? currencyMatch[1] : 'USD';
 
     await vscode.window.withProgress(
@@ -747,15 +751,16 @@ export class InvoiceCommands {
       await vscode.env.openExternal(vscode.Uri.file(pdfPath));
 
       // Also show notification with buttons
+      const revealText = Formatter.getRevealInFileManagerText();
       const action = await vscode.window.showInformationMessage(
         `Invoice PDF: ${pdfPath}`,
         'Open Again',
-        'Show in Finder'
+        revealText
       );
 
       if (action === 'Open Again') {
         await vscode.env.openExternal(vscode.Uri.file(pdfPath));
-      } else if (action === 'Show in Finder') {
+      } else if (action === revealText) {
         await vscode.commands.executeCommand(
           'revealFileInOS',
           vscode.Uri.file(pdfPath)

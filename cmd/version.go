@@ -13,7 +13,7 @@ import (
 
 // These variables are set at build time using ldflags
 var (
-	Version   = "1.0.37"
+	Version   = "1.0.38"
 	GitCommit = "dev"
 	BuildDate = "unknown"
 )

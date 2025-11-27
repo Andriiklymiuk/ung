@@ -1192,8 +1192,6 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Show welcome message
-  vscode.window.showInformationMessage('UNG Billing extension is ready!');
 }
 
 /**

@@ -559,16 +559,6 @@
           "group": "navigation@2"
         },
         {
-          "command": "ung.refreshGettingStarted",
-          "when": "view == ungGettingStarted",
-          "group": "navigation"
-        },
-        {
-          "command": "ung.openDocs",
-          "when": "view == ungGettingStarted",
-          "group": "navigation"
-        },
-        {
           "command": "ung.createInvoice",
           "when": "view == ungInvoices",
           "group": "navigation@1"

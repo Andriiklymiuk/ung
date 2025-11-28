@@ -248,6 +248,7 @@ class AppState: ObservableObject {
   @Published var isLocked: Bool = false
   @Published var appLockEnabled: Bool = false
   @Published var useTouchID: Bool = true
+  @Published var isStartupLock: Bool = false
 
   // Settings
   @Published var hasStoredPassword: Bool = false
@@ -284,6 +285,7 @@ class AppState: ObservableObject {
     useTouchID = UserDefaults.standard.object(forKey: "useTouchID") as? Bool ?? true
     if appLockEnabled {
       isLocked = true
+      isStartupLock = true
     }
   }
 
@@ -317,6 +319,7 @@ class AppState: ObservableObject {
       )
       if success {
         isLocked = false
+        isStartupLock = false
       }
       return success
     } catch {
@@ -340,6 +343,7 @@ class AppState: ObservableObject {
       )
       if success {
         isLocked = false
+        isStartupLock = false
       }
       return success
     } catch {
@@ -350,6 +354,7 @@ class AppState: ObservableObject {
   func lockApp() {
     if appLockEnabled {
       isLocked = true
+      isStartupLock = false
     }
   }
 

@@ -1,4 +1,4 @@
-.PHONY: build install test clean run help release release-vs-code-extension increase_version
+.PHONY: build install test clean run help release release-vs-code-extension increase_version vscodePackage
 
 # Build variables
 BINARY_NAME=ung
@@ -114,6 +114,10 @@ release-vs-code-extension:
 	cd vscode-ung && git push
 	cd vscode-ung && vsce publish
 
+# Package VSCode extension locally (compile and create .vsix)
+vscodePackage:
+	cd vscode-ung && bun compile && vsce package
+
 # Help
 help:
 	@echo "UNG Makefile targets:"
@@ -130,4 +134,5 @@ help:
 	@echo "  release    - Create and push a release tag (auto-bumps patch, or: make release v=1.2.3)"
 	@echo "  release-vs-code-extension - Compile, package, commit, push and publish VS Code extension"
 	@echo "  increase_version - Bump version in CLI and VSCode extension (auto-bumps patch, or: make increase_version v=1.2.3)"
+	@echo "  vscodePackage - Compile and package VSCode extension locally"
 	@echo "  help       - Show this help message"

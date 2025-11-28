@@ -5,6 +5,7 @@
 //  Created by Andrii Klymiuk on 28.11.2025.
 //
 
+import LocalAuthentication
 import SwiftUI
 
 struct MainWindowView: View {
@@ -14,7 +15,7 @@ struct MainWindowView: View {
   var body: some View {
     Group {
       // Show lock screen if app is locked
-      if appState.isLocked && appState.appLockEnabled {
+      if appState.isLocked {
         LockScreenView()
           .frame(minWidth: 400, minHeight: 300)
           .background(backgroundColor)
@@ -44,6 +45,30 @@ struct MainWindowView: View {
       guard appState.status == .ready, appState.metrics.totalRevenue == 0 else { return }
       await appState.refreshDashboard()
     }
+    .overlay(alignment: .bottom) {
+      if appState.showToast {
+        DSToast(
+          message: appState.toastMessage,
+          type: mapToastType(appState.toastType),
+          isPresented: $appState.showToast
+        )
+        .padding(.bottom, 16)
+        .padding(.horizontal, 16)
+        .transition(
+          .move(edge: .bottom).combined(with: .scale(scale: 0.9)).combined(with: .opacity)
+        )
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: appState.showToast)
+      }
+    }
+  }
+
+  private func mapToastType(_ type: AppState.ToastType) -> DSToast.ToastType {
+    switch type {
+    case .success: return .success
+    case .info: return .info
+    case .warning: return .warning
+    case .error: return .error
+    }
   }
 
   private var mainContent: some View {
@@ -69,6 +94,7 @@ struct SidebarView: View {
   @EnvironmentObject var appState: AppState
   @Environment(\.colorScheme) var colorScheme
   @State private var showMoreMenu = false
+  @State private var biometricType: LABiometryType = .none
 
   // Height per sidebar item (56) + spacing (4)
   private let itemHeight: CGFloat = 60
@@ -110,10 +136,24 @@ struct SidebarView: View {
         .padding(.vertical, 12)
 
         Spacer()
+
+        // Touch ID / Password lock button - always visible
+        touchIDButton
       }
     }
     .frame(width: 80)
     .background(.ultraThinMaterial)
+    .onAppear {
+      checkBiometrics()
+    }
+  }
+
+  private func checkBiometrics() {
+    let context = LAContext()
+    var error: NSError?
+    if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+      biometricType = context.biometryType
+    }
   }
 
   private var appHeader: some View {
@@ -159,6 +199,13 @@ struct SidebarView: View {
     .onTapGesture(count: 2) {
       // Double-tap logo to toggle secure mode
       appState.secureMode.toggle()
+
+      // Show toast notification
+      let message =
+        appState.secureMode
+        ? "🔒 Secure Mode Enabled - Sensitive data hidden"
+        : "🔓 Secure Mode Disabled - All data visible"
+      appState.showToastMessage(message, type: appState.secureMode ? .warning : .info)
     }
     .help(
       appState.secureMode
@@ -225,6 +272,34 @@ struct SidebarView: View {
     )
     .padding(.horizontal, 8)
     .padding(.bottom, 8)
+  }
+
+  @ViewBuilder
+  private var touchIDButton: some View {
+    if appState.appLockEnabled {
+      Button(action: {
+        appState.lockApp()
+        appState.showToastMessage("🔒 App Locked", type: .warning)
+      }) {
+        Image(
+          systemName: biometricType == .touchID
+            ? "touchid" : (biometricType == .faceID ? "faceid" : "lock.fill")
+        )
+        .font(.system(size: 20))
+        .foregroundColor(.secondary)
+        .frame(width: 44, height: 44)
+      }
+      .buttonStyle(.plain)
+      .help(
+        biometricType == .touchID
+          ? "Lock app (Touch ID required to unlock)"
+          : (biometricType == .faceID
+            ? "Lock app (Face ID required to unlock)"
+            : "Lock app (Password required to unlock)")
+      )
+      .padding(.horizontal, 8)
+      .padding(.bottom, 12)
+    }
   }
 
 }

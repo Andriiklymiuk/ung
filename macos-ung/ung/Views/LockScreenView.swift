@@ -59,11 +59,6 @@ struct LockScreenView: View {
     .frame(minWidth: 400, minHeight: 300)
     .onAppear {
       checkBiometricType()
-      // Auto-trigger authentication on appear
-      Task {
-        try? await Task.sleep(nanoseconds: 300_000_000)  // 0.3s delay
-        await authenticate()
-      }
     }
   }
 

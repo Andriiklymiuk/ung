@@ -1375,6 +1375,61 @@ struct ExpenseRowView: View {
   }
 }
 
+// MARK: - Reports Section Picker (Responsive)
+struct ReportsSectionPicker: View {
+  @Binding var selection: String
+  let isCompact: Bool
+  @Environment(\.colorScheme) var colorScheme
+
+  private let sections: [(id: String, label: String, icon: String)] = [
+    ("overview", "Overview", "chart.bar.xaxis"),
+    ("calculator", "Rate Calculator", "dollarsign.circle"),
+    ("goals", "Income Goals", "target"),
+  ]
+
+  var body: some View {
+    HStack(spacing: isCompact ? Design.Spacing.xs : Design.Spacing.xxs) {
+      ForEach(sections, id: \.id) { section in
+        Button(action: { selection = section.id }) {
+          if isCompact {
+            // Icon-only for compact mode
+            Image(systemName: section.icon)
+              .font(.system(size: 14, weight: selection == section.id ? .semibold : .regular))
+              .foregroundColor(selection == section.id ? .white : Design.Colors.textSecondary)
+              .frame(width: 36, height: 28)
+              .background(
+                RoundedRectangle(cornerRadius: Design.Radius.sm)
+                  .fill(selection == section.id ? Design.Colors.primary : Color.clear)
+              )
+          } else {
+            // Full label for wide mode
+            HStack(spacing: Design.Spacing.xxs) {
+              Image(systemName: section.icon)
+                .font(.system(size: 12))
+              Text(section.label)
+                .font(Design.Typography.labelSmall)
+            }
+            .foregroundColor(selection == section.id ? .white : Design.Colors.textSecondary)
+            .padding(.horizontal, Design.Spacing.sm)
+            .padding(.vertical, Design.Spacing.xs)
+            .background(
+              RoundedRectangle(cornerRadius: Design.Radius.sm)
+                .fill(selection == section.id ? Design.Colors.primary : Color.clear)
+            )
+          }
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(Design.Spacing.xxxs)
+    .background(
+      RoundedRectangle(cornerRadius: Design.Radius.md)
+        .fill(Design.Colors.surfaceElevated(colorScheme))
+    )
+    .animation(Design.Animation.smooth, value: selection)
+  }
+}
+
 // MARK: - Reports Content
 struct ReportsContent: View {
   @EnvironmentObject var appState: AppState
@@ -1950,61 +2005,6 @@ struct ProjectionItem: View {
         .foregroundColor(Design.Colors.textTertiary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-}
-
-// MARK: - Reports Section Picker (Responsive)
-struct ReportsSectionPicker: View {
-  @Binding var selection: String
-  let isCompact: Bool
-  @Environment(\.colorScheme) var colorScheme
-
-  private let sections: [(id: String, label: String, icon: String)] = [
-    ("overview", "Overview", "chart.bar.xaxis"),
-    ("calculator", "Rate Calculator", "dollarsign.circle"),
-    ("goals", "Income Goals", "target"),
-  ]
-
-  var body: some View {
-    HStack(spacing: isCompact ? Design.Spacing.xs : Design.Spacing.xxs) {
-      ForEach(sections, id: \.id) { section in
-        Button(action: { selection = section.id }) {
-          if isCompact {
-            // Icon-only for compact mode
-            Image(systemName: section.icon)
-              .font(.system(size: 14, weight: selection == section.id ? .semibold : .regular))
-              .foregroundColor(selection == section.id ? .white : Design.Colors.textSecondary)
-              .frame(width: 36, height: 28)
-              .background(
-                RoundedRectangle(cornerRadius: Design.Radius.sm)
-                  .fill(selection == section.id ? Design.Colors.primary : Color.clear)
-              )
-          } else {
-            // Full label for wide mode
-            HStack(spacing: Design.Spacing.xxs) {
-              Image(systemName: section.icon)
-                .font(.system(size: 12))
-              Text(section.label)
-                .font(Design.Typography.labelSmall)
-            }
-            .foregroundColor(selection == section.id ? .white : Design.Colors.textSecondary)
-            .padding(.horizontal, Design.Spacing.sm)
-            .padding(.vertical, Design.Spacing.xs)
-            .background(
-              RoundedRectangle(cornerRadius: Design.Radius.sm)
-                .fill(selection == section.id ? Design.Colors.primary : Color.clear)
-            )
-          }
-        }
-        .buttonStyle(.plain)
-      }
-    }
-    .padding(Design.Spacing.xxxs)
-    .background(
-      RoundedRectangle(cornerRadius: Design.Radius.md)
-        .fill(Design.Colors.surfaceElevated(colorScheme))
-    )
-    .animation(Design.Animation.smooth, value: selection)
   }
 }
 

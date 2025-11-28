@@ -543,34 +543,37 @@ struct DSToast: View {
   }
 
   var body: some View {
-    HStack(spacing: Design.Spacing.sm) {
+    HStack(spacing: Design.Spacing.xs) {
       Image(systemName: type.icon)
-        .font(.system(size: Design.IconSize.md))
+        .font(.system(size: 12, weight: .medium))
         .foregroundColor(type.color)
 
       Text(message)
-        .font(Design.Typography.bodyMedium)
+        .font(.system(size: 12, weight: .medium))
         .foregroundColor(Design.Colors.textPrimary)
-
-      Spacer()
+        .lineLimit(1)
 
       Button(action: { isPresented = false }) {
         Image(systemName: "xmark")
-          .font(.system(size: Design.IconSize.xs, weight: .semibold))
+          .font(.system(size: 9, weight: .semibold))
           .foregroundColor(Design.Colors.textTertiary)
+          .padding(4)
       }
       .buttonStyle(.plain)
     }
-    .padding(Design.Spacing.md)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
     .background(
-      RoundedRectangle(cornerRadius: Design.Radius.sm)
-        .fill(type.color.opacity(0.1))
+      RoundedRectangle(cornerRadius: 8)
+        .fill(.ultraThinMaterial)
         .overlay(
-          RoundedRectangle(cornerRadius: Design.Radius.sm)
-            .stroke(type.color.opacity(0.3), lineWidth: 1)
+          RoundedRectangle(cornerRadius: 8)
+            .stroke(type.color.opacity(0.5), lineWidth: 1.5)
         )
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
     )
-    .transition(.move(edge: .top).combined(with: .opacity))
+    .fixedSize()
+    .transition(.move(edge: .bottom).combined(with: .opacity))
   }
 }
 

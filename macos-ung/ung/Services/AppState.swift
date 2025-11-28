@@ -236,6 +236,13 @@ class AppState: ObservableObject {
   @Published var isRefreshing: Bool = false
   @Published var showError: Bool = false
   @Published var errorMessage: String = ""
+  @Published var showToast: Bool = false
+  @Published var toastMessage: String = ""
+  @Published var toastType: ToastType = .info
+
+  enum ToastType {
+    case success, info, warning, error
+  }
 
   // App Lock
   @Published var isLocked: Bool = false
@@ -377,6 +384,19 @@ class AppState: ObservableObject {
       print("[AppState] Setting status to .ready")
       status = .ready
       await refreshDashboard()
+    }
+  }
+
+  // MARK: - Toast
+  func showToastMessage(_ message: String, type: ToastType = .info) {
+    toastMessage = message
+    toastType = type
+    showToast = true
+
+    // Auto-hide after 3 seconds
+    Task {
+      try? await Task.sleep(nanoseconds: 3_000_000_000)
+      showToast = false
     }
   }
 

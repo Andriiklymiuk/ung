@@ -27,6 +27,13 @@ dist/
 *.swo
 *~
 
+# Xcode
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -44,3 +51,7 @@ Thumbs.db
 
 ung-docs/node_modules/*
 ung-docs/build/*
+
+xcuserdata/*
+xcshareddata/*
+macos-ung/build/*

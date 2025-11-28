@@ -1,4 +1,4 @@
-.PHONY: build install test clean run help release release-vs-code-extension
+.PHONY: build install test clean run help release release-vs-code-extension increase_version
 
 # Build variables
 BINARY_NAME=ung
@@ -78,20 +78,28 @@ build-all:
 	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe .
 	@echo "✓ Cross-compilation complete"
 
-# Release - bump version, create tag, and push to trigger release
-# Usage: make release [v=1.2.3]  (if v is not specified, patch version is bumped)
-# Version is read from cmd/version.go (source of truth), then bumped
-release:
-	@git diff --quiet || (echo "Error: Working directory has uncommitted changes" && exit 1)
+# Increase version - bump version in both CLI and VSCode extension without committing
+# Usage: make increase_version [v=1.2.3]  (if v is not specified, patch version is bumped)
+increase_version:
 	$(eval CURRENT_VERSION := $(shell grep 'Version   = ' cmd/version.go | sed 's/.*"\([^"]*\)".*/\1/'))
 	$(eval MAJOR := $(shell echo $(CURRENT_VERSION) | cut -d. -f1))
 	$(eval MINOR := $(shell echo $(CURRENT_VERSION) | cut -d. -f2))
 	$(eval PATCH := $(shell echo $(CURRENT_VERSION) | cut -d. -f3))
 	$(eval NEW_PATCH := $(shell echo $$(($(PATCH) + 1))))
 	$(eval NEW_VERSION := $(or $(v),$(MAJOR).$(MINOR).$(NEW_PATCH)))
-	@echo "Releasing v$(NEW_VERSION)... (current: v$(CURRENT_VERSION))"
+	@echo "Bumping version from $(CURRENT_VERSION) to $(NEW_VERSION)..."
 	@sed -i.bak 's/Version   = "[^"]*"/Version   = "$(NEW_VERSION)"/' cmd/version.go && rm -f cmd/version.go.bak
 	@sed -i.bak 's/"version": "[^"]*"/"version": "$(NEW_VERSION)"/' vscode-ung/package.json && rm -f vscode-ung/package.json.bak
+	@echo "✓ Updated cmd/version.go to $(NEW_VERSION)"
+	@echo "✓ Updated vscode-ung/package.json to $(NEW_VERSION)"
+
+# Release - bump version, create tag, and push to trigger release
+# Usage: make release [v=1.2.3]  (if v is not specified, patch version is bumped)
+# Version is read from cmd/version.go (source of truth), then bumped
+release:
+	@git diff --quiet || (echo "Error: Working directory has uncommitted changes" && exit 1)
+	@$(MAKE) increase_version v=$(v)
+	$(eval NEW_VERSION := $(shell grep 'Version   = ' cmd/version.go | sed 's/.*"\([^"]*\)".*/\1/'))
 	@git add cmd/version.go vscode-ung/package.json
 	@git commit -m "chore: bump version to $(NEW_VERSION)"
 	@git tag -a v$(NEW_VERSION) -m "Release v$(NEW_VERSION)"
@@ -121,4 +129,5 @@ help:
 	@echo "  build-all  - Cross-compile for all platforms"
 	@echo "  release    - Create and push a release tag (auto-bumps patch, or: make release v=1.2.3)"
 	@echo "  release-vs-code-extension - Compile, package, commit, push and publish VS Code extension"
+	@echo "  increase_version - Bump version in CLI and VSCode extension (auto-bumps patch, or: make increase_version v=1.2.3)"
 	@echo "  help       - Show this help message"

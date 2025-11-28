@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import Security
 
 // MARK: - App State Enum
 enum AppStatus: Equatable {
@@ -14,6 +15,37 @@ enum AppStatus: Equatable {
     case cliNotInstalled
     case notInitialized
     case ready
+}
+
+// MARK: - Pomodoro State
+struct PomodoroState: Equatable {
+    var isActive: Bool = false
+    var isBreak: Bool = false
+    var isPaused: Bool = false
+    var secondsRemaining: Int = 25 * 60
+    var sessionsCompleted: Int = 0
+    var workMinutes: Int = 25
+    var breakMinutes: Int = 5
+    var longBreakMinutes: Int = 15
+    var sessionsUntilLongBreak: Int = 4
+
+    var formattedTime: String {
+        let minutes = secondsRemaining / 60
+        let seconds = secondsRemaining % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    var progress: Double {
+        let total = isBreak ? (sessionsCompleted % sessionsUntilLongBreak == 0 ? longBreakMinutes : breakMinutes) * 60 : workMinutes * 60
+        return Double(total - secondsRemaining) / Double(total)
+    }
+
+    var statusText: String {
+        if !isActive { return "Ready to focus" }
+        if isPaused { return "Paused" }
+        if isBreak { return sessionsCompleted % sessionsUntilLongBreak == 0 ? "Long Break" : "Short Break" }
+        return "Focus Time"
+    }
 }
 
 // MARK: - Data Models
@@ -81,15 +113,85 @@ struct SetupStatus: Equatable {
     }
 }
 
-struct Client: Identifiable, Equatable {
+struct Client: Identifiable, Equatable, Hashable {
     let id: Int
     let name: String
+    var email: String = ""
 }
 
 struct Contract: Identifiable, Equatable {
     let id: Int
     let name: String
     let clientName: String
+    var rate: Double = 0
+    var type: String = "hourly"
+}
+
+// MARK: - Keychain Manager
+class KeychainManager {
+    static let shared = KeychainManager()
+    private let service = "com.ung.ung"
+    private let passwordKey = "database_password"
+
+    func savePassword(_ password: String) -> Bool {
+        guard let data = password.data(using: .utf8) else { return false }
+
+        // Delete existing
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: passwordKey
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+
+        // Add new
+        let addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: passwordKey,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        ]
+
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        return status == errSecSuccess
+    }
+
+    func getPassword() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: passwordKey,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let password = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+
+        return password
+    }
+
+    func deletePassword() -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: passwordKey
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    func hasPassword() -> Bool {
+        return getPassword() != nil
+    }
 }
 
 // MARK: - App State
@@ -101,6 +203,9 @@ class AppState: ObservableObject {
     // Tracking state
     @Published var isTracking: Bool = false
     @Published var activeSession: ActiveSession?
+
+    // Pomodoro state
+    @Published var pomodoroState: PomodoroState = PomodoroState()
 
     // Dashboard data
     @Published var metrics: DashboardMetrics = DashboardMetrics()
@@ -126,15 +231,23 @@ class AppState: ObservableObject {
 
     // Settings
     @Published var useGlobalDatabase: Bool = true
+    @Published var hasStoredPassword: Bool = false
+    @Published var databaseEncrypted: Bool = false
+
+    // Main window navigation
+    @Published var selectedTab: SidebarTab = .dashboard
 
     // Services
     let cliService = CLIService()
+    let keychain = KeychainManager.shared
 
-    // Timer for active tracking
+    // Timers
     private var trackingTimer: Timer?
+    private var pomodoroTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        hasStoredPassword = keychain.hasPassword()
         checkStatus()
     }
 
@@ -277,6 +390,117 @@ class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Pomodoro
+    func startPomodoro() {
+        pomodoroState.isActive = true
+        pomodoroState.isPaused = false
+        pomodoroState.isBreak = false
+        pomodoroState.secondsRemaining = pomodoroState.workMinutes * 60
+        startPomodoroTimer()
+    }
+
+    func pausePomodoro() {
+        pomodoroState.isPaused = true
+        stopPomodoroTimer()
+    }
+
+    func resumePomodoro() {
+        pomodoroState.isPaused = false
+        startPomodoroTimer()
+    }
+
+    func stopPomodoro() {
+        pomodoroState.isActive = false
+        pomodoroState.isPaused = false
+        pomodoroState.isBreak = false
+        pomodoroState.secondsRemaining = pomodoroState.workMinutes * 60
+        stopPomodoroTimer()
+    }
+
+    func skipPomodoro() {
+        if pomodoroState.isBreak {
+            // Skip break, start new work session
+            pomodoroState.isBreak = false
+            pomodoroState.secondsRemaining = pomodoroState.workMinutes * 60
+        } else {
+            // Skip work, start break
+            pomodoroState.sessionsCompleted += 1
+            pomodoroState.isBreak = true
+            let isLongBreak = pomodoroState.sessionsCompleted % pomodoroState.sessionsUntilLongBreak == 0
+            pomodoroState.secondsRemaining = (isLongBreak ? pomodoroState.longBreakMinutes : pomodoroState.breakMinutes) * 60
+        }
+    }
+
+    private func startPomodoroTimer() {
+        stopPomodoroTimer()
+        pomodoroTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                if self.pomodoroState.secondsRemaining > 0 {
+                    self.pomodoroState.secondsRemaining -= 1
+                } else {
+                    self.pomodoroCompleted()
+                }
+            }
+        }
+    }
+
+    private func stopPomodoroTimer() {
+        pomodoroTimer?.invalidate()
+        pomodoroTimer = nil
+    }
+
+    private func pomodoroCompleted() {
+        // Play notification sound
+        NSSound.beep()
+
+        if pomodoroState.isBreak {
+            // Break completed, start new work session
+            pomodoroState.isBreak = false
+            pomodoroState.secondsRemaining = pomodoroState.workMinutes * 60
+        } else {
+            // Work completed, start break
+            pomodoroState.sessionsCompleted += 1
+            pomodoroState.isBreak = true
+            let isLongBreak = pomodoroState.sessionsCompleted % pomodoroState.sessionsUntilLongBreak == 0
+            pomodoroState.secondsRemaining = (isLongBreak ? pomodoroState.longBreakMinutes : pomodoroState.breakMinutes) * 60
+
+            // Send notification
+            sendPomodoroNotification(isLongBreak: isLongBreak)
+        }
+    }
+
+    private func sendPomodoroNotification(isLongBreak: Bool) {
+        let content = UNMutableNotificationContent()
+        content.title = "Pomodoro Complete!"
+        content.body = isLongBreak ? "Great work! Take a long break." : "Nice focus session! Take a short break."
+        content.sound = .default
+
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    // MARK: - Password Management
+    func savePassword(_ password: String) -> Bool {
+        let success = keychain.savePassword(password)
+        if success {
+            hasStoredPassword = true
+        }
+        return success
+    }
+
+    func getStoredPassword() -> String? {
+        return keychain.getPassword()
+    }
+
+    func clearPassword() -> Bool {
+        let success = keychain.deletePassword()
+        if success {
+            hasStoredPassword = false
+        }
+        return success
+    }
+
     // MARK: - Initialization
     func initializeGlobal() async {
         let success = await cliService.initializeGlobal()
@@ -318,3 +542,48 @@ class AppState: ObservableObject {
         return String(format: "%dh %02dm", h, m)
     }
 }
+
+// MARK: - Sidebar Tab
+enum SidebarTab: String, CaseIterable, Identifiable {
+    case dashboard = "Dashboard"
+    case tracking = "Time Tracking"
+    case clients = "Clients"
+    case contracts = "Contracts"
+    case invoices = "Invoices"
+    case expenses = "Expenses"
+    case pomodoro = "Focus Timer"
+    case reports = "Reports"
+    case settings = "Settings"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .dashboard: return "square.grid.2x2"
+        case .tracking: return "clock.fill"
+        case .clients: return "person.2.fill"
+        case .contracts: return "doc.text.fill"
+        case .invoices: return "doc.plaintext.fill"
+        case .expenses: return "dollarsign.circle.fill"
+        case .pomodoro: return "brain.head.profile"
+        case .reports: return "chart.bar.fill"
+        case .settings: return "gearshape.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .dashboard: return .blue
+        case .tracking: return .green
+        case .clients: return .purple
+        case .contracts: return .indigo
+        case .invoices: return .teal
+        case .expenses: return .orange
+        case .pomodoro: return .red
+        case .reports: return .pink
+        case .settings: return .gray
+        }
+    }
+}
+
+import UserNotifications

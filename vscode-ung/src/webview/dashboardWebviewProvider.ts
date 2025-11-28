@@ -807,54 +807,37 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             color: white;
         }
 
-        /* Metrics Grid */
-        .metrics-grid {
-            margin-bottom: 12px;
-        }
-
-        .metric-card {
+        /* Revenue Bar */
+        .revenue-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
             background-color: var(--vscode-input-background);
-            border-radius: 8px;
-            padding: 10px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
             cursor: pointer;
             transition: all 0.15s;
             border: 1px solid transparent;
         }
 
-        .metric-card.revenue-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .metric-card:hover {
+        .revenue-bar:hover {
             background-color: var(--vscode-list-hoverBackground);
             border-color: var(--vscode-focusBorder);
         }
 
-        .metric-header {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .metric-icon {
-            font-size: 14px;
-        }
-
-        .metric-label {
+        .revenue-label {
             font-size: 10px;
             color: var(--vscode-descriptionForeground);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
-        .metric-value {
-            font-size: 18px;
+        .revenue-value {
+            font-size: 14px;
             font-weight: 600;
+            color: var(--vscode-charts-green, #4caf50);
         }
-
-        .metric-value.green { color: var(--vscode-charts-green, #4caf50); }
 
         /* Section */
         .section {
@@ -1383,8 +1366,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private _getContentHtml(needsSetup: boolean): string {
     const m = this._metrics;
     const hasUnpaid = m && m.unpaidAmount > 0;
+    const revenue = m
+      ? this._formatCurrency(m.totalMonthlyRevenue, m.currency)
+      : '$0';
 
-    const secureIcon = this._secureMode ? '🔒' : '👁';
+    const secureIcon = this._secureMode ? '[hide]' : '[show]';
     const secureTitle = this._secureMode
       ? 'Secure mode ON - Click to show data'
       : 'Click to hide sensitive data';
@@ -1402,7 +1388,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     ${secureIcon}
                 </button>
                 <button class="refresh-btn" data-command="refresh" title="Refresh">
-                    🔄
+                    ↻
                 </button>
             </div>
         </div>
@@ -1413,20 +1399,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         ${needsSetup ? this._getSetupSectionHtml() : ''}
 
-        <!-- Metrics -->
+        <!-- Revenue + Quick Actions combined -->
         <div class="section">
-            <div class="section-header">
-                <span class="section-title">Overview</span>
-            </div>
-            <div class="metrics-grid">
-                ${this._getMetricsHtml()}
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="section">
-            <div class="section-header">
-                <span class="section-title">Quick Actions</span>
+            <div class="revenue-bar" data-command="openStatistics">
+                <span class="revenue-label">Revenue</span>
+                <span class="revenue-value">${revenue}</span>
             </div>
             <div class="quick-actions">
                 ${this._getQuickActionsHtml()}
@@ -1438,8 +1415,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         <!-- Recent Time Sessions -->
         <div class="section">
             <div class="section-header-with-link">
-                <span class="section-title">Time Sessions</span>
-                ${this._recentSessions.length > 0 ? '<button class="section-link" data-command="openTracking">View All</button>' : ''}
+                <span class="section-title">Time</span>
+                ${this._recentSessions.length > 0 ? '<button class="section-link" data-command="openTracking">All</button>' : ''}
             </div>
             ${this._getRecentSessionsHtml()}
         </div>
@@ -1448,7 +1425,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         <div class="section">
             <div class="section-header-with-link">
                 <span class="section-title">Contracts</span>
-                ${this._recentContracts.length > 0 ? '<button class="section-link" data-command="openContracts">View All</button>' : ''}
+                ${this._recentContracts.length > 0 ? '<button class="section-link" data-command="openContracts">All</button>' : ''}
             </div>
             ${this._getRecentContractsHtml()}
         </div>
@@ -1457,34 +1434,26 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         <div class="section">
             <div class="section-header-with-link">
                 <span class="section-title">Invoices</span>
-                ${this._recentInvoices.length > 0 ? '<button class="section-link" data-command="openInvoices">View All</button>' : ''}
+                ${this._recentInvoices.length > 0 ? '<button class="section-link" data-command="openInvoices">All</button>' : ''}
             </div>
             ${this._getRecentInvoicesHtml()}
         </div>
 
         <div class="divider"></div>
 
-        <!-- Navigation - simplified to non-duplicated items -->
-        <div class="section">
-            <div class="section-header">
-                <span class="section-title">More</span>
-            </div>
-            <div class="nav-grid nav-grid-compact">
-                <button class="nav-item" data-command="openExpenses">
-                    <span class="nav-icon">💳</span>
-                    <span class="nav-label">Expenses</span>
-                    ${this._counts.expenses > 0 ? `<span class="nav-badge">${this._counts.expenses}</span>` : ''}
-                </button>
-                <button class="nav-item" data-command="openClients">
-                    <span class="nav-icon">👥</span>
-                    <span class="nav-label">Clients</span>
-                    ${this._counts.clients > 0 ? `<span class="nav-badge">${this._counts.clients}</span>` : ''}
-                </button>
-                <button class="nav-item" data-command="openStatistics">
-                    <span class="nav-icon">📊</span>
-                    <span class="nav-label">Reports</span>
-                </button>
-            </div>
+        <!-- Quick Access -->
+        <div class="nav-grid nav-grid-compact">
+            <button class="nav-item" data-command="openExpenses">
+                <span class="nav-label">Expenses</span>
+                ${this._counts.expenses > 0 ? `<span class="nav-badge">${this._counts.expenses}</span>` : ''}
+            </button>
+            <button class="nav-item" data-command="openClients">
+                <span class="nav-label">Clients</span>
+                ${this._counts.clients > 0 ? `<span class="nav-badge">${this._counts.clients}</span>` : ''}
+            </button>
+            <button class="nav-item" data-command="openStatistics">
+                <span class="nav-label">Reports</span>
+            </button>
         </div>
     `;
   }
@@ -1495,10 +1464,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
     return `
         <div class="alert-banner" data-command="openInvoices">
-            <span class="alert-icon">⚠️</span>
-            <span class="alert-text">
-                <span class="alert-value">${this._formatCurrency(m.unpaidAmount, m.currency)}</span> unpaid
-            </span>
+            <span class="alert-value">${this._formatCurrency(m.unpaidAmount, m.currency)}</span> unpaid
         </div>
     `;
   }
@@ -1522,10 +1488,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private _getSetupSectionHtml(): string {
     return `
         <div class="setup-section">
-            <div class="setup-title">
-                <span>🚀</span>
-                <span>Get Started</span>
-            </div>
+            <div class="setup-title">Get Started</div>
             <div class="setup-steps">
                 <div class="setup-step ${this._setupStatus.hasCompany ? 'completed' : ''}" data-command="createCompany">
                     <div class="step-icon ${this._setupStatus.hasCompany ? 'done' : 'pending'}">
@@ -1533,7 +1496,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     </div>
                     <div class="step-content">
                         <div class="step-label">${this._setupStatus.hasCompany ? 'Company Added' : 'Add Company'}</div>
-                        <div class="step-desc">Your business details</div>
                     </div>
                 </div>
                 <div class="setup-step ${this._setupStatus.hasClient ? 'completed' : ''}" data-command="createClient">
@@ -1542,7 +1504,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     </div>
                     <div class="step-content">
                         <div class="step-label">${this._setupStatus.hasClient ? 'Client Added' : 'Add Client'}</div>
-                        <div class="step-desc">Who you work with</div>
                     </div>
                 </div>
                 <div class="setup-step ${this._setupStatus.hasContract ? 'completed' : ''}" data-command="createContract">
@@ -1551,27 +1512,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     </div>
                     <div class="step-content">
                         <div class="step-label">${this._setupStatus.hasContract ? 'Contract Created' : 'Create Contract'}</div>
-                        <div class="step-desc">Rates and terms</div>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
-  }
-
-  private _getMetricsHtml(): string {
-    const m = this._metrics || {
-      totalMonthlyRevenue: 0,
-      currency: 'USD',
-    };
-
-    return `
-        <div class="metric-card revenue-card" data-command="openStatistics">
-            <div class="metric-header">
-                <span class="metric-icon">💰</span>
-                <span class="metric-label">Monthly Revenue</span>
-            </div>
-            <div class="metric-value green">${this._formatCurrency(m.totalMonthlyRevenue, m.currency)}</div>
         </div>
     `;
   }
@@ -1580,73 +1523,70 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     if (this._activeTracking) {
       return `
             <button class="action-btn" data-command="createInvoice">
-                <span class="action-icon">📄</span>
-                <span class="action-label">New Invoice</span>
+                <span class="action-label">+ Invoice</span>
             </button>
             <button class="action-btn" data-command="logExpense">
-                <span class="action-icon">💳</span>
-                <span class="action-label">Log Expense</span>
+                <span class="action-label">+ Expense</span>
             </button>
             <button class="action-btn" data-command="createClient">
-                <span class="action-icon">👤</span>
-                <span class="action-label">Add Client</span>
+                <span class="action-label">+ Client</span>
             </button>
             <button class="action-btn" data-command="createContract">
-                <span class="action-icon">📝</span>
-                <span class="action-label">New Contract</span>
+                <span class="action-label">+ Contract</span>
             </button>
         `;
     }
 
     return `
         <button class="action-btn primary" data-command="startTracking">
-            <span class="action-icon">▶️</span>
             <span class="action-label">Start Tracking</span>
         </button>
         <button class="action-btn" data-command="createInvoice">
-            <span class="action-icon">📄</span>
-            <span class="action-label">New Invoice</span>
+            <span class="action-label">+ Invoice</span>
         </button>
         <button class="action-btn" data-command="logExpense">
-            <span class="action-icon">💳</span>
-            <span class="action-label">Log Expense</span>
+            <span class="action-label">+ Expense</span>
         </button>
     `;
   }
 
   private _getRecentContractsHtml(): string {
     if (this._recentContracts.length === 0) {
-      // Show helpful empty state like CLI
       if (!this._setupStatus.hasClient) {
         return `
-            <div class="empty-state">
-                <div class="empty-state-icon">👥</div>
-                <div class="empty-state-text">Add a client first to create contracts</div>
+            <div class="empty-state compact">
+                <div class="empty-state-text">Add a client first</div>
                 <button class="empty-state-action" data-command="createClient">Add Client</button>
             </div>
         `;
       }
       return `
-            <div class="empty-state">
-                <div class="empty-state-icon">📝</div>
-                <div class="empty-state-text">No contracts yet. Create one to start tracking work.</div>
-                <button class="empty-state-action" data-command="createContract">Create Contract</button>
+            <div class="empty-state compact">
+                <div class="empty-state-text">No contracts yet</div>
+                <button class="empty-state-action" data-command="createContract">+ Contract</button>
             </div>
         `;
     }
 
+    // Check if multiple contracts per client exist
+    const clientCounts = new Map<string, number>();
+    for (const c of this._recentContracts) {
+      clientCounts.set(c.client, (clientCounts.get(c.client) || 0) + 1);
+    }
+
     const items = this._recentContracts
-      .map(
-        (c) => `
+      .map((c) => {
+        const hasMultiple = (clientCounts.get(c.client) || 0) > 1;
+        const title = hasMultiple ? `${c.name} (${c.client})` : c.client;
+        return `
             <div class="recent-item" data-command="openContracts">
-                <span class="recent-item-icon">📝</span>
                 <div class="recent-item-content">
-                    <div class="recent-item-title">${c.client}</div>
-                    <div class="recent-item-subtitle">${c.type} • ${this._maskAmount(c.rate)}</div>
+                    <div class="recent-item-title">${title}</div>
+                    <div class="recent-item-subtitle">${c.type} ${this._maskAmount(c.rate)}</div>
                 </div>
             </div>
-        `
-      )
+        `;
+      })
       .join('');
 
     return `<div class="recent-list">${items}</div>`;
@@ -1654,21 +1594,18 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
   private _getRecentInvoicesHtml(): string {
     if (this._recentInvoices.length === 0) {
-      // Show helpful empty state like CLI
       if (!this._setupStatus.hasContract) {
         return `
-            <div class="empty-state">
-                <div class="empty-state-icon">📝</div>
-                <div class="empty-state-text">Create a contract first to generate invoices</div>
-                <button class="empty-state-action" data-command="createContract">Create Contract</button>
+            <div class="empty-state compact">
+                <div class="empty-state-text">Create a contract first</div>
+                <button class="empty-state-action" data-command="createContract">+ Contract</button>
             </div>
         `;
       }
       return `
-            <div class="empty-state">
-                <div class="empty-state-icon">📄</div>
-                <div class="empty-state-text">No invoices yet. Create one when ready to bill.</div>
-                <button class="empty-state-action" data-command="createInvoice">Create Invoice</button>
+            <div class="empty-state compact">
+                <div class="empty-state-text">No invoices yet</div>
+                <button class="empty-state-action" data-command="createInvoice">+ Invoice</button>
             </div>
         `;
     }
@@ -1678,17 +1615,16 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         const statusClass = inv.status.toLowerCase().replace(/\s+/g, '-');
         return `
             <div class="recent-item invoice-item" data-invoice-id="${inv.id}">
-                <span class="recent-item-icon">📄</span>
                 <div class="recent-item-content" data-command="viewInvoice" data-invoice-id="${inv.id}">
                     <div class="recent-item-title">${inv.invoiceNum} - ${inv.client}</div>
                     <div class="recent-item-subtitle">${this._maskAmount(inv.amount)}</div>
                 </div>
                 <div class="invoice-actions">
-                    <button class="invoice-action-btn" data-command="viewInvoice" data-invoice-id="${inv.id}" title="View Invoice">
-                        <span class="codicon">👁</span>
+                    <button class="invoice-action-btn" data-command="viewInvoice" data-invoice-id="${inv.id}" title="View">
+                        [v]
                     </button>
-                    <button class="invoice-action-btn" data-command="emailInvoice" data-invoice-id="${inv.id}" title="Send Email">
-                        <span class="codicon">✉️</span>
+                    <button class="invoice-action-btn" data-command="emailInvoice" data-invoice-id="${inv.id}" title="Email">
+                        [@]
                     </button>
                 </div>
                 <span class="recent-item-badge ${statusClass}">${inv.status}</span>
@@ -1704,25 +1640,24 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     if (this._recentSessions.length === 0) {
       return `
             <div class="empty-state compact">
-                <div class="empty-state-icon">⏱️</div>
-                <div class="empty-state-text">No time tracked yet. Start tracking to see sessions here.</div>
+                <div class="empty-state-text">No time tracked yet</div>
             </div>
         `;
     }
 
     const items = this._recentSessions
-      .map(
-        (s) => `
+      .map((s) => {
+        const subtitle = s.client ? `${s.client} - ${s.date}` : s.date;
+        return `
             <div class="recent-item" data-command="openTracking">
-                <span class="recent-item-icon">⏱️</span>
                 <div class="recent-item-content">
                     <div class="recent-item-title">${s.project}</div>
-                    <div class="recent-item-subtitle">${s.client || 'No client'} • ${s.date}</div>
+                    <div class="recent-item-subtitle">${subtitle}</div>
                 </div>
                 <span class="session-duration">${this._maskDuration(s.duration)}</span>
             </div>
-        `
-      )
+        `;
+      })
       .join('');
 
     return `<div class="recent-list">${items}</div>`;

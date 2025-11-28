@@ -18,7 +18,6 @@ vendor/
 go.work
 
 # Build output
-ung
 dist/
 
 # IDE

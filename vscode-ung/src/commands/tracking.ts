@@ -368,6 +368,7 @@ export class TrackingCommands {
     const editOptions = [
       { label: '$(symbol-number) Hours', value: 'hours' },
       { label: '$(folder) Project Name', value: 'project' },
+      { label: '$(organization) Client', value: 'client' },
       { label: '$(note) Notes', value: 'notes' },
     ];
 
@@ -378,7 +379,12 @@ export class TrackingCommands {
 
     if (!selected) return;
 
-    const editData: { hours?: number; project?: string; notes?: string } = {};
+    const editData: {
+      hours?: number;
+      project?: string;
+      notes?: string;
+      clientId?: number;
+    } = {};
 
     switch (selected.value) {
       case 'hours': {
@@ -403,6 +409,34 @@ export class TrackingCommands {
         });
         if (!newProject) return;
         editData.project = newProject;
+        break;
+      }
+      case 'client': {
+        // Show client picker
+        const clientsResult = await this.cli.listClients();
+        if (!clientsResult.success || !clientsResult.stdout) {
+          vscode.window.showErrorMessage('Failed to fetch clients');
+          return;
+        }
+        const clients = this.parseClientsFromOutput(clientsResult.stdout);
+        if (clients.length === 0) {
+          vscode.window.showInformationMessage('No clients available');
+          return;
+        }
+        const clientItems = [
+          { label: '$(circle-slash) No client', id: 0 },
+          ...clients.map((c) => ({
+            label: c.name,
+            description: c.email,
+            id: c.id,
+          })),
+        ];
+        const selectedClient = await vscode.window.showQuickPick(clientItems, {
+          placeHolder: 'Select new client',
+          title: 'Change Client',
+        });
+        if (!selectedClient) return;
+        editData.clientId = selectedClient.id;
         break;
       }
       case 'notes': {

@@ -189,6 +189,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'openTracking':
           vscode.commands.executeCommand('ung.viewActiveSession');
           break;
+        case 'setWeeklyTarget':
+          await this._promptSetWeeklyTarget();
+          break;
         case 'openStatistics':
           vscode.commands.executeCommand('ung.openStatistics');
           break;
@@ -1285,6 +1288,24 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             transition: width 0.3s ease;
         }
 
+        .weekly-target {
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .target-text {
+            font-size: 9px;
+            color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.15s;
+        }
+
+        .target-text:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
         /* Streak Badge */
         .streak-badge {
             display: inline-flex;
@@ -1776,6 +1797,42 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     return `<div class="recent-list">${items}</div>`;
   }
 
+  private async _promptSetWeeklyTarget(): Promise<void> {
+    const input = await vscode.window.showInputBox({
+      prompt: 'Set your weekly hours target',
+      placeHolder: 'e.g., 40',
+      value: this._weeklyTarget.toString(),
+      validateInput: (value) => {
+        const num = parseFloat(value);
+        if (Number.isNaN(num) || num <= 0) {
+          return 'Please enter a positive number';
+        }
+        if (num > 168) {
+          return 'Cannot exceed 168 hours (7 days × 24 hours)';
+        }
+        return null;
+      },
+    });
+
+    if (input) {
+      const target = parseFloat(input);
+      const result = await this.cli.exec([
+        'settings',
+        'target',
+        target.toString(),
+      ]);
+      if (result.success) {
+        this._weeklyTarget = target;
+        vscode.window.showInformationMessage(
+          `Weekly target set to ${target} hours`
+        );
+        await this.refresh();
+      } else {
+        vscode.window.showErrorMessage('Failed to save weekly target');
+      }
+    }
+  }
+
   private _getWeeklyProgressHtml(): string {
     if (this._weeklyHours === 0 && this._recentSessions.length === 0) {
       return ''; // Don't show if no tracking data at all
@@ -1801,14 +1858,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         ? `<span class="streak-badge" title="${this._trackingStreak} day streak">${this._trackingStreak}d</span>`
         : '';
 
+    const targetDisplay = this._secureMode ? '**h' : `${this._weeklyTarget}h`;
+
     return `
-        <div class="weekly-progress" data-command="openTracking">
+        <div class="weekly-progress">
             <div class="weekly-header">
-                <span class="weekly-label">This Week ${streakBadge}</span>
-                <span class="weekly-hours">${displayTime}</span>
+                <span class="weekly-label" data-command="openTracking">This Week ${streakBadge}</span>
+                <span class="weekly-hours" data-command="openTracking">${displayTime}</span>
             </div>
-            <div class="weekly-bar">
+            <div class="weekly-bar" data-command="openTracking">
                 <div class="weekly-bar-fill" style="width: ${this._secureMode ? 0 : progress}%"></div>
+            </div>
+            <div class="weekly-target">
+                <span class="target-text" data-command="setWeeklyTarget" title="Click to change weekly target">Goal: ${targetDisplay}</span>
             </div>
         </div>
     `;

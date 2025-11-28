@@ -17,6 +17,7 @@ import { ExpenseProvider } from './views/expenseProvider';
 import { InvoiceProvider } from './views/invoiceProvider';
 import { TrackingProvider } from './views/trackingProvider';
 import { DashboardWebviewProvider } from './webview/dashboardWebviewProvider';
+import { ExpensePanel } from './webview/expensePanel';
 import { ExportPanel } from './webview/exportPanel';
 import { MainDashboardPanel } from './webview/mainDashboardPanel';
 import { OnboardingWebviewProvider } from './webview/onboardingWebviewProvider';
@@ -553,7 +554,7 @@ export async function activate(context: vscode.ExtensionContext) {
       expenseCommands.deleteExpense(item?.itemId)
     ),
     vscode.commands.registerCommand('ung.viewExpenseReport', () =>
-      expenseCommands.viewExpenseReport()
+      ExpensePanel.createOrShow(cli)
     ),
     vscode.commands.registerCommand('ung.refreshExpenses', () =>
       expenseProvider.refresh()

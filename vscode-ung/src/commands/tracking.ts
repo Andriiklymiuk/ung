@@ -13,9 +13,8 @@ export class TrackingCommands {
   ) {}
 
   /**
-   * Start time tracking with simplified UX
-   * Just 2 steps: Project name -> Client picker
-   * If client selected = billable, can adjust later by right-clicking session
+   * Start time tracking with one-step UX
+   * Just pick a client and go! Default project "Software services", can change later.
    */
   async startTracking(): Promise<void> {
     // Check if there's already an active session
@@ -31,7 +30,7 @@ export class TrackingCommands {
       return;
     }
 
-    // Step 1: Show client picker first (most important choice)
+    // One step: Pick a client and start immediately
     let clientId: number | undefined;
     const clientsResult = await this.cli.listClients();
     if (clientsResult.success && clientsResult.stdout) {
@@ -56,16 +55,8 @@ export class TrackingCommands {
       }
     }
 
-    // Step 2: Project name with default "Software services"
-    const project = await vscode.window.showInputBox({
-      prompt: 'Project Name',
-      placeHolder: 'e.g., Website Development',
-      value: 'Software services',
-    });
-
-    if (project === undefined) return; // User cancelled
-
-    // If client selected = billable, otherwise not billable
+    // Default project name, billable if client selected
+    const project = 'Software services';
     const billable = clientId !== undefined;
 
     await vscode.window.withProgress(

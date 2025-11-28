@@ -4,8 +4,7 @@ Freelance billing and time tracking inside VS Code. No spreadsheets. No browser 
 
 ## Install
 
-1. Search **"UNG"** in VS Code Extensions (or `ext install andriiklymiuk.ung`)
-2. Install the CLI:
+1. Install the CLI:
    ```bash
    brew install andriiklymiuk/tools/ung
    ```

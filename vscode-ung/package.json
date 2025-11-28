@@ -504,6 +504,12 @@
         "title": "Security Settings",
         "category": "UNG",
         "icon": "$(lock)"
+      },
+      {
+        "command": "ung.toggleSecureMode",
+        "title": "Toggle Secure Mode",
+        "category": "UNG",
+        "icon": "$(eye)"
       }
     ],
     "viewsContainers": {
@@ -544,14 +550,19 @@
           "group": "navigation@2"
         },
         {
-          "command": "ung.checkForUpdates",
+          "command": "ung.toggleSecureMode",
           "when": "view == ungDashboard",
           "group": "navigation@1"
         },
         {
-          "command": "ung.refreshDashboard",
+          "command": "ung.checkForUpdates",
           "when": "view == ungDashboard",
           "group": "navigation@2"
+        },
+        {
+          "command": "ung.refreshDashboard",
+          "when": "view == ungDashboard",
+          "group": "navigation@3"
         }
       ]
     },

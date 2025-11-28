@@ -156,6 +156,18 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'openPomodoro':
           vscode.commands.executeCommand('ung.startPomodoro');
           break;
+        case 'viewInvoice':
+          if (message.invoiceId) {
+            vscode.commands.executeCommand('ung.viewInvoice', {
+              itemId: message.invoiceId,
+            });
+          }
+          break;
+        case 'emailInvoice':
+          if (message.invoiceId) {
+            vscode.commands.executeCommand('ung.emailInvoice', message.invoiceId);
+          }
+          break;
         case 'refresh':
           await this.refresh();
           break;
@@ -1085,6 +1097,44 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-charts-red, #f44336);
         }
 
+        /* Invoice Action Buttons */
+        .invoice-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+            margin-right: 8px;
+        }
+
+        .invoice-action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--vscode-foreground);
+            opacity: 0.6;
+            transition: all 0.15s;
+            font-size: 12px;
+        }
+
+        .invoice-action-btn:hover {
+            opacity: 1;
+            background: var(--vscode-list-hoverBackground);
+        }
+
+        .invoice-item .recent-item-content {
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .invoice-item .recent-item-content:hover .recent-item-title {
+            color: var(--vscode-textLink-foreground);
+        }
+
         /* Empty State */
         .empty-state {
             display: flex;
@@ -1165,8 +1215,13 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     e.preventDefault();
                     e.stopPropagation();
                     const command = target.getAttribute('data-command');
+                    const invoiceId = target.getAttribute('data-invoice-id');
                     if (command) {
-                        vscode.postMessage({ command: command });
+                        const message = { command: command };
+                        if (invoiceId) {
+                            message.invoiceId = parseInt(invoiceId, 10);
+                        }
+                        vscode.postMessage(message);
                     }
                 }
             });
@@ -1553,11 +1608,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       .map((inv) => {
         const statusClass = inv.status.toLowerCase().replace(/\s+/g, '-');
         return `
-            <div class="recent-item" data-command="openInvoices">
+            <div class="recent-item invoice-item" data-invoice-id="${inv.id}">
                 <span class="recent-item-icon">📄</span>
-                <div class="recent-item-content">
+                <div class="recent-item-content" data-command="viewInvoice" data-invoice-id="${inv.id}">
                     <div class="recent-item-title">${inv.invoiceNum} - ${inv.client}</div>
                     <div class="recent-item-subtitle">${inv.amount}</div>
+                </div>
+                <div class="invoice-actions">
+                    <button class="invoice-action-btn" data-command="viewInvoice" data-invoice-id="${inv.id}" title="View Invoice">
+                        <span class="codicon">👁</span>
+                    </button>
+                    <button class="invoice-action-btn" data-command="emailInvoice" data-invoice-id="${inv.id}" title="Send Email">
+                        <span class="codicon">✉️</span>
+                    </button>
                 </div>
                 <span class="recent-item-badge ${statusClass}">${inv.status}</span>
             </div>

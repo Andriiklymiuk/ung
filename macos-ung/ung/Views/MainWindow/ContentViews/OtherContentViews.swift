@@ -2339,7 +2339,7 @@ struct SettingsCard<Content: View>: View {
 }
 
 struct DatabaseDocument: FileDocument {
-  static var readableContentTypes: [UTType] { [.database] }
+  static var readableContentTypes: [UTType] { [.data] }
 
   var data: Data
 
@@ -2353,11 +2353,5 @@ struct DatabaseDocument: FileDocument {
 
   func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
     FileWrapper(regularFileWithContents: data)
-  }
-}
-
-extension UTType {
-  static var database: UTType {
-    UTType(importedAs: "com.ung.database", conformingTo: .data)
   }
 }

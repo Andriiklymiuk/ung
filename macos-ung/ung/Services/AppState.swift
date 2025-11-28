@@ -6,6 +6,7 @@
 //
 
 import Combine
+import LocalAuthentication
 import Security
 import SwiftUI
 import UserNotifications
@@ -236,8 +237,12 @@ class AppState: ObservableObject {
   @Published var showError: Bool = false
   @Published var errorMessage: String = ""
 
+  // App Lock
+  @Published var isLocked: Bool = false
+  @Published var appLockEnabled: Bool = false
+  @Published var useTouchID: Bool = true
+
   // Settings
-  @Published var useGlobalDatabase: Bool = true
   @Published var hasStoredPassword: Bool = false
   @Published var databaseEncrypted: Bool = false
 
@@ -262,7 +267,83 @@ class AppState: ObservableObject {
 
   init() {
     hasStoredPassword = keychain.hasPassword()
+    loadAppLockSettings()
     checkStatus()
+  }
+
+  // MARK: - App Lock Settings
+  private func loadAppLockSettings() {
+    appLockEnabled = UserDefaults.standard.bool(forKey: "appLockEnabled")
+    useTouchID = UserDefaults.standard.object(forKey: "useTouchID") as? Bool ?? true
+    if appLockEnabled {
+      isLocked = true
+    }
+  }
+
+  func setAppLockEnabled(_ enabled: Bool) {
+    appLockEnabled = enabled
+    UserDefaults.standard.set(enabled, forKey: "appLockEnabled")
+    if enabled {
+      isLocked = true
+    }
+  }
+
+  func setUseTouchID(_ enabled: Bool) {
+    useTouchID = enabled
+    UserDefaults.standard.set(enabled, forKey: "useTouchID")
+  }
+
+  // MARK: - Authentication
+  func authenticateWithBiometrics() async -> Bool {
+    let context = LAContext()
+    var error: NSError?
+
+    guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+      // Biometrics not available, try password
+      return await authenticateWithPassword()
+    }
+
+    do {
+      let success = try await context.evaluatePolicy(
+        .deviceOwnerAuthenticationWithBiometrics,
+        localizedReason: "Unlock UNG to access your data"
+      )
+      if success {
+        isLocked = false
+      }
+      return success
+    } catch {
+      // Biometrics failed, fall back to password
+      return false
+    }
+  }
+
+  func authenticateWithPassword() async -> Bool {
+    let context = LAContext()
+    var error: NSError?
+
+    guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+      return false
+    }
+
+    do {
+      let success = try await context.evaluatePolicy(
+        .deviceOwnerAuthentication,
+        localizedReason: "Enter your password to unlock UNG"
+      )
+      if success {
+        isLocked = false
+      }
+      return success
+    } catch {
+      return false
+    }
+  }
+
+  func lockApp() {
+    if appLockEnabled {
+      isLocked = true
+    }
   }
 
   // MARK: - Status Check

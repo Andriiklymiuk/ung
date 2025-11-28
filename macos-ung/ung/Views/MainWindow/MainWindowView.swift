@@ -13,23 +13,30 @@ struct MainWindowView: View {
 
   var body: some View {
     Group {
-      switch appState.status {
-      case .loading:
-        LoadingView()
-          .frame(width: 300, height: 180)
+      // Show lock screen if app is locked
+      if appState.isLocked && appState.appLockEnabled {
+        LockScreenView()
+          .frame(minWidth: 400, minHeight: 300)
           .background(backgroundColor)
-      case .cliNotInstalled:
-        OnboardingView(state: .notInstalled)
-          .frame(width: 340, height: 380)
-          .background(backgroundColor)
-      case .notInitialized:
-        OnboardingView(state: .notInitialized)
-          .frame(width: 340, height: 400)
-          .background(backgroundColor)
-      case .ready:
-        mainContent
-          // Default comfortable size, but can shrink - sidebar shows "More" for hidden tabs
-          .frame(minWidth: 600, minHeight: 400)
+      } else {
+        switch appState.status {
+        case .loading:
+          LoadingView()
+            .frame(width: 300, height: 180)
+            .background(backgroundColor)
+        case .cliNotInstalled:
+          OnboardingView(state: .notInstalled)
+            .frame(width: 340, height: 380)
+            .background(backgroundColor)
+        case .notInitialized:
+          OnboardingView(state: .notInitialized)
+            .frame(width: 340, height: 400)
+            .background(backgroundColor)
+        case .ready:
+          mainContent
+            // Default comfortable size, but can shrink - sidebar shows "More" for hidden tabs
+            .frame(minWidth: 600, minHeight: 400)
+        }
       }
     }
     .task {

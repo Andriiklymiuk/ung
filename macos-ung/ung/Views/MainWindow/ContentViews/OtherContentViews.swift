@@ -2011,10 +2011,6 @@ struct ReportsSectionPicker: View {
 // MARK: - Settings Content
 struct SettingsContent: View {
   @EnvironmentObject var appState: AppState
-  @State private var passwordInput = ""
-  @State private var showPasswordField = false
-  @State private var showExportPicker = false
-  @State private var showImportPicker = false
   @State private var showCompanyEditor = false
 
   // Company form fields
@@ -2051,108 +2047,8 @@ struct SettingsContent: View {
             }
           )
 
-          // Display settings
-          SettingsCard(title: "Display", icon: "eye") {
-            Toggle("Secure Mode", isOn: $appState.secureMode)
-              .toggleStyle(.switch)
-            Text("Hide sensitive amounts and financial data")
-              .font(Design.Typography.bodySmall)
-              .foregroundColor(Design.Colors.textSecondary)
-          }
-
-          // Database settings
-          SettingsCard(title: "Database", icon: "cylinder") {
-            Toggle("Use Global Database", isOn: $appState.useGlobalDatabase)
-              .toggleStyle(.switch)
-            Text("Store data in ~/.ung/ accessible from anywhere")
-              .font(Design.Typography.bodySmall)
-              .foregroundColor(Design.Colors.textSecondary)
-
-            Divider()
-
-            HStack {
-              Text("Password Protection")
-                .font(Design.Typography.bodyMedium)
-              Spacer()
-              if appState.hasStoredPassword {
-                HStack(spacing: Design.Spacing.xs) {
-                  Image(systemName: "checkmark.shield.fill")
-                    .foregroundColor(Design.Colors.success)
-                  Text("Protected")
-                    .font(Design.Typography.labelSmall)
-                    .foregroundColor(Design.Colors.success)
-
-                  Button("Clear") {
-                    _ = appState.clearPassword()
-                  }
-                  .buttonStyle(DSSecondaryButtonStyle())
-                }
-              } else {
-                Button("Set Password") {
-                  showPasswordField.toggle()
-                }
-                .buttonStyle(DSSecondaryButtonStyle())
-              }
-            }
-
-            if showPasswordField {
-              HStack {
-                SecureField("Enter password", text: $passwordInput)
-                  .textFieldStyle(.roundedBorder)
-                Button("Save") {
-                  if !passwordInput.isEmpty {
-                    _ = appState.savePassword(passwordInput)
-                    passwordInput = ""
-                    showPasswordField = false
-                  }
-                }
-                .buttonStyle(DSPrimaryButtonStyle())
-                .disabled(passwordInput.isEmpty)
-              }
-              .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            Divider()
-
-            HStack(spacing: Design.Spacing.sm) {
-              Button(action: { showExportPicker = true }) {
-                Label("Export Data", systemImage: "square.and.arrow.up")
-              }
-              .buttonStyle(DSSecondaryButtonStyle())
-
-              Button(action: { showImportPicker = true }) {
-                Label("Import Data", systemImage: "square.and.arrow.down")
-              }
-              .buttonStyle(DSSecondaryButtonStyle())
-            }
-          }
-
-          // About
-          SettingsCard(title: "About", icon: "info.circle") {
-            HStack {
-              VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
-                Text("UNG")
-                  .font(Design.Typography.headingSmall)
-                Text("Freelance Time Tracking & Invoicing")
-                  .font(Design.Typography.bodySmall)
-                  .foregroundColor(Design.Colors.textSecondary)
-              }
-              Spacer()
-              DSBadge(text: "v1.0", color: Design.Colors.primary)
-            }
-
-            Divider()
-
-            HStack(spacing: Design.Spacing.md) {
-              Link(destination: URL(string: "https://andriiklymiuk.github.io/ung/")!) {
-                Label("Documentation", systemImage: "book.fill")
-              }
-              Link(destination: URL(string: "https://github.com/Andriiklymiuk/ung/issues")!) {
-                Label("Report Issue", systemImage: "exclamationmark.bubble.fill")
-              }
-            }
-            .font(Design.Typography.bodyMedium)
-          }
+          // Settings sections from SettingsSection component
+          SettingsSection()
         }
         .padding(Design.Spacing.lg)
       }
@@ -2167,32 +2063,7 @@ struct SettingsContent: View {
           .transition(.scale.combined(with: .opacity))
       }
     }
-    .animation(Design.Animation.smooth, value: showPasswordField)
     .animation(Design.Animation.smooth, value: showCompanyEditor)
-    .fileExporter(
-      isPresented: $showExportPicker,
-      document: DatabaseDocument(data: Data()),
-      contentType: .database,
-      defaultFilename: "ung_backup.db"
-    ) { result in
-      if case .success(let url) = result {
-        Task {
-          _ = await appState.cliService.exportDatabase(to: url.path)
-        }
-      }
-    }
-    .fileImporter(
-      isPresented: $showImportPicker,
-      allowedContentTypes: [.database, .init(filenameExtension: "sql")!],
-      allowsMultipleSelection: false
-    ) { result in
-      if case .success(let urls) = result, let url = urls.first {
-        Task {
-          _ = await appState.cliService.importDatabase(from: url.path)
-          await appState.refreshDashboard()
-        }
-      }
-    }
   }
 
   private var companyEditorSheet: some View {
@@ -2307,34 +2178,6 @@ struct CompanyProfileSection: View {
     .scaleEffect(isHovered ? 1.005 : 1.0)
     .animation(Design.Animation.smooth, value: isHovered)
     .onHover { hovering in isHovered = hovering }
-  }
-}
-
-struct SettingsCard<Content: View>: View {
-  let title: String
-  let icon: String
-  @ViewBuilder let content: () -> Content
-  @Environment(\.colorScheme) var colorScheme
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: Design.Spacing.md) {
-      HStack {
-        Image(systemName: icon)
-          .foregroundColor(Design.Colors.textSecondary)
-        Text(title)
-          .font(Design.Typography.headingSmall)
-      }
-
-      content()
-    }
-    .padding(Design.Spacing.lg)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      RoundedRectangle(cornerRadius: Design.Radius.md)
-        .fill(Design.Colors.surfaceElevated(colorScheme))
-        .shadow(
-          color: Design.Shadow.sm.color, radius: Design.Shadow.sm.radius, y: Design.Shadow.sm.y)
-    )
   }
 }
 

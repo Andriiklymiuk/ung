@@ -902,6 +902,7 @@ export class UngCli {
       hours?: number;
       project?: string;
       notes?: string;
+      clientId?: number;
     }
   ): Promise<CliResult> {
     const args = ['track', 'edit', id.toString()];
@@ -914,6 +915,8 @@ export class UngCli {
       const escapedNotes = data.notes.replace(/'/g, "'\\''");
       args.push('--notes', `'${escapedNotes}'`);
     }
+    if (data.clientId !== undefined)
+      args.push('--client', data.clientId.toString());
     return this.exec(args);
   }
 

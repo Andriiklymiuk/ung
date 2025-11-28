@@ -102,7 +102,7 @@ export class TemplateEditorPanel {
             this.updateBlock(message.blockId, message.updates);
             break;
           case 'addBlock':
-            this.addBlock(message.blockType);
+            this.addBlock(message.blockType, message.beforeIndex);
             break;
           case 'removeBlock':
             this.removeBlock(message.blockId);
@@ -358,13 +358,13 @@ export class TemplateEditorPanel {
       const fs = await import('node:fs');
       fs.writeFileSync(tempPath, JSON.stringify(this.currentTemplate, null, 2));
 
-      const result = await this.cli.exec([
-        'template',
-        'preview',
-        tempPath,
-        '--output',
-        previewPath,
-      ]);
+      // Use --file flag to specify external file path
+      // Use useGlobal: false to prevent --global flag from being added
+      // (otherwise CLI interprets the path as a template name in ~/.ung/templates/)
+      const result = await this.cli.exec(
+        ['template', 'preview', '--file', tempPath, '--output', previewPath],
+        { useGlobal: false }
+      );
 
       if (result.success) {
         // Open the PDF
@@ -373,6 +373,13 @@ export class TemplateEditorPanel {
         vscode.window.showErrorMessage(
           `Preview failed: ${result.error || 'Unknown error'}`
         );
+      }
+
+      // Clean up temp file
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
       }
     } catch (error) {
       vscode.window.showErrorMessage(
@@ -391,9 +398,14 @@ export class TemplateEditorPanel {
       (b) => b.id === blockId
     );
     if (blockIndex !== -1) {
+      const block = this.currentTemplate.blocks[blockIndex];
+      // Deep merge nested objects (position, style, options)
       this.currentTemplate.blocks[blockIndex] = {
-        ...this.currentTemplate.blocks[blockIndex],
+        ...block,
         ...updates,
+        position: { ...block.position, ...updates.position },
+        style: { ...block.style, ...updates.style },
+        options: { ...block.options, ...updates.options },
       };
       this.sendTemplateToWebview();
     }
@@ -401,8 +413,10 @@ export class TemplateEditorPanel {
 
   /**
    * Add a new block to the template
+   * @param blockType Type of block to add
+   * @param beforeIndex Optional index to insert before (appends to end if not provided)
    */
-  private addBlock(blockType: BlockType) {
+  private addBlock(blockType: BlockType, beforeIndex?: number) {
     if (!this.currentTemplate) return;
 
     const newBlock: TemplateBlock = {
@@ -412,7 +426,11 @@ export class TemplateEditorPanel {
       style: { fontSize: 9 },
     };
 
-    this.currentTemplate.blocks.push(newBlock);
+    if (beforeIndex !== undefined && beforeIndex >= 0) {
+      this.currentTemplate.blocks.splice(beforeIndex, 0, newBlock);
+    } else {
+      this.currentTemplate.blocks.push(newBlock);
+    }
     this.sendTemplateToWebview();
   }
 
@@ -746,20 +764,25 @@ export class TemplateEditorPanel {
             border: 1px solid var(--vscode-input-border);
         }
         .drop-zone {
-            min-height: 50px;
+            min-height: 60px;
             border: 2px dashed var(--vscode-input-border);
-            border-radius: 4px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--vscode-descriptionForeground);
             font-size: 12px;
-            margin: 8px 0;
+            margin: 12px 0;
+            padding: 16px;
             transition: all 0.2s;
+            background: rgba(128, 128, 128, 0.05);
         }
-        .drop-zone.active {
+        .drop-zone.active, .drop-zone.drop-target {
             border-color: var(--vscode-focusBorder);
-            background: rgba(0, 120, 212, 0.1);
+            border-style: solid;
+            background: rgba(0, 120, 212, 0.15);
+            color: var(--vscode-textLink-foreground);
+            font-weight: 500;
         }
 
         /* Preview blocks styling */
@@ -944,6 +967,7 @@ export class TemplateEditorPanel {
         window.addEventListener('load', () => {
             vscode.postMessage({ command: 'ready' });
             setupDragAndDrop();
+            setupContextMenu();
         });
 
         // Handle messages from extension
@@ -958,15 +982,34 @@ export class TemplateEditorPanel {
         });
 
         function setupDragAndDrop() {
-            // Component items
-            document.querySelectorAll('.component-item').forEach(item => {
-                item.addEventListener('dragstart', (e) => {
-                    draggedType = item.dataset.type;
-                    e.dataTransfer.effectAllowed = 'copy';
+            // Component items - use event delegation on sidebar
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
+                sidebar.addEventListener('dragstart', (e) => {
+                    const item = e.target.closest('.component-item');
+                    if (item) {
+                        draggedType = item.dataset.type;
+                        e.dataTransfer.effectAllowed = 'copy';
+                        e.dataTransfer.setData('text/plain', item.dataset.type);
+                    }
                 });
-                item.addEventListener('dragend', () => {
+                sidebar.addEventListener('dragend', () => {
                     draggedType = null;
                 });
+            }
+        }
+
+        function setupContextMenu() {
+            // Right-click context menu for blocks
+            document.addEventListener('contextmenu', (e) => {
+                const block = e.target.closest('.block');
+                if (block) {
+                    e.preventDefault();
+                    const blockId = block.dataset.blockId;
+                    if (blockId && confirm('Remove this block?')) {
+                        vscode.postMessage({ command: 'removeBlock', blockId });
+                    }
+                }
             });
         }
 
@@ -1091,21 +1134,35 @@ export class TemplateEditorPanel {
 
         function handleDragOver(e) {
             e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = draggedType ? 'copy' : 'move';
             e.currentTarget.classList.add('drop-target', 'active');
         }
 
         function handleDragLeave(e) {
-            e.currentTarget.classList.remove('drop-target', 'active');
+            e.preventDefault();
+            // Only remove class if we're actually leaving the element
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
+            if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+                e.currentTarget.classList.remove('drop-target', 'active');
+            }
         }
 
         function handleDropOnBlock(e, targetBlockId) {
             e.preventDefault();
+            e.stopPropagation();
             e.currentTarget.classList.remove('drop-target', 'active');
 
-            if (draggedType) {
+            // Get dragged type from dataTransfer if draggedType is null
+            const droppedType = draggedType || e.dataTransfer.getData('text/plain');
+
+            if (droppedType) {
                 // Adding new block before target
                 const targetIndex = currentTemplate.blocks.findIndex(b => b.id === targetBlockId);
-                vscode.postMessage({ command: 'addBlock', blockType: draggedType, beforeIndex: targetIndex });
+                vscode.postMessage({ command: 'addBlock', blockType: droppedType, beforeIndex: targetIndex });
+                draggedType = null;
             } else if (draggedBlockId && draggedBlockId !== targetBlockId) {
                 // Reordering blocks
                 const newOrder = [...currentTemplate.blocks.map(b => b.id)];
@@ -1119,10 +1176,15 @@ export class TemplateEditorPanel {
 
         function handleDropEnd(e) {
             e.preventDefault();
+            e.stopPropagation();
             e.currentTarget.classList.remove('drop-target', 'active');
 
-            if (draggedType) {
-                vscode.postMessage({ command: 'addBlock', blockType: draggedType });
+            // Get dragged type from dataTransfer if draggedType is null
+            const droppedType = draggedType || e.dataTransfer.getData('text/plain');
+
+            if (droppedType) {
+                vscode.postMessage({ command: 'addBlock', blockType: droppedType });
+                draggedType = null;
             }
         }
 

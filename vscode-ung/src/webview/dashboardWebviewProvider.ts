@@ -28,6 +28,28 @@ interface EntityCounts {
 }
 
 /**
+ * Recent contract info
+ */
+interface RecentContract {
+  id: number;
+  name: string;
+  client: string;
+  type: string;
+  rate: string;
+}
+
+/**
+ * Recent invoice info
+ */
+interface RecentInvoice {
+  id: number;
+  invoiceNum: string;
+  client: string;
+  amount: string;
+  status: string;
+}
+
+/**
  * Dashboard webview provider for the sidebar
  * Shows a professional dashboard with metrics, quick actions, and navigation
  */
@@ -49,7 +71,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     project: string;
     client: string;
     duration: string;
+    startTime: number; // Unix timestamp in seconds for live timer
   } | null = null;
+  private _recentContracts: RecentContract[] = [];
+  private _recentInvoices: RecentInvoice[] = [];
   private _setupStatus: {
     hasCompany: boolean;
     hasClient: boolean;
@@ -156,6 +181,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       this._checkSetupStatus(),
       this._loadCounts(),
       this._loadTodayHours(),
+      this._loadRecentContracts(),
+      this._loadRecentInvoices(),
     ]);
 
     this._isLoading = false;
@@ -236,6 +263,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         let project = 'Unknown';
         let client = '';
         let duration = '0:00';
+        let startTime = Math.floor(Date.now() / 1000); // Default to now
 
         for (const line of lines) {
           if (line.includes('Project:')) {
@@ -244,10 +272,26 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             client = line.split(':')[1]?.trim() || '';
           } else if (line.includes('Duration:') || line.includes('Elapsed:')) {
             duration = line.split(':').slice(1).join(':').trim() || '0:00';
+            // Calculate start time from duration
+            const durationParts = duration.match(/(\d+):(\d+)(?::(\d+))?/);
+            if (durationParts) {
+              const hours = parseInt(durationParts[1], 10) || 0;
+              const minutes = parseInt(durationParts[2], 10) || 0;
+              const seconds = parseInt(durationParts[3], 10) || 0;
+              const elapsedSeconds = hours * 3600 + minutes * 60 + seconds;
+              startTime = Math.floor(Date.now() / 1000) - elapsedSeconds;
+            }
+          } else if (line.includes('Started:') || line.includes('Start:')) {
+            // Try to parse start time if provided
+            const timeStr = line.split(':').slice(1).join(':').trim();
+            const parsed = Date.parse(timeStr);
+            if (!Number.isNaN(parsed)) {
+              startTime = Math.floor(parsed / 1000);
+            }
           }
         }
 
-        this._activeTracking = { project, client, duration };
+        this._activeTracking = { project, client, duration, startTime };
       } else {
         this._activeTracking = null;
       }
@@ -288,6 +332,90 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         hasContract: false,
       };
     }
+  }
+
+  private async _loadRecentContracts(): Promise<void> {
+    try {
+      const result = await this.cli.exec(['contract', 'list']);
+      if (result.success && result.stdout) {
+        this._recentContracts = this._parseContractsFromOutput(result.stdout);
+      } else {
+        this._recentContracts = [];
+      }
+    } catch {
+      this._recentContracts = [];
+    }
+  }
+
+  private _parseContractsFromOutput(output: string): RecentContract[] {
+    const lines = output
+      .split('\n')
+      .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+    if (lines.length < 2) return [];
+
+    const contracts: RecentContract[] = [];
+    // Skip header line
+    for (let i = 1; i < lines.length && contracts.length < 3; i++) {
+      const parts = lines[i]
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 6) {
+        const id = parseInt(parts[0], 10);
+        if (!Number.isNaN(id)) {
+          contracts.push({
+            id,
+            name: parts[2] || 'Unnamed',
+            client: parts[3] || 'Unknown',
+            type: parts[4] || 'hourly',
+            rate: parts[5] || '-',
+          });
+        }
+      }
+    }
+    return contracts;
+  }
+
+  private async _loadRecentInvoices(): Promise<void> {
+    try {
+      const result = await this.cli.exec(['invoice', 'list']);
+      if (result.success && result.stdout) {
+        this._recentInvoices = this._parseInvoicesFromOutput(result.stdout);
+      } else {
+        this._recentInvoices = [];
+      }
+    } catch {
+      this._recentInvoices = [];
+    }
+  }
+
+  private _parseInvoicesFromOutput(output: string): RecentInvoice[] {
+    const lines = output
+      .split('\n')
+      .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+    if (lines.length < 2) return [];
+
+    const invoices: RecentInvoice[] = [];
+    // Skip header line
+    for (let i = 1; i < lines.length && invoices.length < 3; i++) {
+      const parts = lines[i]
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 5) {
+        const id = parseInt(parts[0], 10);
+        if (!Number.isNaN(id)) {
+          invoices.push({
+            id,
+            invoiceNum: parts[1] || `INV-${id}`,
+            client: parts[2] || 'Unknown',
+            amount: parts[3] || '$0',
+            status: parts[4] || 'draft',
+          });
+        }
+      }
+    }
+    return invoices;
   }
 
   private _parseDashboardOutput(output: string): DashboardMetrics {
@@ -847,14 +975,47 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             margin: 14px 0;
         }
 
-        /* Tools Grid */
+        /* Tools Grid - improved styling */
         .tools-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            display: flex;
+            gap: 8px;
         }
 
         .tool-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, var(--vscode-input-background) 0%, color-mix(in srgb, var(--vscode-input-background) 90%, var(--vscode-textLink-foreground)) 100%);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.2s;
+            border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 50%, transparent);
+            flex: 1;
+        }
+
+        .tool-item:hover {
+            background: linear-gradient(135deg, var(--vscode-list-hoverBackground) 0%, color-mix(in srgb, var(--vscode-list-hoverBackground) 80%, var(--vscode-textLink-foreground)) 100%);
+            border-color: var(--vscode-focusBorder);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .tool-icon {
+            font-size: 14px;
+        }
+
+        /* Recent Items List */
+        .recent-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .recent-item {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -862,18 +1023,126 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-input-background);
             border-radius: 6px;
             cursor: pointer;
-            font-size: 11px;
             transition: all 0.15s;
             border: 1px solid transparent;
         }
 
-        .tool-item:hover {
+        .recent-item:hover {
             background-color: var(--vscode-list-hoverBackground);
             border-color: var(--vscode-focusBorder);
         }
 
-        .tool-icon {
+        .recent-item-icon {
             font-size: 12px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .recent-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .recent-item-title {
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .recent-item-subtitle {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .recent-item-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .recent-item-badge.paid {
+            background-color: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 20%, transparent);
+            color: var(--vscode-charts-green, #4caf50);
+        }
+
+        .recent-item-badge.pending, .recent-item-badge.sent {
+            background-color: color-mix(in srgb, var(--vscode-charts-orange, #ff9800) 20%, transparent);
+            color: var(--vscode-charts-orange, #ff9800);
+        }
+
+        .recent-item-badge.draft {
+            background-color: color-mix(in srgb, var(--vscode-descriptionForeground) 20%, transparent);
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .recent-item-badge.overdue {
+            background-color: color-mix(in srgb, var(--vscode-charts-red, #f44336) 20%, transparent);
+            color: var(--vscode-charts-red, #f44336);
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background-color: color-mix(in srgb, var(--vscode-input-background) 50%, transparent);
+            border: 1px dashed var(--vscode-panel-border);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 24px;
+            opacity: 0.6;
+        }
+
+        .empty-state-text {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .empty-state-action {
+            font-size: 11px;
+            color: var(--vscode-textLink-foreground);
+            cursor: pointer;
+            padding: 4px 10px;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border-radius: 4px;
+            border: none;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .empty-state-action:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        /* Section with view all link */
+        .section-header-with-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .section-link {
+            font-size: 10px;
+            color: var(--vscode-textLink-foreground);
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .section-link:hover {
+            background-color: var(--vscode-list-hoverBackground);
         }
     </style>
 </head>
@@ -899,6 +1168,31 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     }
                 }
             });
+
+            // Live timer for active tracking
+            const timerEl = document.getElementById('live-timer');
+            const startTimeAttr = timerEl ? timerEl.getAttribute('data-start-time') : null;
+
+            if (timerEl && startTimeAttr) {
+                const startTime = parseInt(startTimeAttr, 10);
+
+                function updateTimer() {
+                    const now = Math.floor(Date.now() / 1000);
+                    const elapsed = now - startTime;
+
+                    const hours = Math.floor(elapsed / 3600);
+                    const minutes = Math.floor((elapsed % 3600) / 60);
+                    const seconds = elapsed % 60;
+
+                    timerEl.textContent = hours.toString().padStart(1, '0') + ':' +
+                                         minutes.toString().padStart(2, '0') + ':' +
+                                         seconds.toString().padStart(2, '0');
+                }
+
+                // Update immediately and then every second
+                updateTimer();
+                setInterval(updateTimer, 1000);
+            }
         })();
     </script>
 </body>
@@ -960,6 +1254,26 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             <div class="quick-actions">
                 ${this._getQuickActionsHtml()}
             </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Recent Contracts -->
+        <div class="section">
+            <div class="section-header-with-link">
+                <span class="section-title">Contracts</span>
+                ${this._recentContracts.length > 0 ? '<button class="section-link" data-command="openContracts">View All</button>' : ''}
+            </div>
+            ${this._getRecentContractsHtml()}
+        </div>
+
+        <!-- Recent Invoices -->
+        <div class="section">
+            <div class="section-header-with-link">
+                <span class="section-title">Invoices</span>
+                ${this._recentInvoices.length > 0 ? '<button class="section-link" data-command="openInvoices">View All</button>' : ''}
+            </div>
+            ${this._getRecentInvoicesHtml()}
         </div>
 
         <div class="divider"></div>
@@ -1046,7 +1360,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 <div class="tracking-project">${this._activeTracking.project}</div>
                 ${this._activeTracking.client ? `<div class="tracking-meta">${this._activeTracking.client}</div>` : ''}
             </div>
-            <div class="tracking-duration">${this._activeTracking.duration}</div>
+            <div class="tracking-duration" id="live-timer" data-start-time="${this._activeTracking.startTime}">${this._activeTracking.duration}</div>
             <button class="stop-btn" data-command="stopTracking">Stop</button>
         </div>
     `;
@@ -1172,5 +1486,83 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             <span class="action-label">Log Expense</span>
         </button>
     `;
+  }
+
+  private _getRecentContractsHtml(): string {
+    if (this._recentContracts.length === 0) {
+      // Show helpful empty state like CLI
+      if (!this._setupStatus.hasClient) {
+        return `
+            <div class="empty-state">
+                <div class="empty-state-icon">👥</div>
+                <div class="empty-state-text">Add a client first to create contracts</div>
+                <button class="empty-state-action" data-command="createClient">Add Client</button>
+            </div>
+        `;
+      }
+      return `
+            <div class="empty-state">
+                <div class="empty-state-icon">📝</div>
+                <div class="empty-state-text">No contracts yet. Create one to start tracking work.</div>
+                <button class="empty-state-action" data-command="createContract">Create Contract</button>
+            </div>
+        `;
+    }
+
+    const items = this._recentContracts
+      .map(
+        (c) => `
+            <div class="recent-item" data-command="openContracts">
+                <span class="recent-item-icon">📝</span>
+                <div class="recent-item-content">
+                    <div class="recent-item-title">${c.client}</div>
+                    <div class="recent-item-subtitle">${c.type} • ${c.rate}</div>
+                </div>
+            </div>
+        `
+      )
+      .join('');
+
+    return `<div class="recent-list">${items}</div>`;
+  }
+
+  private _getRecentInvoicesHtml(): string {
+    if (this._recentInvoices.length === 0) {
+      // Show helpful empty state like CLI
+      if (!this._setupStatus.hasContract) {
+        return `
+            <div class="empty-state">
+                <div class="empty-state-icon">📝</div>
+                <div class="empty-state-text">Create a contract first to generate invoices</div>
+                <button class="empty-state-action" data-command="createContract">Create Contract</button>
+            </div>
+        `;
+      }
+      return `
+            <div class="empty-state">
+                <div class="empty-state-icon">📄</div>
+                <div class="empty-state-text">No invoices yet. Create one when ready to bill.</div>
+                <button class="empty-state-action" data-command="createInvoice">Create Invoice</button>
+            </div>
+        `;
+    }
+
+    const items = this._recentInvoices
+      .map((inv) => {
+        const statusClass = inv.status.toLowerCase().replace(/\s+/g, '-');
+        return `
+            <div class="recent-item" data-command="openInvoices">
+                <span class="recent-item-icon">📄</span>
+                <div class="recent-item-content">
+                    <div class="recent-item-title">${inv.invoiceNum} - ${inv.client}</div>
+                    <div class="recent-item-subtitle">${inv.amount}</div>
+                </div>
+                <span class="recent-item-badge ${statusClass}">${inv.status}</span>
+            </div>
+        `;
+      })
+      .join('');
+
+    return `<div class="recent-list">${items}</div>`;
   }
 }

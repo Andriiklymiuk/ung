@@ -260,9 +260,15 @@ export class UngCli {
     }
   ): Promise<CliResult> {
     const args = ['client', 'edit', id.toString()];
-    if (data.name) args.push('--name', `"${data.name}"`);
+    if (data.name) {
+      const escapedName = data.name.replace(/'/g, "'\\''");
+      args.push('--name', `'${escapedName}'`);
+    }
     if (data.email) args.push('--email', data.email);
-    if (data.address) args.push('--address', `"${data.address}"`);
+    if (data.address) {
+      const escapedAddress = data.address.replace(/'/g, "'\\''");
+      args.push('--address', `'${escapedAddress}'`);
+    }
     if (data.taxId) args.push('--tax-id', data.taxId);
 
     return this.exec(args);
@@ -286,11 +292,20 @@ export class UngCli {
     }
   ): Promise<CliResult> {
     const args = ['company', 'edit', id.toString()];
-    if (data.name) args.push('--name', `"${data.name}"`);
+    if (data.name) {
+      const escapedName = data.name.replace(/'/g, "'\\''");
+      args.push('--name', `'${escapedName}'`);
+    }
     if (data.email) args.push('--email', data.email);
-    if (data.address) args.push('--address', `"${data.address}"`);
+    if (data.address) {
+      const escapedAddress = data.address.replace(/'/g, "'\\''");
+      args.push('--address', `'${escapedAddress}'`);
+    }
     if (data.taxId) args.push('--tax-id', data.taxId);
-    if (data.bankName) args.push('--bank-name', `"${data.bankName}"`);
+    if (data.bankName) {
+      const escapedBankName = data.bankName.replace(/'/g, "'\\''");
+      args.push('--bank-name', `'${escapedBankName}'`);
+    }
     if (data.bankAccount) args.push('--bank-account', data.bankAccount);
     if (data.bankSwift) args.push('--bank-swift', data.bankSwift);
 
@@ -334,7 +349,10 @@ export class UngCli {
     }
   ): Promise<CliResult> {
     const args = ['contract', 'edit', id.toString()];
-    if (data.name) args.push('--name', `"${data.name}"`);
+    if (data.name) {
+      const escapedName = data.name.replace(/'/g, "'\\''");
+      args.push('--name', `'${escapedName}'`);
+    }
     if (data.rate !== undefined) args.push('--rate', data.rate.toString());
     if (data.price !== undefined) args.push('--price', data.price.toString());
     if (data.currency) args.push('--currency', data.currency);
@@ -346,6 +364,7 @@ export class UngCli {
 
   /**
    * Create a new contract
+   * Note: Uses shell quoting for names with spaces
    */
   async createContract(data: {
     clientId: number;
@@ -357,11 +376,15 @@ export class UngCli {
   }): Promise<CliResult> {
     const args = ['contract', 'add'];
     args.push('--client', data.clientId.toString());
-    args.push('--name', `"${data.name}"`);
+    // Properly escape the name for shell - use single quotes to avoid shell interpretation
+    const escapedName = data.name.replace(/'/g, "'\\''");
+    args.push('--name', `'${escapedName}'`);
     args.push('--type', data.type);
     if (data.rate !== undefined) args.push('--rate', data.rate.toString());
     if (data.price !== undefined) args.push('--price', data.price.toString());
     if (data.currency) args.push('--currency', data.currency);
+    // Add --yes to skip any interactive prompts
+    args.push('--yes');
 
     return this.exec(args);
   }
@@ -852,7 +875,10 @@ export class UngCli {
     if (data.amount !== undefined)
       args.push('--amount', data.amount.toString());
     if (data.dueDate) args.push('--due', data.dueDate);
-    if (data.description) args.push('--description', `"${data.description}"`);
+    if (data.description) {
+      const escapedDesc = data.description.replace(/'/g, "'\\''");
+      args.push('--description', `'${escapedDesc}'`);
+    }
     return this.exec(args);
   }
 
@@ -880,8 +906,14 @@ export class UngCli {
   ): Promise<CliResult> {
     const args = ['track', 'edit', id.toString()];
     if (data.hours !== undefined) args.push('--hours', data.hours.toString());
-    if (data.project) args.push('--project', `"${data.project}"`);
-    if (data.notes) args.push('--notes', `"${data.notes}"`);
+    if (data.project) {
+      const escapedProject = data.project.replace(/'/g, "'\\''");
+      args.push('--project', `'${escapedProject}'`);
+    }
+    if (data.notes) {
+      const escapedNotes = data.notes.replace(/'/g, "'\\''");
+      args.push('--notes', `'${escapedNotes}'`);
+    }
     return this.exec(args);
   }
 

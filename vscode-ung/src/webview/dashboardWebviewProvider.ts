@@ -316,9 +316,16 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
   private _countLines(output: string | undefined): number {
     if (!output) return 0;
+    // Filter out table borders, headers, and "No data" messages
     const lines = output
       .split('\n')
-      .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+      .filter(
+        (l) =>
+          l.trim() &&
+          !l.includes('─') &&
+          !l.includes('ID') &&
+          !l.toLowerCase().startsWith('no ')
+      );
     return Math.max(0, lines.length - 1); // Subtract header
   }
 

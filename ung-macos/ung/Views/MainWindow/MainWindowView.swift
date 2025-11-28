@@ -256,40 +256,54 @@ struct SidebarItem: View {
 struct ContentAreaView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.colorScheme) var colorScheme
+    @State private var showGlobalSearch = false
+    @State private var globalSearchQuery = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            contentHeader
+        ZStack {
+            VStack(spacing: 0) {
+                // Header
+                contentHeader
 
-            Divider()
+                Divider()
 
-            // Content
-            ScrollView {
-                switch appState.selectedTab {
-                case .dashboard:
-                    MainDashboardContent()
-                case .tracking:
-                    TrackingContent()
-                case .clients:
-                    ClientsContent()
-                case .contracts:
-                    ContractsContent()
-                case .invoices:
-                    InvoicesContent()
-                case .expenses:
-                    ExpensesContent()
-                case .pomodoro:
-                    PomodoroContent()
-                case .reports:
-                    ReportsContent()
-                case .settings:
-                    SettingsContent()
+                // Content
+                ScrollView {
+                    switch appState.selectedTab {
+                    case .dashboard:
+                        MainDashboardContent()
+                    case .tracking:
+                        TrackingContent()
+                    case .clients:
+                        ClientsContent()
+                    case .contracts:
+                        ContractsContent()
+                    case .invoices:
+                        InvoicesContent()
+                    case .expenses:
+                        ExpensesContent()
+                    case .pomodoro:
+                        PomodoroContent()
+                    case .reports:
+                        ReportsContent()
+                    case .settings:
+                        SettingsContent()
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(colorScheme == .dark ? Color(white: 0.16) : Color.white)
+
+            // Global search overlay
+            if showGlobalSearch {
+                GlobalSearchOverlay(
+                    searchQuery: $globalSearchQuery,
+                    isPresented: $showGlobalSearch
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(colorScheme == .dark ? Color(white: 0.16) : Color.white)
+        .animation(Design.Animation.smooth, value: showGlobalSearch)
     }
 
     private var contentHeader: some View {
@@ -306,6 +320,35 @@ struct ContentAreaView: View {
             }
 
             Spacer()
+
+            // Global search button
+            Button(action: { showGlobalSearch = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12))
+                    Text("Search")
+                        .font(.system(size: 12))
+                    Text("⌘K")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("k", modifiers: .command)
 
             // Refresh button
             Button(action: { Task { await appState.refreshDashboard() } }) {
@@ -371,6 +414,260 @@ struct ContentAreaView: View {
         default:
             return nil
         }
+    }
+}
+
+// MARK: - Global Search Overlay
+struct GlobalSearchOverlay: View {
+    @EnvironmentObject var appState: AppState
+    @Binding var searchQuery: String
+    @Binding var isPresented: Bool
+    @FocusState private var isFocused: Bool
+    @Environment(\.colorScheme) var colorScheme
+
+    struct SearchResult: Identifiable {
+        let id = UUID()
+        let type: SearchResultType
+        let title: String
+        let subtitle: String
+        let icon: String
+        let color: Color
+        let action: () -> Void
+    }
+
+    enum SearchResultType: String {
+        case client, contract, invoice, expense, session, action
+    }
+
+    var searchResults: [SearchResult] {
+        guard !searchQuery.isEmpty else {
+            return quickActions
+        }
+
+        var results: [SearchResult] = []
+
+        // Search clients
+        results += appState.clients
+            .filter { $0.name.localizedCaseInsensitiveContains(searchQuery) || $0.email.localizedCaseInsensitiveContains(searchQuery) }
+            .prefix(3)
+            .map { client in
+                SearchResult(
+                    type: .client,
+                    title: client.name,
+                    subtitle: client.email.isEmpty ? "Client" : client.email,
+                    icon: "person.fill",
+                    color: Design.Colors.purple,
+                    action: { appState.selectedTab = .clients; isPresented = false }
+                )
+            }
+
+        // Search contracts
+        results += appState.contracts
+            .filter { $0.name.localizedCaseInsensitiveContains(searchQuery) || $0.clientName.localizedCaseInsensitiveContains(searchQuery) }
+            .prefix(3)
+            .map { contract in
+                SearchResult(
+                    type: .contract,
+                    title: contract.name,
+                    subtitle: "\(contract.clientName) • $\(Int(contract.rate))/hr",
+                    icon: "doc.text.fill",
+                    color: Design.Colors.indigo,
+                    action: { appState.selectedTab = .contracts; isPresented = false }
+                )
+            }
+
+        // Search invoices
+        results += appState.recentInvoices
+            .filter { $0.invoiceNum.localizedCaseInsensitiveContains(searchQuery) || $0.client.localizedCaseInsensitiveContains(searchQuery) }
+            .prefix(3)
+            .map { invoice in
+                SearchResult(
+                    type: .invoice,
+                    title: invoice.invoiceNum,
+                    subtitle: "\(invoice.client) • \(invoice.amount)",
+                    icon: "doc.plaintext.fill",
+                    color: Design.Colors.teal,
+                    action: { appState.selectedTab = .invoices; isPresented = false }
+                )
+            }
+
+        // Search expenses
+        results += appState.recentExpenses
+            .filter { $0.description.localizedCaseInsensitiveContains(searchQuery) || $0.category.localizedCaseInsensitiveContains(searchQuery) }
+            .prefix(3)
+            .map { expense in
+                SearchResult(
+                    type: .expense,
+                    title: expense.description,
+                    subtitle: "\(expense.category) • \(expense.amount)",
+                    icon: "dollarsign.circle.fill",
+                    color: Design.Colors.warning,
+                    action: { appState.selectedTab = .expenses; isPresented = false }
+                )
+            }
+
+        // Search sessions
+        results += appState.recentSessions
+            .filter { $0.project.localizedCaseInsensitiveContains(searchQuery) }
+            .prefix(3)
+            .map { session in
+                SearchResult(
+                    type: .session,
+                    title: session.project,
+                    subtitle: "\(session.date) • \(session.duration)",
+                    icon: "clock.fill",
+                    color: Design.Colors.primary,
+                    action: { appState.selectedTab = .tracking; isPresented = false }
+                )
+            }
+
+        return results
+    }
+
+    var quickActions: [SearchResult] {
+        [
+            SearchResult(type: .action, title: "Start Tracking", subtitle: "Begin a new time session", icon: "play.fill", color: Design.Colors.success, action: { appState.selectedTab = .tracking; isPresented = false }),
+            SearchResult(type: .action, title: "Create Invoice", subtitle: "Bill your clients", icon: "doc.text.fill", color: Design.Colors.teal, action: { appState.selectedTab = .invoices; isPresented = false }),
+            SearchResult(type: .action, title: "Add Client", subtitle: "Register a new client", icon: "person.badge.plus", color: Design.Colors.purple, action: { appState.selectedTab = .clients; isPresented = false }),
+            SearchResult(type: .action, title: "Log Expense", subtitle: "Track a business expense", icon: "dollarsign.circle", color: Design.Colors.warning, action: { appState.selectedTab = .expenses; isPresented = false }),
+            SearchResult(type: .action, title: "Start Focus", subtitle: "Begin Pomodoro session", icon: "brain.head.profile", color: Design.Colors.error, action: { appState.selectedTab = .pomodoro; isPresented = false }),
+            SearchResult(type: .action, title: "View Reports", subtitle: "Analytics and insights", icon: "chart.bar.fill", color: Design.Colors.primary, action: { appState.selectedTab = .reports; isPresented = false }),
+        ]
+    }
+
+    var body: some View {
+        ZStack {
+            // Backdrop
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture { isPresented = false }
+
+            // Search dialog
+            VStack(spacing: 0) {
+                // Search input
+                HStack(spacing: Design.Spacing.sm) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16))
+                        .foregroundColor(Design.Colors.textSecondary)
+
+                    TextField("Search clients, invoices, or type a command...", text: $searchQuery)
+                        .font(Design.Typography.bodyMedium)
+                        .textFieldStyle(.plain)
+                        .focused($isFocused)
+
+                    if !searchQuery.isEmpty {
+                        Button(action: { searchQuery = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(Design.Colors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Text("ESC")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(Design.Colors.textTertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.15)))
+                }
+                .padding(Design.Spacing.md)
+
+                Divider()
+
+                // Results
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+                        if searchQuery.isEmpty {
+                            Text("Quick Actions")
+                                .font(Design.Typography.labelSmall)
+                                .foregroundColor(Design.Colors.textTertiary)
+                                .padding(.horizontal, Design.Spacing.md)
+                                .padding(.top, Design.Spacing.sm)
+                        } else if searchResults.isEmpty {
+                            VStack(spacing: Design.Spacing.sm) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(Design.Colors.textTertiary)
+                                Text("No results found")
+                                    .font(Design.Typography.bodyMedium)
+                                    .foregroundColor(Design.Colors.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Design.Spacing.xl)
+                        }
+
+                        ForEach(searchResults) { result in
+                            SearchResultRow(result: result)
+                        }
+                    }
+                    .padding(.vertical, Design.Spacing.sm)
+                }
+                .frame(maxHeight: 400)
+            }
+            .frame(width: 560)
+            .background(
+                RoundedRectangle(cornerRadius: Design.Radius.lg)
+                    .fill(Design.Colors.surfaceElevated(colorScheme))
+                    .shadow(color: .black.opacity(0.3), radius: 24, y: 12)
+            )
+            .onAppear { isFocused = true }
+            .onExitCommand { isPresented = false }
+        }
+    }
+}
+
+struct SearchResultRow: View {
+    let result: GlobalSearchOverlay.SearchResult
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: result.action) {
+            HStack(spacing: Design.Spacing.sm) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Design.Radius.xs)
+                        .fill(result.color.opacity(0.15))
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: result.icon)
+                        .font(.system(size: 14))
+                        .foregroundColor(result.color)
+                }
+
+                VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
+                    Text(result.title)
+                        .font(Design.Typography.labelMedium)
+                        .foregroundColor(Design.Colors.textPrimary)
+
+                    Text(result.subtitle)
+                        .font(Design.Typography.bodySmall)
+                        .foregroundColor(Design.Colors.textSecondary)
+                }
+
+                Spacer()
+
+                if result.type != .action {
+                    Text(result.type.rawValue.capitalized)
+                        .font(Design.Typography.labelSmall)
+                        .foregroundColor(Design.Colors.textTertiary)
+                        .padding(.horizontal, Design.Spacing.xs)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.1)))
+                }
+
+                Image(systemName: "return")
+                    .font(.system(size: 10))
+                    .foregroundColor(Design.Colors.textTertiary)
+                    .opacity(isHovered ? 1 : 0)
+            }
+            .padding(.horizontal, Design.Spacing.md)
+            .padding(.vertical, Design.Spacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: Design.Radius.sm)
+                    .fill(isHovered ? Color.secondary.opacity(0.1) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in isHovered = hovering }
     }
 }
 

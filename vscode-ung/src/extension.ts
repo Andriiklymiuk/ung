@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { UngCli } from './cli/ungCli';
 import { ClientCommands } from './commands/client';
@@ -324,6 +326,34 @@ export async function activate(context: vscode.ExtensionContext) {
 
           const result = await cli.initialize(false);
           if (result.success) {
+            // Add .ung/ to .gitignore if it exists and entry is not already there
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (workspaceFolder) {
+              const gitignorePath = path.join(
+                workspaceFolder.uri.fsPath,
+                '.gitignore'
+              );
+              try {
+                if (fs.existsSync(gitignorePath)) {
+                  const content = fs.readFileSync(gitignorePath, 'utf-8');
+                  // Check if .ung/ or .ung is already in gitignore
+                  const lines = content.split('\n').map((l) => l.trim());
+                  const hasUngEntry = lines.some(
+                    (l) => l === '.ung/' || l === '.ung' || l === '.ung/*'
+                  );
+                  if (!hasUngEntry) {
+                    // Add .ung/ to gitignore
+                    const newContent = content.endsWith('\n')
+                      ? `${content}.ung/\n`
+                      : `${content}\n.ung/\n`;
+                    fs.writeFileSync(gitignorePath, newContent);
+                  }
+                }
+              } catch {
+                // Silently ignore gitignore errors - not critical
+              }
+            }
+
             vscode.commands.executeCommand(
               'setContext',
               'ung.isInitialized',
@@ -593,6 +623,9 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.refreshDashboard', () =>
       dashboardWebviewProvider.refresh()
+    ),
+    vscode.commands.registerCommand('ung.toggleSecureMode', () =>
+      dashboardWebviewProvider.toggleSecureMode()
     )
   );
 

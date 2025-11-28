@@ -9,9 +9,26 @@ import SwiftUI
 
 @main
 struct ungApp: App {
+    @StateObject private var appState = AppState()
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra {
+            MenuBarView()
+                .environmentObject(appState)
+        } label: {
+            Label {
+                Text("UNG")
+            } icon: {
+                if appState.isTracking {
+                    Image(systemName: "record.circle.fill")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.red, .primary)
+                } else {
+                    Image(systemName: "clock.badge.checkmark")
+                        .symbolRenderingMode(.hierarchical)
+                }
+            }
         }
+        .menuBarExtraStyle(.window)
     }
 }

@@ -434,9 +434,10 @@ export async function activate(context: vscode.ExtensionContext) {
     contractProvider.refresh();
     dashboardWebviewProvider.refresh();
   });
-  const invoiceCommands = new InvoiceCommands(cli, () =>
-    invoiceProvider.refresh()
-  );
+  const invoiceCommands = new InvoiceCommands(cli, () => {
+    invoiceProvider.refresh();
+    dashboardWebviewProvider.refresh();
+  });
   const expenseCommands = new ExpenseCommands(cli, () =>
     expenseProvider.refresh()
   );

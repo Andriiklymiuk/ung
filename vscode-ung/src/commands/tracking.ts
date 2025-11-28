@@ -13,7 +13,9 @@ export class TrackingCommands {
   ) {}
 
   /**
-   * Start time tracking with improved UX
+   * Start time tracking with simplified UX
+   * Just 2 steps: Project name -> Client picker
+   * If client selected = billable, can adjust later by right-clicking session
    */
   async startTracking(): Promise<void> {
     // Check if there's already an active session
@@ -29,23 +31,14 @@ export class TrackingCommands {
       return;
     }
 
-    // Step 1: Project name with default "Software services"
-    const project = await vscode.window.showInputBox({
-      prompt: 'Project Name',
-      placeHolder: 'e.g., Website Development',
-      value: 'Software services',
-    });
-
-    if (project === undefined) return; // User cancelled
-
-    // Step 2: Show client picker instead of asking for ID
+    // Step 1: Show client picker first (most important choice)
     let clientId: number | undefined;
     const clientsResult = await this.cli.listClients();
     if (clientsResult.success && clientsResult.stdout) {
       const clients = this.parseClientsFromOutput(clientsResult.stdout);
       if (clients.length > 0) {
         const clientItems = [
-          { label: '$(circle-slash) No client', id: undefined },
+          { label: '$(circle-slash) No client (non-billable)', id: undefined },
           ...clients.map((c) => ({
             label: c.name,
             description: c.email,
@@ -54,8 +47,8 @@ export class TrackingCommands {
         ];
 
         const selectedClient = await vscode.window.showQuickPick(clientItems, {
-          placeHolder: 'Select a client (optional)',
-          title: 'Start Tracking - Select Client',
+          placeHolder: 'Select a client to start tracking',
+          title: 'Start Tracking',
         });
 
         if (selectedClient === undefined) return; // User cancelled
@@ -63,25 +56,17 @@ export class TrackingCommands {
       }
     }
 
-    // Step 3: Billable - default to Yes
-    const billable = await vscode.window.showQuickPick(
-      [
-        { label: '$(check) Yes', value: true },
-        { label: '$(close) No', value: false },
-      ],
-      {
-        placeHolder: 'Is this billable?',
-        title: 'Start Tracking - Billable',
-      }
-    );
-
-    if (billable === undefined) return; // User cancelled
-
-    // Step 4: Notes (optional)
-    const notes = await vscode.window.showInputBox({
-      prompt: 'Notes (optional)',
-      placeHolder: 'What are you working on?',
+    // Step 2: Project name with default "Software services"
+    const project = await vscode.window.showInputBox({
+      prompt: 'Project Name',
+      placeHolder: 'e.g., Website Development',
+      value: 'Software services',
     });
+
+    if (project === undefined) return; // User cancelled
+
+    // If client selected = billable, otherwise not billable
+    const billable = clientId !== undefined;
 
     await vscode.window.withProgress(
       {
@@ -93,8 +78,7 @@ export class TrackingCommands {
         const result = await this.cli.startTracking({
           clientId,
           project,
-          billable: billable.value,
-          notes,
+          billable,
         });
 
         if (result.success) {

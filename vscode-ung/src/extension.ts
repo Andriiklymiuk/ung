@@ -174,16 +174,8 @@ export async function activate(context: vscode.ExtensionContext) {
       // Refresh the onboarding webview
       await onboardingProvider.refresh();
       if (isNowInstalled) {
-        vscode.window
-          .showInformationMessage(
-            'UNG CLI detected! Reloading to enable features...',
-            'Reload'
-          )
-          .then((choice) => {
-            if (choice === 'Reload') {
-              vscode.commands.executeCommand('workbench.action.reloadWindow');
-            }
-          });
+        // Silently reload to enable features
+        vscode.commands.executeCommand('workbench.action.reloadWindow');
       } else {
         vscode.window.showWarningMessage(
           'UNG CLI not found. Please install it first.'

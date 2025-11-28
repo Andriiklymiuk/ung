@@ -87,6 +87,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private _recentInvoices: RecentInvoice[] = [];
   private _recentSessions: RecentSession[] = [];
   private _weeklyHours: number = 0;
+  private _weeklyTarget: number = 40;
+  private _trackingStreak: number = 0;
   private _secureMode: boolean = false;
   private _setupStatus: {
     hasCompany: boolean;
@@ -125,7 +127,34 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (message) => {
       switch (message.command) {
         case 'startTracking':
-          vscode.commands.executeCommand('ung.startTracking');
+          // Check prerequisites: company → client → contract
+          if (!this._setupStatus.hasCompany) {
+            const choice = await vscode.window.showWarningMessage(
+              'Add a company first to start tracking',
+              'Add Company'
+            );
+            if (choice === 'Add Company') {
+              vscode.commands.executeCommand('ung.createCompany');
+            }
+          } else if (!this._setupStatus.hasClient) {
+            const choice = await vscode.window.showWarningMessage(
+              'Add a client first to start tracking',
+              'Add Client'
+            );
+            if (choice === 'Add Client') {
+              vscode.commands.executeCommand('ung.createClient');
+            }
+          } else if (!this._setupStatus.hasContract) {
+            const choice = await vscode.window.showWarningMessage(
+              'Create a contract first to start tracking',
+              'Create Contract'
+            );
+            if (choice === 'Create Contract') {
+              vscode.commands.executeCommand('ung.createContract');
+            }
+          } else {
+            vscode.commands.executeCommand('ung.startTracking');
+          }
           break;
         case 'stopTracking':
           vscode.commands.executeCommand('ung.stopTracking');
@@ -218,6 +247,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       this._loadRecentInvoices(),
       this._loadRecentSessions(),
       this._loadWeeklyHours(),
+      this._loadWeeklyTarget(),
+      this._loadTrackingStreak(),
     ]);
 
     this._isLoading = false;
@@ -321,22 +352,24 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         this.cli.exec(['contract', 'list']),
       ]);
 
+      // Check for actual data rows (not just headers/empty tables)
+      const companyLines = (companyResult.stdout || '')
+        .split('\n')
+        .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+      const clientLines = (clientResult.stdout || '')
+        .split('\n')
+        .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+      const contractLines = (contractResult.stdout || '')
+        .split('\n')
+        .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+
       this._setupStatus = {
-        hasCompany: !!(
+        hasCompany:
           companyResult.success &&
-          companyResult.stdout &&
-          !companyResult.stdout.includes('No company')
-        ),
-        hasClient: !!(
-          clientResult.success &&
-          clientResult.stdout &&
-          clientResult.stdout.split('\n').length > 2
-        ),
-        hasContract: !!(
-          contractResult.success &&
-          contractResult.stdout &&
-          contractResult.stdout.split('\n').length > 2
-        ),
+          companyLines.length > 1 &&
+          !companyResult.stdout?.includes('No company'),
+        hasClient: clientResult.success && clientLines.length > 1,
+        hasContract: contractResult.success && contractLines.length > 1,
       };
     } catch {
       this._setupStatus = {
@@ -511,6 +544,39 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
     }
     return totalMinutes / 60; // Return as decimal hours
+  }
+
+  private async _loadWeeklyTarget(): Promise<void> {
+    try {
+      const result = await this.cli.exec([
+        'settings',
+        'get',
+        'weekly_hours_target',
+      ]);
+      if (result.success && result.stdout) {
+        const target = parseFloat(result.stdout.trim());
+        if (!Number.isNaN(target) && target > 0) {
+          this._weeklyTarget = target;
+        }
+      }
+    } catch {
+      // Keep default of 40
+    }
+  }
+
+  private async _loadTrackingStreak(): Promise<void> {
+    try {
+      const result = await this.cli.exec(['settings', 'streak']);
+      if (result.success && result.stdout) {
+        // Parse "X day streak" from output
+        const match = result.stdout.match(/(\d+)\s*day/);
+        if (match) {
+          this._trackingStreak = parseInt(match[1], 10);
+        }
+      }
+    } catch {
+      this._trackingStreak = 0;
+    }
   }
 
   private _parseDashboardOutput(output: string): DashboardMetrics {
@@ -1271,6 +1337,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             transition: width 0.3s ease;
         }
 
+        /* Streak Badge */
+        .streak-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1px 5px;
+            background: linear-gradient(135deg, var(--vscode-charts-orange, #ff9800), var(--vscode-charts-yellow, #ffeb3b));
+            color: #000;
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 8px;
+            margin-left: 6px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
         /* Invoice Action Buttons */
         .invoice-actions {
             display: flex;
@@ -1774,14 +1856,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         ? `${hours}h ${minutes}m`
         : `${hours}h`;
 
-    // Progress towards 40h week (common target)
-    const weeklyTarget = 40;
-    const progress = Math.min((this._weeklyHours / weeklyTarget) * 100, 100);
+    // Progress towards customizable weekly target
+    const progress = Math.min(
+      (this._weeklyHours / this._weeklyTarget) * 100,
+      100
+    );
+
+    // Streak badge (only show if streak > 1)
+    const streakBadge =
+      this._trackingStreak > 1
+        ? `<span class="streak-badge" title="${this._trackingStreak} day streak">${this._trackingStreak}d</span>`
+        : '';
 
     return `
         <div class="weekly-progress" data-command="openTracking">
             <div class="weekly-header">
-                <span class="weekly-label">This Week</span>
+                <span class="weekly-label">This Week ${streakBadge}</span>
                 <span class="weekly-hours">${displayTime}</span>
             </div>
             <div class="weekly-bar">

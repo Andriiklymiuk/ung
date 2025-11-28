@@ -227,6 +227,35 @@ actor CLIService {
         return result.exitCode == 0
     }
 
+    func updateCompany(name: String?, email: String?, address: String?, phone: String?, taxId: String?) async -> Bool {
+        var args = ["company", "update"]
+        if let name = name {
+            args.append(contentsOf: ["--name", name])
+        }
+        if let email = email {
+            args.append(contentsOf: ["--email", email])
+        }
+        if let address = address {
+            args.append(contentsOf: ["--address", address])
+        }
+        if let phone = phone {
+            args.append(contentsOf: ["--phone", phone])
+        }
+        if let taxId = taxId {
+            args.append(contentsOf: ["--tax-id", taxId])
+        }
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    func getCompanyDetails() async -> (name: String, email: String, address: String, phone: String, taxId: String)? {
+        let result = await execute(["company", "view"])
+        if result.exitCode == 0 && !result.output.contains("No company") {
+            return parseCompanyDetails(result.output)
+        }
+        return nil
+    }
+
     // MARK: - Clients
     func createClient(name: String, email: String?) async -> Bool {
         var args = ["client", "create", name]
@@ -237,10 +266,55 @@ actor CLIService {
         return result.exitCode == 0
     }
 
+    func updateClient(id: Int, name: String?, email: String?) async -> Bool {
+        var args = ["client", "update", "\(id)"]
+        if let name = name {
+            args.append(contentsOf: ["--name", name])
+        }
+        if let email = email {
+            args.append(contentsOf: ["--email", email])
+        }
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    func deleteClient(id: Int) async -> Bool {
+        let result = await execute(["client", "delete", "\(id)", "--force"])
+        return result.exitCode == 0
+    }
+
+    func getClientDetails(id: Int) async -> (name: String, email: String, address: String, phone: String)? {
+        let result = await execute(["client", "view", "\(id)"])
+        if result.exitCode == 0 {
+            return parseClientDetails(result.output)
+        }
+        return nil
+    }
+
     // MARK: - Contracts
     func createContract(name: String, clientId: Int, rate: Double, type: String) async -> Bool {
         let args = ["contract", "create", name, "--client", "\(clientId)", "--rate", "\(rate)", "--type", type]
         let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    func updateContract(id: Int, name: String?, rate: Double?, type: String?) async -> Bool {
+        var args = ["contract", "update", "\(id)"]
+        if let name = name {
+            args.append(contentsOf: ["--name", name])
+        }
+        if let rate = rate {
+            args.append(contentsOf: ["--rate", "\(rate)"])
+        }
+        if let type = type {
+            args.append(contentsOf: ["--type", type])
+        }
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    func deleteContract(id: Int) async -> Bool {
+        let result = await execute(["contract", "delete", "\(id)", "--force"])
         return result.exitCode == 0
     }
 
@@ -251,6 +325,30 @@ actor CLIService {
         return result.exitCode == 0
     }
 
+    func updateExpense(id: Int, description: String?, amount: Double?, category: String?) async -> Bool {
+        var args = ["expense", "update", "\(id)"]
+        if let description = description {
+            args.append(contentsOf: ["--description", description])
+        }
+        if let amount = amount {
+            args.append(contentsOf: ["--amount", "\(amount)"])
+        }
+        if let category = category {
+            args.append(contentsOf: ["--category", category])
+        }
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    func deleteExpense(id: Int) async -> Bool {
+        let result = await execute(["expense", "delete", "\(id)", "--force"])
+        return result.exitCode == 0
+    }
+
+    func getExpenseCategories() async -> [String] {
+        return ["Software", "Hardware", "Travel", "Meals", "Office", "Marketing", "Education", "Other"]
+    }
+
     // MARK: - Invoices
     func createInvoice(clientId: Int) async -> Bool {
         let args = ["invoice", "create", "--client", "\(clientId)"]
@@ -258,8 +356,60 @@ actor CLIService {
         return result.exitCode == 0
     }
 
+    func createInvoiceFromSessions(contractId: Int, sessionIds: [Int]?) async -> Bool {
+        var args = ["invoice", "create", "--contract", "\(contractId)"]
+        if let sessionIds = sessionIds {
+            args.append(contentsOf: ["--sessions", sessionIds.map { "\($0)" }.joined(separator: ",")])
+        }
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    func updateInvoiceStatus(invoiceId: Int, status: String) async -> Bool {
+        let args = ["invoice", "status", "\(invoiceId)", status]
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
     func markInvoicePaid(invoiceId: Int) async -> Bool {
-        let args = ["invoice", "status", "\(invoiceId)", "paid"]
+        return await updateInvoiceStatus(invoiceId: invoiceId, status: "paid")
+    }
+
+    func markInvoiceSent(invoiceId: Int) async -> Bool {
+        return await updateInvoiceStatus(invoiceId: invoiceId, status: "sent")
+    }
+
+    func deleteInvoice(id: Int) async -> Bool {
+        let result = await execute(["invoice", "delete", "\(id)", "--force"])
+        return result.exitCode == 0
+    }
+
+    func generateInvoicePDF(invoiceId: Int, outputPath: String) async -> Bool {
+        let args = ["invoice", "pdf", "\(invoiceId)", "--output", outputPath]
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    func sendInvoiceEmail(invoiceId: Int) async -> Bool {
+        let args = ["invoice", "send", "\(invoiceId)"]
+        let result = await execute(args)
+        return result.exitCode == 0
+    }
+
+    // MARK: - Sessions
+    func deleteSession(id: Int) async -> Bool {
+        let result = await execute(["track", "delete", "\(id)", "--force"])
+        return result.exitCode == 0
+    }
+
+    func updateSession(id: Int, project: String?, notes: String?) async -> Bool {
+        var args = ["track", "update", "\(id)"]
+        if let project = project {
+            args.append(contentsOf: ["--project", project])
+        }
+        if let notes = notes {
+            args.append(contentsOf: ["--notes", notes])
+        }
         let result = await execute(args)
         return result.exitCode == 0
     }
@@ -535,5 +685,56 @@ actor CLIService {
         return output.components(separatedBy: "\n")
             .filter { $0.contains("│") && !$0.contains("ID") && !$0.contains("─") }
             .count
+    }
+
+    private func parseCompanyDetails(_ output: String) -> (name: String, email: String, address: String, phone: String, taxId: String)? {
+        var name = ""
+        var email = ""
+        var address = ""
+        var phone = ""
+        var taxId = ""
+
+        let lines = output.components(separatedBy: "\n")
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("Name:") {
+                name = trimmed.replacingOccurrences(of: "Name:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Email:") {
+                email = trimmed.replacingOccurrences(of: "Email:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Address:") {
+                address = trimmed.replacingOccurrences(of: "Address:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Phone:") {
+                phone = trimmed.replacingOccurrences(of: "Phone:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Tax ID:") || trimmed.hasPrefix("TaxID:") {
+                taxId = trimmed.replacingOccurrences(of: "Tax ID:", with: "").replacingOccurrences(of: "TaxID:", with: "").trimmingCharacters(in: .whitespaces)
+            }
+        }
+
+        if name.isEmpty { return nil }
+        return (name, email, address, phone, taxId)
+    }
+
+    private func parseClientDetails(_ output: String) -> (name: String, email: String, address: String, phone: String)? {
+        var name = ""
+        var email = ""
+        var address = ""
+        var phone = ""
+
+        let lines = output.components(separatedBy: "\n")
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("Name:") {
+                name = trimmed.replacingOccurrences(of: "Name:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Email:") {
+                email = trimmed.replacingOccurrences(of: "Email:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Address:") {
+                address = trimmed.replacingOccurrences(of: "Address:", with: "").trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Phone:") {
+                phone = trimmed.replacingOccurrences(of: "Phone:", with: "").trimmingCharacters(in: .whitespaces)
+            }
+        }
+
+        if name.isEmpty { return nil }
+        return (name, email, address, phone)
     }
 }

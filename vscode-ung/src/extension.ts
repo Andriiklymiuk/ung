@@ -68,6 +68,9 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  // Set callback for ExpensePanel to refresh dashboard when expenses change
+  ExpensePanel.setOnChangeCallback(() => dashboardWebviewProvider.refresh());
+
   // Register install commands (always available)
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.installCli', async () => {
@@ -396,6 +399,51 @@ export async function activate(context: vscode.ExtensionContext) {
   if (version) {
     outputChannel.appendLine(`UNG CLI version: ${version}`);
   }
+
+  // Watch for .ung folder deletion to switch back to onboarding
+  const watchUngFolder = () => {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+
+    // Use a file system watcher for the workspace .ung folder
+    if (workspaceFolder) {
+      const localUngPath = path.join(workspaceFolder.uri.fsPath, '.ung');
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceFolder, '.ung/**')
+      );
+      watcher.onDidDelete(async () => {
+        // Check if the whole folder is gone
+        if (!fs.existsSync(localUngPath)) {
+          vscode.commands.executeCommand(
+            'setContext',
+            'ung.isInitialized',
+            false
+          );
+          await onboardingProvider.refresh();
+        }
+      });
+      context.subscriptions.push(watcher);
+    }
+
+    // Also check periodically for global folder deletion
+    const checkInterval = setInterval(async () => {
+      const stillInitialized = await cli.isInitialized();
+      if (!stillInitialized) {
+        vscode.commands.executeCommand(
+          'setContext',
+          'ung.isInitialized',
+          false
+        );
+        await onboardingProvider.refresh();
+        clearInterval(checkInterval);
+      }
+    }, 10000); // Check every 10 seconds
+
+    context.subscriptions.push({
+      dispose: () => clearInterval(checkInterval),
+    });
+  };
+
+  watchUngFolder();
 
   // Check if database is encrypted and password is available
   // If encrypted but no password in keychain, prompt user to save it

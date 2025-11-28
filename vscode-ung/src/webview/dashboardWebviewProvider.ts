@@ -50,6 +50,17 @@ interface RecentInvoice {
 }
 
 /**
+ * Recent time session info
+ */
+interface RecentSession {
+  id: number;
+  project: string;
+  client: string;
+  duration: string;
+  date: string;
+}
+
+/**
  * Dashboard webview provider for the sidebar
  * Shows a professional dashboard with metrics, quick actions, and navigation
  */
@@ -65,7 +76,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     contracts: 0,
     expenses: 0,
   };
-  private _todayHours: number = 0;
   private _isLoading: boolean = true;
   private _activeTracking: {
     project: string;
@@ -75,6 +85,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   } | null = null;
   private _recentContracts: RecentContract[] = [];
   private _recentInvoices: RecentInvoice[] = [];
+  private _recentSessions: RecentSession[] = [];
+  private _secureMode: boolean = false;
   private _setupStatus: {
     hasCompany: boolean;
     hasClient: boolean;
@@ -165,11 +177,20 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           break;
         case 'emailInvoice':
           if (message.invoiceId) {
-            vscode.commands.executeCommand('ung.emailInvoice', message.invoiceId);
+            vscode.commands.executeCommand(
+              'ung.emailInvoice',
+              message.invoiceId
+            );
           }
           break;
         case 'refresh':
           await this.refresh();
+          break;
+        case 'toggleSecureMode':
+          this._secureMode = !this._secureMode;
+          if (this._view) {
+            this._view.webview.html = this._getHtmlForWebview();
+          }
           break;
       }
     });
@@ -192,9 +213,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       this._checkActiveTracking(),
       this._checkSetupStatus(),
       this._loadCounts(),
-      this._loadTodayHours(),
       this._loadRecentContracts(),
       this._loadRecentInvoices(),
+      this._loadRecentSessions(),
     ]);
 
     this._isLoading = false;
@@ -239,28 +260,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       .split('\n')
       .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
     return Math.max(0, lines.length - 1); // Subtract header
-  }
-
-  private async _loadTodayHours(): Promise<void> {
-    try {
-      const result = await this.cli.exec(['track', 'today']);
-      if (result.success && result.stdout) {
-        const match = result.stdout.match(/(\d+\.?\d*)\s*h/i);
-        if (match) {
-          this._todayHours = parseFloat(match[1]);
-        } else {
-          // Try to parse duration format like "2:30"
-          const durationMatch = result.stdout.match(/(\d+):(\d+)/);
-          if (durationMatch) {
-            this._todayHours =
-              parseInt(durationMatch[1], 10) +
-              parseInt(durationMatch[2], 10) / 60;
-          }
-        }
-      }
-    } catch {
-      this._todayHours = 0;
-    }
   }
 
   private async _checkActiveTracking(): Promise<void> {
@@ -430,6 +429,48 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     return invoices;
   }
 
+  private async _loadRecentSessions(): Promise<void> {
+    try {
+      const result = await this.cli.exec(['track', 'list', '--limit', '3']);
+      if (result.success && result.stdout) {
+        this._recentSessions = this._parseSessionsFromOutput(result.stdout);
+      } else {
+        this._recentSessions = [];
+      }
+    } catch {
+      this._recentSessions = [];
+    }
+  }
+
+  private _parseSessionsFromOutput(output: string): RecentSession[] {
+    const lines = output
+      .split('\n')
+      .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+    if (lines.length < 2) return [];
+
+    const sessions: RecentSession[] = [];
+    // Skip header line
+    for (let i = 1; i < lines.length && sessions.length < 3; i++) {
+      const parts = lines[i]
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 4) {
+        const id = parseInt(parts[0], 10);
+        if (!Number.isNaN(id)) {
+          sessions.push({
+            id,
+            project: parts[1] || 'Unknown',
+            client: parts[2] || '',
+            duration: parts[3] || '0:00',
+            date: parts[4] || 'Today',
+          });
+        }
+      }
+    }
+    return sessions;
+  }
+
   private _parseDashboardOutput(output: string): DashboardMetrics {
     const metrics: DashboardMetrics = {
       totalMonthlyRevenue: 0,
@@ -507,12 +548,23 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private _formatCurrency(amount: number, currency: string = 'USD'): string {
+    if (this._secureMode) {
+      return '****';
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  }
+
+  private _maskDuration(duration: string): string {
+    return this._secureMode ? '**:**' : duration;
+  }
+
+  private _maskAmount(amount: string): string {
+    return this._secureMode ? '****' : amount;
   }
 
   private _getHtmlForWebview(): string {
@@ -538,8 +590,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
             background-color: var(--vscode-sideBar-background);
-            padding: 16px;
-            line-height: 1.5;
+            padding: 12px;
+            line-height: 1.4;
         }
 
         .container {
@@ -580,8 +632,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
             border-bottom: 1px solid var(--vscode-panel-border);
         }
 
@@ -628,17 +680,45 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             animation: spin 1s linear infinite;
         }
 
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .secure-btn {
+            background: none;
+            border: none;
+            color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: all 0.15s;
+            opacity: 0.7;
+        }
+
+        .secure-btn:hover {
+            background-color: var(--vscode-list-hoverBackground);
+            opacity: 1;
+        }
+
+        .secure-btn.active {
+            color: var(--vscode-charts-green, #4caf50);
+            opacity: 1;
+        }
+
         /* Alert Banner */
         .alert-banner {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
+            gap: 8px;
+            padding: 8px 10px;
             background-color: color-mix(in srgb, var(--vscode-charts-red, #f44336) 15%, var(--vscode-sideBar-background));
             border: 1px solid var(--vscode-charts-red, #f44336);
-            border-radius: 8px;
-            margin-bottom: 14px;
-            font-size: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 11px;
             cursor: pointer;
             transition: background-color 0.15s;
         }
@@ -664,12 +744,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .tracking-banner {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
+            gap: 8px;
+            padding: 8px 10px;
             background: linear-gradient(135deg, color-mix(in srgb, var(--vscode-charts-green, #4caf50) 15%, var(--vscode-sideBar-background)), var(--vscode-sideBar-background));
             border: 1px solid var(--vscode-charts-green, #4caf50);
-            border-radius: 8px;
-            margin-bottom: 14px;
+            border-radius: 6px;
+            margin-bottom: 10px;
         }
 
         .tracking-indicator {
@@ -729,19 +809,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         /* Metrics Grid */
         .metrics-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .metric-card {
             background-color: var(--vscode-input-background);
             border-radius: 8px;
-            padding: 12px;
+            padding: 10px 12px;
             cursor: pointer;
             transition: all 0.15s;
             border: 1px solid transparent;
+        }
+
+        .metric-card.revenue-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .metric-card:hover {
@@ -753,7 +836,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: center;
             gap: 6px;
-            margin-bottom: 4px;
         }
 
         .metric-icon {
@@ -773,21 +855,17 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .metric-value.green { color: var(--vscode-charts-green, #4caf50); }
-        .metric-value.blue { color: var(--vscode-charts-blue, #2196f3); }
-        .metric-value.orange { color: var(--vscode-charts-orange, #ff9800); }
-        .metric-value.red { color: var(--vscode-charts-red, #f44336); }
-        .metric-value.purple { color: var(--vscode-charts-purple, #9c27b0); }
 
         /* Section */
         .section {
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .section-header {
             display: flex;
             align-items: center;
             gap: 6px;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
         }
 
         .section-title {
@@ -853,12 +931,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             gap: 6px;
         }
 
+        .nav-grid-compact {
+            display: flex;
+            gap: 6px;
+        }
+
+        .nav-grid-compact .nav-item {
+            flex: 1;
+            padding: 8px 6px;
+        }
+
         .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 4px;
-            padding: 12px 6px;
+            padding: 10px 6px;
             background-color: var(--vscode-input-background);
             border: 1px solid transparent;
             border-radius: 8px;
@@ -877,7 +965,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .nav-icon {
-            font-size: 18px;
+            font-size: 16px;
         }
 
         .nav-label {
@@ -984,7 +1072,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .divider {
             height: 1px;
             background: linear-gradient(to right, transparent, var(--vscode-panel-border), transparent);
-            margin: 14px 0;
+            margin: 10px 0;
         }
 
         /* Tools Grid - improved styling */
@@ -1032,8 +1120,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .recent-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
+            gap: 6px;
+            padding: 6px 8px;
             background-color: var(--vscode-input-background);
             border-radius: 6px;
             cursor: pointer;
@@ -1097,6 +1185,17 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-charts-red, #f44336);
         }
 
+        /* Session duration */
+        .session-duration {
+            font-size: 11px;
+            font-weight: 600;
+            font-family: monospace;
+            color: var(--vscode-charts-blue, #2196f3);
+            padding: 2px 6px;
+            background: color-mix(in srgb, var(--vscode-charts-blue, #2196f3) 15%, transparent);
+            border-radius: 4px;
+        }
+
         /* Invoice Action Buttons */
         .invoice-actions {
             display: flex;
@@ -1140,35 +1239,44 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
-            padding: 16px;
+            gap: 6px;
+            padding: 12px;
             background-color: color-mix(in srgb, var(--vscode-input-background) 50%, transparent);
             border: 1px dashed var(--vscode-panel-border);
             border-radius: 8px;
             text-align: center;
         }
 
+        .empty-state.compact {
+            padding: 10px;
+            gap: 4px;
+        }
+
+        .empty-state.compact .empty-state-icon {
+            font-size: 16px;
+        }
+
         .empty-state-icon {
-            font-size: 24px;
+            font-size: 20px;
             opacity: 0.6;
         }
 
         .empty-state-text {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--vscode-descriptionForeground);
         }
 
         .empty-state-action {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--vscode-textLink-foreground);
             cursor: pointer;
-            padding: 4px 10px;
+            padding: 4px 8px;
             background-color: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
             border-radius: 4px;
             border: none;
             font-weight: 500;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         .empty-state-action:hover {
@@ -1229,8 +1337,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             // Live timer for active tracking
             const timerEl = document.getElementById('live-timer');
             const startTimeAttr = timerEl ? timerEl.getAttribute('data-start-time') : null;
+            const isSecure = timerEl ? timerEl.getAttribute('data-secure') === 'true' : false;
 
-            if (timerEl && startTimeAttr) {
+            if (timerEl && startTimeAttr && !isSecure) {
                 const startTime = parseInt(startTimeAttr, 10);
 
                 function updateTimer() {
@@ -1275,6 +1384,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     const m = this._metrics;
     const hasUnpaid = m && m.unpaidAmount > 0;
 
+    const secureIcon = this._secureMode ? '🔒' : '👁';
+    const secureTitle = this._secureMode
+      ? 'Secure mode ON - Click to show data'
+      : 'Click to hide sensitive data';
+    const secureClass = this._secureMode ? 'secure-btn active' : 'secure-btn';
+
     return `
         <!-- Header -->
         <div class="header">
@@ -1282,9 +1397,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 <div class="logo">U</div>
                 <span class="header-title">Dashboard</span>
             </div>
-            <button class="refresh-btn" data-command="refresh" title="Refresh">
-                🔄
-            </button>
+            <div class="header-actions">
+                <button class="${secureClass}" data-command="toggleSecureMode" title="${secureTitle}">
+                    ${secureIcon}
+                </button>
+                <button class="refresh-btn" data-command="refresh" title="Refresh">
+                    🔄
+                </button>
+            </div>
         </div>
 
         ${this._activeTracking ? this._getActiveTrackingHtml() : ''}
@@ -1315,6 +1435,15 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         <div class="divider"></div>
 
+        <!-- Recent Time Sessions -->
+        <div class="section">
+            <div class="section-header-with-link">
+                <span class="section-title">Time Sessions</span>
+                ${this._recentSessions.length > 0 ? '<button class="section-link" data-command="openTracking">View All</button>' : ''}
+            </div>
+            ${this._getRecentSessionsHtml()}
+        </div>
+
         <!-- Recent Contracts -->
         <div class="section">
             <div class="section-header-with-link">
@@ -1335,58 +1464,25 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         <div class="divider"></div>
 
-        <!-- Navigation -->
+        <!-- Navigation - simplified to non-duplicated items -->
         <div class="section">
             <div class="section-header">
-                <span class="section-title">Navigate</span>
+                <span class="section-title">More</span>
             </div>
-            <div class="nav-grid">
-                <button class="nav-item" data-command="openInvoices">
-                    <span class="nav-icon">📄</span>
-                    <span class="nav-label">Invoices</span>
-                    ${this._counts.invoices > 0 ? `<span class="nav-badge">${this._counts.invoices}</span>` : ''}
+            <div class="nav-grid nav-grid-compact">
+                <button class="nav-item" data-command="openExpenses">
+                    <span class="nav-icon">💳</span>
+                    <span class="nav-label">Expenses</span>
+                    ${this._counts.expenses > 0 ? `<span class="nav-badge">${this._counts.expenses}</span>` : ''}
                 </button>
                 <button class="nav-item" data-command="openClients">
                     <span class="nav-icon">👥</span>
                     <span class="nav-label">Clients</span>
                     ${this._counts.clients > 0 ? `<span class="nav-badge">${this._counts.clients}</span>` : ''}
                 </button>
-                <button class="nav-item" data-command="openContracts">
-                    <span class="nav-icon">📝</span>
-                    <span class="nav-label">Contracts</span>
-                    ${this._counts.contracts > 0 ? `<span class="nav-badge">${this._counts.contracts}</span>` : ''}
-                </button>
-                <button class="nav-item" data-command="openExpenses">
-                    <span class="nav-icon">💳</span>
-                    <span class="nav-label">Expenses</span>
-                    ${this._counts.expenses > 0 ? `<span class="nav-badge">${this._counts.expenses}</span>` : ''}
-                </button>
-                <button class="nav-item" data-command="openTracking">
-                    <span class="nav-icon">⏱️</span>
-                    <span class="nav-label">Time</span>
-                </button>
                 <button class="nav-item" data-command="openStatistics">
                     <span class="nav-icon">📊</span>
                     <span class="nav-label">Reports</span>
-                </button>
-            </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- Tools -->
-        <div class="section">
-            <div class="section-header">
-                <span class="section-title">Tools</span>
-            </div>
-            <div class="tools-grid">
-                <button class="tool-item" data-command="openTemplateEditor">
-                    <span class="tool-icon">🎨</span>
-                    <span>Templates</span>
-                </button>
-                <button class="tool-item" data-command="openPomodoro">
-                    <span class="tool-icon">🍅</span>
-                    <span>Pomodoro</span>
                 </button>
             </div>
         </div>
@@ -1417,7 +1513,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 <div class="tracking-project">${this._activeTracking.project}</div>
                 ${this._activeTracking.client ? `<div class="tracking-meta">${this._activeTracking.client}</div>` : ''}
             </div>
-            <div class="tracking-duration" id="live-timer" data-start-time="${this._activeTracking.startTime}">${this._activeTracking.duration}</div>
+            <div class="tracking-duration" id="live-timer" data-start-time="${this._activeTracking.startTime}" data-secure="${this._secureMode}">${this._secureMode ? '**:**:**' : this._activeTracking.duration}</div>
             <button class="stop-btn" data-command="stopTracking">Stop</button>
         </div>
     `;
@@ -1466,43 +1562,16 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private _getMetricsHtml(): string {
     const m = this._metrics || {
       totalMonthlyRevenue: 0,
-      projectedHours: 0,
-      pendingInvoices: 0,
-      unpaidAmount: 0,
-      totalClients: 0,
-      activeContracts: 0,
-      averageHourlyRate: 0,
       currency: 'USD',
     };
 
     return `
-        <div class="metric-card" data-command="openStatistics">
+        <div class="metric-card revenue-card" data-command="openStatistics">
             <div class="metric-header">
                 <span class="metric-icon">💰</span>
-                <span class="metric-label">Revenue</span>
+                <span class="metric-label">Monthly Revenue</span>
             </div>
             <div class="metric-value green">${this._formatCurrency(m.totalMonthlyRevenue, m.currency)}</div>
-        </div>
-        <div class="metric-card" data-command="openTracking">
-            <div class="metric-header">
-                <span class="metric-icon">📅</span>
-                <span class="metric-label">Today</span>
-            </div>
-            <div class="metric-value blue">${this._todayHours.toFixed(1)}h</div>
-        </div>
-        <div class="metric-card" data-command="openInvoices">
-            <div class="metric-header">
-                <span class="metric-icon">📄</span>
-                <span class="metric-label">Pending</span>
-            </div>
-            <div class="metric-value ${m.pendingInvoices > 0 ? 'orange' : ''}">${m.pendingInvoices}</div>
-        </div>
-        <div class="metric-card" data-command="openStatistics">
-            <div class="metric-header">
-                <span class="metric-icon">💵</span>
-                <span class="metric-label">Avg Rate</span>
-            </div>
-            <div class="metric-value purple">${m.averageHourlyRate > 0 ? `$${m.averageHourlyRate.toFixed(0)}/h` : '-'}</div>
         </div>
     `;
   }
@@ -1573,7 +1642,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 <span class="recent-item-icon">📝</span>
                 <div class="recent-item-content">
                     <div class="recent-item-title">${c.client}</div>
-                    <div class="recent-item-subtitle">${c.type} • ${c.rate}</div>
+                    <div class="recent-item-subtitle">${c.type} • ${this._maskAmount(c.rate)}</div>
                 </div>
             </div>
         `
@@ -1612,7 +1681,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 <span class="recent-item-icon">📄</span>
                 <div class="recent-item-content" data-command="viewInvoice" data-invoice-id="${inv.id}">
                     <div class="recent-item-title">${inv.invoiceNum} - ${inv.client}</div>
-                    <div class="recent-item-subtitle">${inv.amount}</div>
+                    <div class="recent-item-subtitle">${this._maskAmount(inv.amount)}</div>
                 </div>
                 <div class="invoice-actions">
                     <button class="invoice-action-btn" data-command="viewInvoice" data-invoice-id="${inv.id}" title="View Invoice">
@@ -1626,6 +1695,34 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             </div>
         `;
       })
+      .join('');
+
+    return `<div class="recent-list">${items}</div>`;
+  }
+
+  private _getRecentSessionsHtml(): string {
+    if (this._recentSessions.length === 0) {
+      return `
+            <div class="empty-state compact">
+                <div class="empty-state-icon">⏱️</div>
+                <div class="empty-state-text">No time tracked yet. Start tracking to see sessions here.</div>
+            </div>
+        `;
+    }
+
+    const items = this._recentSessions
+      .map(
+        (s) => `
+            <div class="recent-item" data-command="openTracking">
+                <span class="recent-item-icon">⏱️</span>
+                <div class="recent-item-content">
+                    <div class="recent-item-title">${s.project}</div>
+                    <div class="recent-item-subtitle">${s.client || 'No client'} • ${s.date}</div>
+                </div>
+                <span class="session-duration">${this._maskDuration(s.duration)}</span>
+            </div>
+        `
+      )
       .join('');
 
     return `<div class="recent-list">${items}</div>`;

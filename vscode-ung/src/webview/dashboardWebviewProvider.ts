@@ -735,63 +735,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             font-size: 12px;
         }
 
-        /* Header */
-        .header {
+        /* Action Bar */
+        .action-bar {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--vscode-panel-border);
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .logo {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--vscode-textLink-foreground), var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground)));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: 600;
-            color: white;
-        }
-
-        .header-title {
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .refresh-btn {
-            background: none;
-            border: none;
-            color: var(--vscode-textLink-foreground);
-            cursor: pointer;
-            padding: 6px;
-            border-radius: 4px;
-            font-size: 14px;
-            transition: background-color 0.15s;
-        }
-
-        .refresh-btn:hover {
-            background-color: var(--vscode-list-hoverBackground);
-        }
-
-        .refresh-btn.spinning {
-            animation: spin 1s linear infinite;
-        }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            justify-content: flex-end;
+            margin-bottom: 6px;
         }
 
         .secure-btn {
@@ -799,11 +747,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             border: none;
             color: var(--vscode-descriptionForeground);
             cursor: pointer;
-            padding: 5px;
+            padding: 4px 8px;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
             transition: all 0.15s;
-            opacity: 0.7;
+            opacity: 0.6;
         }
 
         .secure-btn:hover {
@@ -1529,15 +1477,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
   private _getLoadingHtml(): string {
     return `
-        <div class="header">
-            <div class="header-left">
-                <div class="logo">U</div>
-                <span class="header-title">Dashboard</span>
-            </div>
-        </div>
         <div class="loading-overlay">
             <div class="spinner"></div>
-            <div class="loading-text">Loading dashboard...</div>
+            <div class="loading-text">Loading...</div>
         </div>
     `;
   }
@@ -1556,20 +1498,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     const secureClass = this._secureMode ? 'secure-btn active' : 'secure-btn';
 
     return `
-        <!-- Header -->
-        <div class="header">
-            <div class="header-left">
-                <div class="logo">U</div>
-                <span class="header-title">Dashboard</span>
-            </div>
-            <div class="header-actions">
-                <button class="${secureClass}" data-command="toggleSecureMode" title="${secureTitle}">
-                    ${secureIcon}
-                </button>
-                <button class="refresh-btn" data-command="refresh" title="Refresh">
-                    ↻
-                </button>
-            </div>
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <button class="${secureClass}" data-command="toggleSecureMode" title="${secureTitle}">
+                ${secureIcon}
+            </button>
         </div>
 
         ${this._activeTracking ? this._getActiveTrackingHtml() : ''}
@@ -1675,7 +1608,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                         ${this._setupStatus.hasCompany ? '✓' : '1'}
                     </div>
                     <div class="step-content">
-                        <div class="step-label">${this._setupStatus.hasCompany ? 'Company Added' : 'Add Company'}</div>
+                        <div class="step-label">${this._setupStatus.hasCompany ? 'Company Added' : 'Add Your Company'}</div>
                     </div>
                 </div>
                 <div class="setup-step ${this._setupStatus.hasClient ? 'completed' : ''}" data-command="createClient">

@@ -443,9 +443,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Company commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('ung.createCompany', () =>
-      companyCommands.createCompany()
-    ),
+    vscode.commands.registerCommand('ung.createCompany', async () => {
+      await companyCommands.createCompany();
+      dashboardWebviewProvider.refresh();
+    }),
     vscode.commands.registerCommand('ung.editCompany', () =>
       companyCommands.editCompany()
     )
@@ -453,9 +454,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Client commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('ung.createClient', () =>
-      clientCommands.createClient()
-    ),
+    vscode.commands.registerCommand('ung.createClient', async () => {
+      await clientCommands.createClient();
+      dashboardWebviewProvider.refresh();
+    }),
     vscode.commands.registerCommand('ung.viewClient', (clientId) =>
       clientCommands.viewClient(clientId)
     ),
@@ -475,9 +477,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Contract commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('ung.createContract', () =>
-      contractCommands.createContract()
-    ),
+    vscode.commands.registerCommand('ung.createContract', async () => {
+      await contractCommands.createContract();
+      dashboardWebviewProvider.refresh();
+    }),
     vscode.commands.registerCommand('ung.viewContract', (item) =>
       contractCommands.viewContract(item?.itemId)
     ),

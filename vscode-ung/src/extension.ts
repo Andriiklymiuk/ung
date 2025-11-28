@@ -426,21 +426,24 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Initialize command handlers
   const companyCommands = new CompanyCommands(cli);
-  const clientCommands = new ClientCommands(cli, () =>
-    clientProvider.refresh()
-  );
-  const contractCommands = new ContractCommands(cli, () =>
-    contractProvider.refresh()
-  );
+  const clientCommands = new ClientCommands(cli, () => {
+    clientProvider.refresh();
+    dashboardWebviewProvider.refresh();
+  });
+  const contractCommands = new ContractCommands(cli, () => {
+    contractProvider.refresh();
+    dashboardWebviewProvider.refresh();
+  });
   const invoiceCommands = new InvoiceCommands(cli, () =>
     invoiceProvider.refresh()
   );
   const expenseCommands = new ExpenseCommands(cli, () =>
     expenseProvider.refresh()
   );
-  const trackingCommands = new TrackingCommands(cli, statusBar, () =>
-    trackingProvider.refresh()
-  );
+  const trackingCommands = new TrackingCommands(cli, statusBar, () => {
+    trackingProvider.refresh();
+    dashboardWebviewProvider.refresh();
+  });
   const securityCommands = new SecurityCommands(cli, outputChannel);
 
   // Register all commands

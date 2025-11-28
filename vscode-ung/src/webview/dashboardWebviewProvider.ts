@@ -86,6 +86,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private _recentContracts: RecentContract[] = [];
   private _recentInvoices: RecentInvoice[] = [];
   private _recentSessions: RecentSession[] = [];
+  private _weeklyHours: number = 0;
   private _secureMode: boolean = false;
   private _setupStatus: {
     hasCompany: boolean;
@@ -216,6 +217,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       this._loadRecentContracts(),
       this._loadRecentInvoices(),
       this._loadRecentSessions(),
+      this._loadWeeklyHours(),
     ]);
 
     this._isLoading = false;
@@ -469,6 +471,46 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
     }
     return sessions;
+  }
+
+  private async _loadWeeklyHours(): Promise<void> {
+    try {
+      // Get this week's sessions and sum up hours
+      const result = await this.cli.exec(['track', 'list', '--week']);
+      if (result.success && result.stdout) {
+        this._weeklyHours = this._parseWeeklyHours(result.stdout);
+      } else {
+        this._weeklyHours = 0;
+      }
+    } catch {
+      this._weeklyHours = 0;
+    }
+  }
+
+  private _parseWeeklyHours(output: string): number {
+    const lines = output
+      .split('\n')
+      .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+    if (lines.length < 2) return 0;
+
+    let totalMinutes = 0;
+    // Skip header line, sum durations
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i]
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 4) {
+        const duration = parts[3] || '0:00';
+        const match = duration.match(/(\d+):(\d+)(?::(\d+))?/);
+        if (match) {
+          const hours = parseInt(match[1], 10) || 0;
+          const minutes = parseInt(match[2], 10) || 0;
+          totalMinutes += hours * 60 + minutes;
+        }
+      }
+    }
+    return totalMinutes / 60; // Return as decimal hours
   }
 
   private _parseDashboardOutput(output: string): DashboardMetrics {
@@ -1179,6 +1221,56 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             border-radius: 4px;
         }
 
+        /* Weekly Progress Widget */
+        .weekly-progress {
+            padding: 8px 10px;
+            background-color: var(--vscode-input-background);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .weekly-progress:hover {
+            background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--vscode-focusBorder);
+        }
+
+        .weekly-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .weekly-label {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .weekly-hours {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--vscode-charts-blue, #2196f3);
+        }
+
+        .weekly-bar {
+            height: 4px;
+            background-color: var(--vscode-input-border, var(--vscode-panel-border));
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .weekly-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--vscode-charts-blue, #2196f3), var(--vscode-charts-green, #4caf50));
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
         /* Invoice Action Buttons */
         .invoice-actions {
             display: flex;
@@ -1191,21 +1283,26 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 24px;
-            height: 24px;
+            padding: 3px 8px;
             border: none;
-            background: transparent;
+            background: var(--vscode-input-background);
             border-radius: 4px;
             cursor: pointer;
-            color: var(--vscode-foreground);
-            opacity: 0.6;
+            color: var(--vscode-descriptionForeground);
             transition: all 0.15s;
-            font-size: 12px;
+            font-size: 10px;
+            font-family: var(--vscode-font-family);
+            font-weight: 500;
         }
 
         .invoice-action-btn:hover {
-            opacity: 1;
             background: var(--vscode-list-hoverBackground);
+            color: var(--vscode-foreground);
+        }
+
+        .invoice-action-btn.send:hover {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
         }
 
         .invoice-item .recent-item-content {
@@ -1370,10 +1467,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       ? this._formatCurrency(m.totalMonthlyRevenue, m.currency)
       : '$0';
 
-    const secureIcon = this._secureMode ? '[hide]' : '[show]';
+    const secureIcon = this._secureMode ? '●' : '○';
     const secureTitle = this._secureMode
-      ? 'Secure mode ON - Click to show data'
-      : 'Click to hide sensitive data';
+      ? 'Data hidden - Click to show'
+      : 'Click to hide amounts';
     const secureClass = this._secureMode ? 'secure-btn active' : 'secure-btn';
 
     return `
@@ -1405,6 +1502,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 <span class="revenue-label">Revenue</span>
                 <span class="revenue-value">${revenue}</span>
             </div>
+            ${this._getWeeklyProgressHtml()}
             <div class="quick-actions">
                 ${this._getQuickActionsHtml()}
             </div>
@@ -1620,11 +1718,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     <div class="recent-item-subtitle">${this._maskAmount(inv.amount)}</div>
                 </div>
                 <div class="invoice-actions">
-                    <button class="invoice-action-btn" data-command="viewInvoice" data-invoice-id="${inv.id}" title="View">
-                        [v]
+                    <button class="invoice-action-btn view" data-command="viewInvoice" data-invoice-id="${inv.id}" title="View invoice">
+                        View
                     </button>
-                    <button class="invoice-action-btn" data-command="emailInvoice" data-invoice-id="${inv.id}" title="Email">
-                        [@]
+                    <button class="invoice-action-btn send" data-command="emailInvoice" data-invoice-id="${inv.id}" title="Send invoice by email">
+                        Send
                     </button>
                 </div>
                 <span class="recent-item-badge ${statusClass}">${inv.status}</span>
@@ -1661,5 +1759,35 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       .join('');
 
     return `<div class="recent-list">${items}</div>`;
+  }
+
+  private _getWeeklyProgressHtml(): string {
+    if (this._weeklyHours === 0 && this._recentSessions.length === 0) {
+      return ''; // Don't show if no tracking data at all
+    }
+
+    const hours = Math.floor(this._weeklyHours);
+    const minutes = Math.round((this._weeklyHours - hours) * 60);
+    const displayTime = this._secureMode
+      ? '**h **m'
+      : minutes > 0
+        ? `${hours}h ${minutes}m`
+        : `${hours}h`;
+
+    // Progress towards 40h week (common target)
+    const weeklyTarget = 40;
+    const progress = Math.min((this._weeklyHours / weeklyTarget) * 100, 100);
+
+    return `
+        <div class="weekly-progress" data-command="openTracking">
+            <div class="weekly-header">
+                <span class="weekly-label">This Week</span>
+                <span class="weekly-hours">${displayTime}</span>
+            </div>
+            <div class="weekly-bar">
+                <div class="weekly-bar-fill" style="width: ${this._secureMode ? 0 : progress}%"></div>
+            </div>
+        </div>
+    `;
   }
 }

@@ -198,3 +198,17 @@ type RecurringInvoice struct {
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 }
+
+// UserSettings stores user preferences and dashboard settings
+type UserSettings struct {
+	ID                uint      `gorm:"primaryKey" json:"id"`
+	Key               string    `gorm:"uniqueIndex;not null" json:"key"`
+	Value             string    `gorm:"not null" json:"value"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// Settings keys
+const (
+	SettingWeeklyHoursTarget = "weekly_hours_target"
+)

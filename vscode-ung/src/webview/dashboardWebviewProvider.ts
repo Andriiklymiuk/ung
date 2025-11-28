@@ -239,6 +239,21 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             );
           }
           break;
+        case 'deleteExpense':
+          if (message.expenseId) {
+            const confirm = await vscode.window.showWarningMessage(
+              'Delete this expense?',
+              { modal: true },
+              'Delete'
+            );
+            if (confirm === 'Delete') {
+              await vscode.commands.executeCommand('ung.deleteExpense', {
+                itemId: message.expenseId,
+              });
+              await this.refresh();
+            }
+          }
+          break;
         case 'refresh':
           await this.refresh();
           break;
@@ -1293,6 +1308,33 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             border-radius: 4px;
         }
 
+        /* Delete button */
+        .delete-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border: none;
+            background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+            color: var(--vscode-errorForeground, #f48771);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 4px;
+            transition: all 0.15s;
+        }
+
+        .recent-item:hover .delete-btn {
+            display: flex;
+        }
+
+        .delete-btn:hover {
+            background: var(--vscode-inputValidation-errorBorder, #be1100);
+            color: white;
+        }
+
         /* Weekly Progress Widget */
         .weekly-progress {
             padding: 8px 10px;
@@ -1510,10 +1552,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     e.stopPropagation();
                     const command = target.getAttribute('data-command');
                     const invoiceId = target.getAttribute('data-invoice-id');
+                    const expenseId = target.getAttribute('data-expense-id');
                     if (command) {
                         const message = { command: command };
                         if (invoiceId) {
                             message.invoiceId = parseInt(invoiceId, 10);
+                        }
+                        if (expenseId) {
+                            message.expenseId = parseInt(expenseId, 10);
                         }
                         vscode.postMessage(message);
                     }
@@ -1834,12 +1880,13 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     const items = this._recentExpenses
       .map((e) => {
         return `
-            <div class="recent-item" data-command="openExpenses">
-                <div class="recent-item-content">
+            <div class="recent-item expense-item" data-expense-id="${e.id}">
+                <div class="recent-item-content" data-command="openExpenses">
                     <div class="recent-item-title">${e.description}</div>
                     <div class="recent-item-subtitle">${e.category} - ${e.date}</div>
                 </div>
                 <span class="expense-amount">${this._maskAmount(e.amount)}</span>
+                <button class="delete-btn" data-command="deleteExpense" data-expense-id="${e.id}" title="Delete expense">x</button>
             </div>
         `;
       })

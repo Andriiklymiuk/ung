@@ -11,17 +11,25 @@ interface Expense {
   vendor: string;
 }
 
+type TimePeriod = 'all' | '1w' | '1m' | '3m' | '6m' | '1y';
+
 /**
  * Expense Panel - View and manage expenses
  */
 export class ExpensePanel {
   public static currentPanel: ExpensePanel | undefined;
   private static readonly viewType = 'ungExpenses';
+  private static onChangeCallback: (() => void) | undefined;
 
   private readonly panel: vscode.WebviewPanel;
   private readonly cli: UngCli;
   private disposables: vscode.Disposable[] = [];
   private expenses: Expense[] = [];
+  private timePeriod: TimePeriod = '1m';
+
+  public static setOnChangeCallback(callback: () => void) {
+    ExpensePanel.onChangeCallback = callback;
+  }
 
   public static createOrShow(cli: UngCli) {
     const column = vscode.window.activeTextEditor
@@ -64,9 +72,14 @@ export class ExpensePanel {
           case 'addExpense':
             await vscode.commands.executeCommand('ung.logExpense');
             await this.update();
+            ExpensePanel.onChangeCallback?.();
             break;
           case 'deleteExpense':
             await this.deleteExpense(message.id);
+            break;
+          case 'setTimePeriod':
+            this.timePeriod = message.period as TimePeriod;
+            await this.update();
             break;
         }
       },
@@ -86,6 +99,7 @@ export class ExpensePanel {
       if (result.success) {
         vscode.window.showInformationMessage('Expense deleted');
         await this.update();
+        ExpensePanel.onChangeCallback?.();
       } else {
         vscode.window.showErrorMessage('Failed to delete expense');
       }
@@ -129,6 +143,36 @@ export class ExpensePanel {
         }
       }
     }
+
+    // Filter by time period
+    if (this.timePeriod !== 'all') {
+      const now = new Date();
+      const cutoffDate = new Date();
+
+      switch (this.timePeriod) {
+        case '1w':
+          cutoffDate.setDate(now.getDate() - 7);
+          break;
+        case '1m':
+          cutoffDate.setMonth(now.getMonth() - 1);
+          break;
+        case '3m':
+          cutoffDate.setMonth(now.getMonth() - 3);
+          break;
+        case '6m':
+          cutoffDate.setMonth(now.getMonth() - 6);
+          break;
+        case '1y':
+          cutoffDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+
+      return expenses.filter((e) => {
+        const expenseDate = new Date(e.date);
+        return expenseDate >= cutoffDate;
+      });
+    }
+
     return expenses;
   }
 
@@ -338,12 +382,46 @@ export class ExpensePanel {
         .empty-state h3 {
             margin-bottom: 8px;
         }
+        .period-selector {
+            display: flex;
+            gap: 2px;
+            background: var(--vscode-input-background);
+            border-radius: 6px;
+            padding: 2px;
+        }
+        .period-btn {
+            padding: 6px 12px;
+            border: none;
+            background: none;
+            color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+            font-size: 12px;
+            font-family: var(--vscode-font-family);
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .period-btn:hover {
+            background: var(--vscode-list-hoverBackground);
+            color: var(--vscode-foreground);
+        }
+        .period-btn.active {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Expenses</h1>
         <div class="header-actions">
+            <div class="period-selector">
+                <button class="period-btn ${this.timePeriod === '1w' ? 'active' : ''}" onclick="setPeriod('1w')">1W</button>
+                <button class="period-btn ${this.timePeriod === '1m' ? 'active' : ''}" onclick="setPeriod('1m')">1M</button>
+                <button class="period-btn ${this.timePeriod === '3m' ? 'active' : ''}" onclick="setPeriod('3m')">3M</button>
+                <button class="period-btn ${this.timePeriod === '6m' ? 'active' : ''}" onclick="setPeriod('6m')">6M</button>
+                <button class="period-btn ${this.timePeriod === '1y' ? 'active' : ''}" onclick="setPeriod('1y')">1Y</button>
+                <button class="period-btn ${this.timePeriod === 'all' ? 'active' : ''}" onclick="setPeriod('all')">All</button>
+            </div>
             <button class="btn btn-secondary" onclick="refresh()">Refresh</button>
             <button class="btn btn-primary" onclick="addExpense()">+ Add Expense</button>
         </div>
@@ -402,6 +480,10 @@ export class ExpensePanel {
 
         function deleteExpense(id) {
             vscode.postMessage({ command: 'deleteExpense', id: id });
+        }
+
+        function setPeriod(period) {
+            vscode.postMessage({ command: 'setTimePeriod', period: period });
         }
     </script>
 </body>

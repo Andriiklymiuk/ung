@@ -865,6 +865,7 @@ struct InvoicesContent: View {
   @EnvironmentObject var appState: AppState
   @Binding var showAddSheet: Bool
   @State private var showDeleteConfirmation = false
+  @State private var showRecurringSheet = false
   @State private var selectedInvoice: RecentInvoice?
   @State private var searchQuery = ""
   @State private var filterStatus = "all"
@@ -951,6 +952,24 @@ struct InvoicesContent: View {
 
               Spacer()
 
+              // Recurring invoices button
+              Button(action: { showRecurringSheet = true }) {
+                HStack(spacing: 4) {
+                  Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 11))
+                  Text("Recurring")
+                    .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(Design.Colors.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                  RoundedRectangle(cornerRadius: 6)
+                    .fill(Design.Colors.primary.opacity(0.1))
+                )
+              }
+              .buttonStyle(.plain)
+
               SearchBar(text: $searchQuery, placeholder: "Search invoices...")
                 .frame(maxWidth: 250)
             }
@@ -1027,6 +1046,10 @@ struct InvoicesContent: View {
     .animation(Design.Animation.smooth, value: showAddSheet)
     .animation(Design.Animation.smooth, value: showDeleteConfirmation)
     .animation(Design.Animation.smooth, value: filterStatus)
+    .sheet(isPresented: $showRecurringSheet) {
+      RecurringInvoicesSheet()
+        .environmentObject(appState)
+    }
   }
 
   private var createInvoiceSheet: some View {

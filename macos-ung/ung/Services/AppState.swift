@@ -100,6 +100,7 @@ struct RecentExpense: Identifiable, Equatable {
     let description: String
     let amount: String
     let category: String
+    var date: String = ""
 }
 
 struct SetupStatus: Equatable {
@@ -277,6 +278,12 @@ class AppState: ObservableObject {
     let database = DatabaseService.shared
     let keychain = KeychainManager.shared
 
+    // Performance optimization
+    private let refreshDebouncer = Debouncer(delay: 0.3)
+    private let refreshThrottler = Throttler(minimumInterval: 0.5)
+    private var lastRefreshTime: Date?
+    private var pendingRefreshTask: Task<Void, Never>?
+
     // Timers
     private var trackingTimer: Timer?
     private var pomodoroTimer: Timer?
@@ -437,9 +444,36 @@ class AppState: ObservableObject {
     }
 
     // MARK: - Dashboard Refresh
+
+    /// Debounced refresh - use this for UI-triggered refreshes
+    func requestRefresh() {
+        refreshDebouncer.debounce { [weak self] in
+            Task { @MainActor in
+                await self?.refreshDashboard()
+            }
+        }
+    }
+
+    /// Core refresh implementation with throttling
     func refreshDashboard() async {
         guard status == .ready else { return }
+
+        // Throttle: Skip if we refreshed recently (within 0.5s)
+        if let lastTime = lastRefreshTime,
+           Date().timeIntervalSince(lastTime) < 0.5 {
+            return
+        }
+
+        // Cancel any pending refresh
+        pendingRefreshTask?.cancel()
+
         isRefreshing = true
+        lastRefreshTime = Date()
+
+        // Use PerformanceMonitor in debug to track slow operations
+        #if DEBUG
+        let start = CFAbsoluteTimeGetCurrent()
+        #endif
 
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadMetrics() }
@@ -452,6 +486,13 @@ class AppState: ObservableObject {
             group.addTask { await self.loadClients() }
             group.addTask { await self.loadContracts() }
         }
+
+        #if DEBUG
+        let elapsed = CFAbsoluteTimeGetCurrent() - start
+        if elapsed > 0.1 {
+            print("⚠️ Dashboard refresh took \(String(format: "%.3f", elapsed))s")
+        }
+        #endif
 
         isRefreshing = false
 
@@ -555,16 +596,14 @@ class AppState: ObservableObject {
 
     private func checkActiveTracking() async {
         do {
-            if let session = try await database.getActiveSession() {
-                let client = session.clientId != nil ?
-                    try await database.getClient(id: session.clientId!)?.name ?? "" : ""
-
+            // Optimized: Single query with JOIN instead of N+1
+            if let result = try await database.getActiveSessionWithClient() {
                 activeSession = ActiveSession(
-                    id: Int(session.id ?? 0),
-                    project: session.projectName ?? "Active Session",
-                    client: client,
-                    startTime: session.startTime,
-                    elapsedSeconds: session.calculatedDuration
+                    id: Int(result.session.id ?? 0),
+                    project: result.session.projectName ?? "Active Session",
+                    client: result.clientName ?? "",
+                    startTime: result.session.startTime,
+                    elapsedSeconds: result.session.calculatedDuration
                 )
                 isTracking = true
                 startTrackingTimer()
@@ -583,16 +622,13 @@ class AppState: ObservableObject {
     private func loadRecentInvoices() async {
         do {
             let invoices = try await database.getRecentInvoices(limit: 3)
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .currency
-            formatter.currencyCode = "USD"
-
+            // Use pre-configured cached formatter for performance
             recentInvoices = invoices.map { invoice in
                 RecentInvoice(
                     id: Int(invoice.id ?? 0),
                     invoiceNum: invoice.invoiceNum,
                     client: "",
-                    amount: formatter.string(from: NSNumber(value: invoice.amount)) ?? "$0.00",
+                    amount: Formatters.currency.string(from: NSNumber(value: invoice.amount)) ?? "$0.00",
                     status: invoice.status
                 )
             }
@@ -604,16 +640,14 @@ class AppState: ObservableObject {
     private func loadRecentSessions() async {
         do {
             let sessions = try await database.getRecentSessions(limit: 5)
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateStyle = .short
-
+            // Use pre-configured cached formatter for performance
             recentSessions = sessions.compactMap { session in
                 guard let id = session.id else { return nil }
                 return RecentSession(
                     id: Int(id),
                     project: session.projectName ?? "Session",
                     duration: session.formattedDuration,
-                    date: dateFormatter.string(from: session.startTime)
+                    date: Formatters.shortDate.string(from: session.startTime)
                 )
             }
         } catch {
@@ -624,17 +658,15 @@ class AppState: ObservableObject {
     private func loadRecentExpenses() async {
         do {
             let expenses = try await database.getRecentExpenses(limit: 5)
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .currency
-            formatter.currencyCode = "USD"
-
+            // Use pre-configured cached formatter for performance
             recentExpenses = expenses.compactMap { expense in
                 guard let id = expense.id else { return nil }
                 return RecentExpense(
                     id: Int(id),
                     description: expense.description,
-                    amount: formatter.string(from: NSNumber(value: expense.amount)) ?? "$0.00",
-                    category: expense.category
+                    amount: Formatters.currency.string(from: NSNumber(value: expense.amount)) ?? "$0.00",
+                    category: expense.category,
+                    date: Formatters.shortDate.string(from: expense.date)
                 )
             }
         } catch {

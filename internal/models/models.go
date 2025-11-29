@@ -248,6 +248,10 @@ const (
 	JobSourceWeWorkRemotely JobSource = "weworkremotely"
 	JobSourceJobicy         JobSource = "jobicy"
 	JobSourceArbeitnow      JobSource = "arbeitnow"
+	JobSourceDjinni         JobSource = "djinni"      // Ukrainian IT jobs
+	JobSourceDOU            JobSource = "dou"         // Ukrainian IT community
+	JobSourceNetherlands    JobSource = "netherlands" // Dutch job boards
+	JobSourceEuroJobs       JobSource = "eurojobs"    // European job boards
 	JobSourceUpwork         JobSource = "upwork"
 	JobSourceLinkedIn       JobSource = "linkedin"
 	JobSourceManual         JobSource = "manual"

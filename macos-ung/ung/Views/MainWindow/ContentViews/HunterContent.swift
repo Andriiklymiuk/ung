@@ -205,42 +205,99 @@ struct HunterContent: View {
     }
 
     private var jobsFilterBar: some View {
-        HStack(spacing: 12) {
-            // Search
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                TextField("Search jobs...", text: $hunterState.searchQuery)
-                    .textFieldStyle(.plain)
-            }
-            .padding(8)
-            .background(Color.gray.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .frame(maxWidth: 300)
-
-            // Source filter
-            Picker("Source", selection: $hunterState.selectedSource) {
-                Text("All Sources").tag(nil as JobSource?)
-                ForEach(JobSource.allCases, id: \.self) { source in
-                    Text(source.displayName).tag(source as JobSource?)
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                // Search
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField("Search jobs...", text: $hunterState.searchQuery)
+                        .textFieldStyle(.plain)
                 }
+                .padding(8)
+                .background(Color.gray.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .frame(maxWidth: 300)
+
+                // Region filter
+                Picker("Region", selection: $hunterState.selectedRegion) {
+                    Text("All Regions").tag(nil as JobRegion?)
+                    ForEach(JobRegion.allCases, id: \.self) { region in
+                        HStack {
+                            Text(region.flag)
+                            Text(region.displayName)
+                        }.tag(region as JobRegion?)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 140)
+
+                // Source filter
+                Picker("Source", selection: $hunterState.selectedSource) {
+                    Text("All Sources").tag(nil as JobSource?)
+                    ForEach(JobSource.allCases, id: \.self) { source in
+                        HStack {
+                            Image(systemName: source.iconName)
+                            Text(source.displayName)
+                        }.tag(source as JobSource?)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 170)
+
+                // Remote filter
+                Toggle("Remote only", isOn: $hunterState.remoteOnly)
+
+                Spacer()
+
+                // Sort
+                Picker("Sort", selection: $hunterState.sortBy) {
+                    Text("Match Score").tag(JobSortBy.matchScore)
+                    Text("Posted Date").tag(JobSortBy.postedDate)
+                    Text("Company").tag(JobSortBy.company)
+                }
+                .pickerStyle(.menu)
+                .frame(width: 130)
             }
-            .pickerStyle(.menu)
-            .frame(width: 150)
 
-            // Remote filter
-            Toggle("Remote only", isOn: $hunterState.remoteOnly)
+            // Quick region filters
+            HStack(spacing: 8) {
+                Text("Quick filter:")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
 
-            Spacer()
+                ForEach(JobRegion.allCases, id: \.self) { region in
+                    Button(action: {
+                        hunterState.selectedRegion = hunterState.selectedRegion == region ? nil : region
+                    }) {
+                        HStack(spacing: 4) {
+                            Text(region.flag)
+                            Text(region.shortName)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            hunterState.selectedRegion == region
+                                ? Color.accentColor.opacity(0.2)
+                                : Color.gray.opacity(0.1)
+                        )
+                        .foregroundColor(
+                            hunterState.selectedRegion == region
+                                ? .accentColor
+                                : .secondary
+                        )
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
 
-            // Sort
-            Picker("Sort", selection: $hunterState.sortBy) {
-                Text("Match Score").tag(JobSortBy.matchScore)
-                Text("Posted Date").tag(JobSortBy.postedDate)
-                Text("Company").tag(JobSortBy.company)
+                Spacer()
+
+                Text("\(hunterState.filteredJobs.count) jobs")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
             }
-            .pickerStyle(.menu)
-            .frame(width: 130)
         }
     }
 
@@ -1037,6 +1094,61 @@ enum JobSortBy: String, CaseIterable {
     case matchScore
     case postedDate
     case company
+}
+
+// MARK: - Job Region
+
+enum JobRegion: String, CaseIterable {
+    case global
+    case ukraine
+    case netherlands
+    case europe
+    case usa
+
+    var displayName: String {
+        switch self {
+        case .global: return "Global"
+        case .ukraine: return "Ukraine"
+        case .netherlands: return "Netherlands"
+        case .europe: return "Europe"
+        case .usa: return "USA"
+        }
+    }
+
+    var shortName: String {
+        switch self {
+        case .global: return "Global"
+        case .ukraine: return "UA"
+        case .netherlands: return "NL"
+        case .europe: return "EU"
+        case .usa: return "US"
+        }
+    }
+
+    var flag: String {
+        switch self {
+        case .global: return "🌍"
+        case .ukraine: return "🇺🇦"
+        case .netherlands: return "🇳🇱"
+        case .europe: return "🇪🇺"
+        case .usa: return "🇺🇸"
+        }
+    }
+
+    var sources: [JobSource] {
+        switch self {
+        case .global:
+            return JobSource.allCases
+        case .ukraine:
+            return [.djinni, .dou]
+        case .netherlands:
+            return [.netherlands]
+        case .europe:
+            return [.netherlands, .eurojobs, .arbeitnow]
+        case .usa:
+            return [.hackernews, .remoteok, .weworkremotely]
+        }
+    }
 }
 
 #Preview {

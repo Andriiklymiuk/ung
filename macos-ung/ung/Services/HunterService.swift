@@ -23,6 +23,7 @@ class HunterState: ObservableObject {
     // Filter state
     @Published var searchQuery = ""
     @Published var selectedSource: JobSource?
+    @Published var selectedRegion: JobRegion?
     @Published var remoteOnly = false
     @Published var sortBy: JobSortBy = .matchScore
 
@@ -40,6 +41,14 @@ class HunterState: ObservableObject {
                 job.title.localizedCaseInsensitiveContains(searchQuery) ||
                 (job.company?.localizedCaseInsensitiveContains(searchQuery) ?? false) ||
                 (job.description?.localizedCaseInsensitiveContains(searchQuery) ?? false)
+            }
+        }
+
+        // Region filter (takes priority over source filter)
+        if let region = selectedRegion {
+            let regionSources = region.sources
+            result = result.filter { job in
+                regionSources.contains(job.jobSource)
             }
         }
 

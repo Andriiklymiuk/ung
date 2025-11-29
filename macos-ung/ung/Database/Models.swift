@@ -599,6 +599,10 @@ enum JobSource: String, Codable, CaseIterable {
     case weworkremotely
     case jobicy
     case arbeitnow
+    case djinni       // Ukrainian IT jobs
+    case dou          // Ukrainian IT community
+    case netherlands  // Dutch job boards
+    case eurojobs     // European job boards
     case upwork
     case linkedin
     case manual
@@ -610,6 +614,10 @@ enum JobSource: String, Codable, CaseIterable {
         case .weworkremotely: return "WeWorkRemotely"
         case .jobicy: return "Jobicy"
         case .arbeitnow: return "Arbeitnow"
+        case .djinni: return "Djinni (UA)"
+        case .dou: return "DOU (UA)"
+        case .netherlands: return "Netherlands"
+        case .eurojobs: return "Euro Jobs"
         case .upwork: return "Upwork"
         case .linkedin: return "LinkedIn"
         case .manual: return "Manual"
@@ -623,9 +631,22 @@ enum JobSource: String, Codable, CaseIterable {
         case .weworkremotely: return "laptopcomputer"
         case .jobicy: return "briefcase.fill"
         case .arbeitnow: return "building.2"
+        case .djinni: return "flag.fill"
+        case .dou: return "text.bubble.fill"
+        case .netherlands: return "windmill.fill"
+        case .eurojobs: return "globe.europe.africa.fill"
         case .upwork: return "person.2.fill"
         case .linkedin: return "person.crop.square.fill"
         case .manual: return "square.and.pencil"
+        }
+    }
+
+    var country: String? {
+        switch self {
+        case .djinni, .dou: return "Ukraine"
+        case .netherlands: return "Netherlands"
+        case .eurojobs: return "Europe"
+        default: return nil
         }
     }
 }

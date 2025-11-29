@@ -4,6 +4,7 @@
 //
 //  Native Swift database service using GRDB.
 //  Reads the same SQL migration files as the Go CLI for consistency.
+//  Supports iCloud sync for cross-device data sharing.
 //
 
 import Foundation
@@ -17,6 +18,7 @@ enum DatabaseError: LocalizedError {
     case queryFailed(String)
     case notFound
     case invalidData(String)
+    case iCloudNotAvailable
 
     var errorDescription: String? {
         switch self {
@@ -30,8 +32,19 @@ enum DatabaseError: LocalizedError {
             return "Record not found"
         case .invalidData(let message):
             return "Invalid data: \(message)"
+        case .iCloudNotAvailable:
+            return "iCloud is not available on this device"
         }
     }
+}
+
+// MARK: - Sync Status
+
+enum SyncStatus: Equatable {
+    case idle
+    case syncing
+    case completed
+    case error(String)
 }
 
 // MARK: - Database Service
@@ -40,34 +53,82 @@ actor DatabaseService {
     private var dbPool: DatabasePool?
     private let fileManager = FileManager.default
 
+    // iCloud sync state
+    private(set) var iCloudEnabled: Bool = false
+    private(set) var syncStatus: SyncStatus = .idle
+    private var metadataQuery: NSMetadataQuery?
+
     // Singleton for app-wide access
     static let shared = DatabaseService()
 
-    private init() {}
+    private init() {
+        // Load iCloud preference
+        iCloudEnabled = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+    }
+
+    // MARK: - iCloud Availability
+
+    /// Check if iCloud is available on this device
+    var isICloudAvailable: Bool {
+        fileManager.ubiquityIdentityToken != nil
+    }
+
+    /// Get the iCloud container URL if available
+    var iCloudContainerURL: URL? {
+        fileManager.url(forUbiquityContainerIdentifier: nil)
+    }
+
+    /// Get the iCloud Documents directory
+    var iCloudDocumentsURL: URL? {
+        iCloudContainerURL?.appendingPathComponent("Documents")
+    }
 
     // MARK: - Database Path
 
     /// Returns the path to the database file
-    /// - On macOS: ~/.ung/ung.db
-    /// - On iOS: App's Documents directory in iCloud container (if available) or local
+    /// - On macOS with iCloud: ~/Library/Mobile Documents/iCloud~com~ung~ung/Documents/ung.db
+    /// - On macOS without iCloud: ~/.ung/ung.db
+    /// - On iOS: Always uses iCloud if available, otherwise local Documents
     var databasePath: String {
         #if os(iOS)
         // iOS: Use iCloud Documents if available, otherwise local Documents
-        if let iCloudURL = fileManager.url(forUbiquityContainerIdentifier: nil)?
-            .appendingPathComponent("Documents")
-        {
+        if let iCloudURL = iCloudDocumentsURL {
             try? fileManager.createDirectory(at: iCloudURL, withIntermediateDirectories: true)
             return iCloudURL.appendingPathComponent("ung.db").path
         }
         let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
         return documentsURL.appendingPathComponent("ung.db").path
         #else
-        // macOS: Use ~/.ung/ to match CLI
+        // macOS: Use iCloud if enabled, otherwise ~/.ung/
+        if iCloudEnabled, let iCloudURL = iCloudDocumentsURL {
+            try? fileManager.createDirectory(at: iCloudURL, withIntermediateDirectories: true)
+            return iCloudURL.appendingPathComponent("ung.db").path
+        }
         let homeDir = fileManager.homeDirectoryForCurrentUser
         let ungDir = homeDir.appendingPathComponent(".ung")
         try? fileManager.createDirectory(at: ungDir, withIntermediateDirectories: true)
         return ungDir.appendingPathComponent("ung.db").path
         #endif
+    }
+
+    /// Returns the local database path (non-iCloud)
+    var localDatabasePath: String {
+        #if os(iOS)
+        let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return documentsURL.appendingPathComponent("ung.db").path
+        #else
+        let homeDir = fileManager.homeDirectoryForCurrentUser
+        let ungDir = homeDir.appendingPathComponent(".ung")
+        try? fileManager.createDirectory(at: ungDir, withIntermediateDirectories: true)
+        return ungDir.appendingPathComponent("ung.db").path
+        #endif
+    }
+
+    /// Returns the iCloud database path if available
+    var iCloudDatabasePath: String? {
+        guard let iCloudURL = iCloudDocumentsURL else { return nil }
+        try? fileManager.createDirectory(at: iCloudURL, withIntermediateDirectories: true)
+        return iCloudURL.appendingPathComponent("ung.db").path
     }
 
     /// Returns the directory for storing invoices
@@ -115,6 +176,126 @@ actor DatabaseService {
     /// Close the database connection
     func close() {
         dbPool = nil
+    }
+
+    // MARK: - iCloud Sync
+
+    /// Enable or disable iCloud sync
+    /// When enabling, copies local database to iCloud
+    /// When disabling, copies iCloud database to local
+    func setICloudEnabled(_ enabled: Bool) async throws {
+        guard enabled != iCloudEnabled else { return }
+
+        if enabled {
+            guard isICloudAvailable else {
+                throw DatabaseError.iCloudNotAvailable
+            }
+            // Copy local database to iCloud
+            try await migrateToICloud()
+        } else {
+            // Copy iCloud database to local
+            try await migrateFromICloud()
+        }
+
+        iCloudEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "iCloudSyncEnabled")
+
+        // Reinitialize with new path
+        close()
+        try await initialize()
+    }
+
+    /// Migrate database from local to iCloud
+    private func migrateToICloud() async throws {
+        guard let iCloudPath = iCloudDatabasePath else {
+            throw DatabaseError.iCloudNotAvailable
+        }
+
+        syncStatus = .syncing
+
+        let localPath = localDatabasePath
+        let iCloudURL = URL(fileURLWithPath: iCloudPath)
+
+        // Close current connection
+        close()
+
+        // Check if local database exists
+        if fileManager.fileExists(atPath: localPath) {
+            // Check if iCloud already has a database
+            if fileManager.fileExists(atPath: iCloudPath) {
+                // Use the more recent one
+                let localAttrs = try? fileManager.attributesOfItem(atPath: localPath)
+                let iCloudAttrs = try? fileManager.attributesOfItem(atPath: iCloudPath)
+
+                let localDate = localAttrs?[.modificationDate] as? Date ?? .distantPast
+                let iCloudDate = iCloudAttrs?[.modificationDate] as? Date ?? .distantPast
+
+                if localDate > iCloudDate {
+                    // Local is newer, overwrite iCloud
+                    try fileManager.removeItem(atPath: iCloudPath)
+                    try fileManager.copyItem(atPath: localPath, toPath: iCloudPath)
+                }
+                // Otherwise keep iCloud version
+            } else {
+                // Copy local to iCloud
+                try fileManager.copyItem(atPath: localPath, toPath: iCloudPath)
+            }
+        }
+
+        syncStatus = .completed
+    }
+
+    /// Migrate database from iCloud to local
+    private func migrateFromICloud() async throws {
+        guard let iCloudPath = iCloudDatabasePath else { return }
+
+        syncStatus = .syncing
+
+        let localPath = localDatabasePath
+
+        // Close current connection
+        close()
+
+        // Check if iCloud database exists
+        if fileManager.fileExists(atPath: iCloudPath) {
+            // Backup local if it exists
+            if fileManager.fileExists(atPath: localPath) {
+                let backupPath = localPath + ".backup"
+                try? fileManager.removeItem(atPath: backupPath)
+                try? fileManager.copyItem(atPath: localPath, toPath: backupPath)
+                try fileManager.removeItem(atPath: localPath)
+            }
+            // Copy from iCloud
+            try fileManager.copyItem(atPath: iCloudPath, toPath: localPath)
+        }
+
+        syncStatus = .completed
+    }
+
+    /// Trigger iCloud sync check - call when app comes to foreground
+    func triggerSync() async -> SyncStatus {
+        guard iCloudEnabled, isICloudAvailable else {
+            return .idle
+        }
+
+        syncStatus = .syncing
+
+        // Force download if file exists in iCloud but not downloaded
+        if let iCloudPath = iCloudDatabasePath {
+            let url = URL(fileURLWithPath: iCloudPath)
+            do {
+                try fileManager.startDownloadingUbiquitousItem(at: url)
+                // Wait a moment for sync to start
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                syncStatus = .completed
+            } catch {
+                syncStatus = .error(error.localizedDescription)
+            }
+        } else {
+            syncStatus = .idle
+        }
+
+        return syncStatus
     }
 
     // MARK: - Migrations

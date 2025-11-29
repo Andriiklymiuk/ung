@@ -159,6 +159,22 @@ struct MainWindowView: View {
 #if os(iOS)
 struct iOSTabView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+
+    var body: some View {
+        if horizontalSizeClass == .regular {
+            // iPad: Use sidebar navigation like macOS
+            iPadSplitView()
+        } else {
+            // iPhone: Use tab bar
+            iPhoneTabView()
+        }
+    }
+}
+
+// MARK: - iPhone Tab View
+struct iPhoneTabView: View {
+    @EnvironmentObject var appState: AppState
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -191,6 +207,135 @@ struct iOSTabView: View {
                     Label("More", systemImage: "ellipsis")
                 }
                 .tag(SidebarTab.settings)
+        }
+    }
+}
+
+// MARK: - iPad Split View
+struct iPadSplitView: View {
+    @EnvironmentObject var appState: AppState
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    var body: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            // Sidebar
+            iPadSidebar()
+        } detail: {
+            // Content
+            iPadDetailView()
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+}
+
+struct iPadSidebar: View {
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        List(selection: $appState.selectedTab) {
+            Section("Main") {
+                ForEach([SidebarTab.dashboard, .tracking, .clients, .invoices], id: \.self) { tab in
+                    Label(tab.rawValue, systemImage: tab.icon)
+                        .tag(tab)
+                }
+            }
+
+            Section("More") {
+                ForEach([SidebarTab.contracts, .expenses, .pomodoro, .reports], id: \.self) { tab in
+                    Label(tab.rawValue, systemImage: tab.icon)
+                        .tag(tab)
+                }
+            }
+
+            Section {
+                Label(SidebarTab.settings.rawValue, systemImage: SidebarTab.settings.icon)
+                    .tag(SidebarTab.settings)
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("UNG")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if appState.isTracking {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                        Text(appState.activeSession?.formattedDuration ?? "")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct iPadDetailView: View {
+    @EnvironmentObject var appState: AppState
+    @State private var showAddSheet = false
+
+    var body: some View {
+        Group {
+            switch appState.selectedTab {
+            case .dashboard:
+                MainDashboardContent()
+            case .tracking:
+                TrackingContent(showAddSheet: $showAddSheet)
+            case .clients:
+                ClientsContent(showAddSheet: $showAddSheet)
+            case .contracts:
+                ContractsContent(showAddSheet: $showAddSheet)
+            case .invoices:
+                InvoicesContent(showAddSheet: $showAddSheet)
+            case .expenses:
+                ExpensesContent(showAddSheet: $showAddSheet)
+            case .pomodoro:
+                PomodoroContent()
+            case .reports:
+                ReportsContent()
+            case .settings:
+                SettingsContent()
+            }
+        }
+        .navigationTitle(appState.selectedTab.rawValue)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if let action = primaryAction {
+                    Button(action: action.action) {
+                        Label(action.title, systemImage: action.icon)
+                    }
+                    .tint(action.color)
+                }
+            }
+
+            ToolbarItem(placement: .automatic) {
+                Button(action: { Task { await appState.refreshDashboard() } }) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(appState.isRefreshing)
+            }
+        }
+    }
+
+    private var primaryAction: (title: String, icon: String, color: Color, action: () -> Void)? {
+        switch appState.selectedTab {
+        case .tracking:
+            return appState.isTracking
+                ? nil : ("Start", "play.fill", .green, { showAddSheet = true })
+        case .clients:
+            return ("Add", "plus", .purple, { showAddSheet = true })
+        case .contracts:
+            return appState.clients.isEmpty ? nil : ("Add", "plus", .indigo, { showAddSheet = true })
+        case .invoices:
+            return (appState.setupStatus.hasCompany && !appState.clients.isEmpty && !appState.contracts.isEmpty)
+                ? ("Create", "plus", .teal, { showAddSheet = true }) : nil
+        case .expenses:
+            return ("Add", "plus", .orange, { showAddSheet = true })
+        case .pomodoro:
+            return appState.pomodoroState.isActive
+                ? nil : ("Start", "play.fill", .red, { appState.startPomodoro() })
+        default:
+            return nil
         }
     }
 }

@@ -26,6 +26,12 @@ func SetupRouter(
 	rateController *controllers.RateController,
 	goalController *controllers.GoalController,
 	subscriptionController *ungMiddleware.SubscriptionController,
+	recurringController *controllers.RecurringController,
+	reportController *controllers.ReportController,
+	pomodoroController *controllers.PomodoroController,
+	templateController *controllers.TemplateController,
+	searchController *controllers.SearchController,
+	exportController *controllers.ExportController,
 	authMiddleware func(http.Handler) http.Handler,
 	tenantMiddleware func(http.Handler) http.Handler,
 	subscriptionMiddleware func(http.Handler) http.Handler,
@@ -161,6 +167,76 @@ func SetupRouter(
 					r.Get("/{id}", goalController.Get)
 					r.Put("/{id}", goalController.Update)
 					r.Delete("/{id}", goalController.Delete)
+				})
+
+				// Recurring Invoices
+				r.Route("/recurring", func(r chi.Router) {
+					r.Get("/", recurringController.List)
+					r.Post("/", recurringController.Create)
+					r.Post("/generate", recurringController.Generate)
+					r.Get("/{id}", recurringController.Get)
+					r.Put("/{id}", recurringController.Update)
+					r.Delete("/{id}", recurringController.Delete)
+					r.Post("/{id}/pause", recurringController.Pause)
+					r.Post("/{id}/resume", recurringController.Resume)
+					r.Post("/{id}/generate", recurringController.GenerateSingle)
+				})
+
+				// Reports
+				r.Route("/reports", func(r chi.Router) {
+					r.Get("/weekly", reportController.Weekly)
+					r.Get("/monthly", reportController.Monthly)
+					r.Get("/revenue", reportController.Revenue)
+					r.Get("/clients", reportController.Clients)
+					r.Get("/overdue", reportController.Overdue)
+					r.Get("/unpaid", reportController.Unpaid)
+				})
+
+				// Pomodoro Timer
+				r.Route("/pomodoro", func(r chi.Router) {
+					r.Get("/", pomodoroController.List)
+					r.Get("/active", pomodoroController.Active)
+					r.Get("/stats", pomodoroController.Stats)
+					r.Post("/start", pomodoroController.Start)
+					r.Get("/{id}", pomodoroController.Get)
+					r.Post("/{id}/stop", pomodoroController.Stop)
+					r.Post("/{id}/complete", pomodoroController.Complete)
+					r.Delete("/{id}", pomodoroController.Delete)
+				})
+
+				// Templates
+				r.Route("/templates", func(r chi.Router) {
+					r.Get("/", templateController.List)
+					r.Post("/", templateController.Create)
+					r.Get("/default", templateController.GetDefault)
+					r.Get("/{id}", templateController.Get)
+					r.Put("/{id}", templateController.Update)
+					r.Delete("/{id}", templateController.Delete)
+					r.Post("/{id}/preview", templateController.Preview)
+				})
+
+				// Search
+				r.Route("/search", func(r chi.Router) {
+					r.Get("/", searchController.Search)
+					r.Get("/invoices", searchController.SearchInvoices)
+					r.Get("/clients", searchController.SearchClients)
+					r.Get("/contracts", searchController.SearchContracts)
+				})
+
+				// Export
+				r.Route("/export", func(r chi.Router) {
+					r.Get("/all", exportController.ExportAllJSON)
+					r.Get("/invoices/csv", exportController.ExportInvoicesCSV)
+					r.Get("/expenses/csv", exportController.ExportExpensesCSV)
+					r.Get("/tracking/csv", exportController.ExportTrackingCSV)
+					r.Get("/clients/csv", exportController.ExportClientsCSV)
+				})
+
+				// Import
+				r.Route("/import", func(r chi.Router) {
+					r.Post("/all", exportController.ImportAllJSON)
+					r.Post("/clients/csv", exportController.ImportClientsCSV)
+					r.Post("/expenses/csv", exportController.ImportExpensesCSV)
 				})
 			})
 

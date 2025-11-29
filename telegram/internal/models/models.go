@@ -71,4 +71,10 @@ const (
 	StateTrackLogHours          SessionState = "track_log_hours"
 	StateTrackLogProject        SessionState = "track_log_project"
 	StateTrackLogNotes          SessionState = "track_log_notes"
+	// Search states
+	StateSearchQuery            SessionState = "search_query"
+	// Pomodoro states
+	StatePomodoroProject        SessionState = "pomodoro_project"
+	// Goal states
+	StateGoalAmount             SessionState = "goal_amount"
 )

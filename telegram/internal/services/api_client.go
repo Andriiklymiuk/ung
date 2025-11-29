@@ -824,3 +824,525 @@ func (c *APIClient) GetDashboard(token string) (*RevenueProjection, error) {
 
 	return &projection, nil
 }
+
+// RecurringInvoice represents a recurring invoice from the API
+type RecurringInvoice struct {
+	ID             uint    `json:"id"`
+	ClientID       uint    `json:"client_id"`
+	CompanyID      uint    `json:"company_id"`
+	Amount         float64 `json:"amount"`
+	Currency       string  `json:"currency"`
+	Description    string  `json:"description"`
+	Frequency      string  `json:"frequency"`
+	DayOfMonth     int     `json:"day_of_month"`
+	NextRunDate    string  `json:"next_run_date"`
+	Active         bool    `json:"active"`
+	TotalGenerated int     `json:"total_generated"`
+}
+
+// ListRecurring fetches recurring invoices
+func (c *APIClient) ListRecurring(token string) ([]RecurringInvoice, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/recurring", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var recurring []RecurringInvoice
+	if err := json.Unmarshal(body, &recurring); err != nil {
+		return nil, err
+	}
+
+	return recurring, nil
+}
+
+// WeeklyReport represents weekly report data
+type WeeklyReport struct {
+	WeekStart    string  `json:"week_start"`
+	WeekEnd      string  `json:"week_end"`
+	TotalHours   float64 `json:"total_hours"`
+	TotalRevenue float64 `json:"total_revenue"`
+	Sessions     int     `json:"sessions"`
+}
+
+// GetWeeklyReport fetches weekly report
+func (c *APIClient) GetWeeklyReport(token string) (*WeeklyReport, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/reports/weekly", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var report WeeklyReport
+	if err := json.Unmarshal(body, &report); err != nil {
+		return nil, err
+	}
+
+	return &report, nil
+}
+
+// MonthlyReport represents monthly report data
+type MonthlyReport struct {
+	Month         string  `json:"month"`
+	Year          int     `json:"year"`
+	TotalHours    float64 `json:"total_hours"`
+	TotalRevenue  float64 `json:"total_revenue"`
+	TotalExpenses float64 `json:"total_expenses"`
+	Profit        float64 `json:"profit"`
+	InvoicesSent  int     `json:"invoices_sent"`
+	InvoicesPaid  int     `json:"invoices_paid"`
+}
+
+// GetMonthlyReport fetches monthly report
+func (c *APIClient) GetMonthlyReport(token string) (*MonthlyReport, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/reports/monthly", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var report MonthlyReport
+	if err := json.Unmarshal(body, &report); err != nil {
+		return nil, err
+	}
+
+	return &report, nil
+}
+
+// OverdueReport represents overdue invoices report
+type OverdueReport struct {
+	TotalOverdue float64 `json:"total_overdue"`
+	Count        int     `json:"count"`
+}
+
+// GetOverdueReport fetches overdue invoices report
+func (c *APIClient) GetOverdueReport(token string) (*OverdueReport, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/reports/overdue", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var report OverdueReport
+	if err := json.Unmarshal(body, &report); err != nil {
+		return nil, err
+	}
+
+	return &report, nil
+}
+
+// UnpaidReport represents unpaid invoices report
+type UnpaidReport struct {
+	TotalUnpaid float64 `json:"total_unpaid"`
+	Pending     float64 `json:"pending"`
+	Overdue     float64 `json:"overdue"`
+	Count       int     `json:"count"`
+}
+
+// GetUnpaidReport fetches unpaid invoices report
+func (c *APIClient) GetUnpaidReport(token string) (*UnpaidReport, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/reports/unpaid", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var report UnpaidReport
+	if err := json.Unmarshal(body, &report); err != nil {
+		return nil, err
+	}
+
+	return &report, nil
+}
+
+// PomodoroStats represents pomodoro statistics
+type PomodoroStats struct {
+	TodayCompleted int64   `json:"today_completed"`
+	TodayMinutes   int     `json:"today_minutes"`
+	WeekCompleted  int64   `json:"week_completed"`
+	MonthCompleted int64   `json:"month_completed"`
+	TotalCompleted int64   `json:"total_completed"`
+	CurrentStreak  int     `json:"current_streak"`
+	AvgDaily30d    float64 `json:"avg_daily_30d"`
+}
+
+// StartPomodoro starts a pomodoro session
+func (c *APIClient) StartPomodoro(token string, duration int, projectName string) (map[string]interface{}, error) {
+	data := map[string]interface{}{
+		"duration":     duration,
+		"project_name": projectName,
+		"session_type": "work",
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/pomodoro/start", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// GetActivePomodoro gets the active pomodoro session
+func (c *APIClient) GetActivePomodoro(token string) (map[string]interface{}, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/pomodoro/active", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// GetPomodoroStats gets pomodoro statistics
+func (c *APIClient) GetPomodoroStats(token string) (*PomodoroStats, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/pomodoro/stats", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var stats PomodoroStats
+	if err := json.Unmarshal(body, &stats); err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}
+
+// IncomeGoal represents an income goal
+type IncomeGoal struct {
+	ID          uint    `json:"id"`
+	Amount      float64 `json:"amount"`
+	Period      string  `json:"period"`
+	Year        int     `json:"year"`
+	Month       int     `json:"month"`
+	Description string  `json:"description"`
+}
+
+// GoalStatus represents goal progress
+type GoalStatus struct {
+	Goal      IncomeGoal `json:"goal"`
+	Current   float64    `json:"current"`
+	Progress  float64    `json:"progress_percent"`
+	Remaining float64    `json:"remaining"`
+}
+
+// GetGoalStatus fetches goal status/progress
+func (c *APIClient) GetGoalStatus(token string) (*GoalStatus, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/goals/status", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var status GoalStatus
+	if err := json.Unmarshal(body, &status); err != nil {
+		return nil, err
+	}
+
+	return &status, nil
+}
+
+// RateAnalysis represents rate analysis data
+type RateAnalysis struct {
+	AverageRate   float64 `json:"average_rate"`
+	EffectiveRate float64 `json:"effective_rate"`
+	TotalHours    float64 `json:"total_hours"`
+	TotalRevenue  float64 `json:"total_revenue"`
+	SuggestedRate float64 `json:"suggested_rate"`
+}
+
+// GetRateAnalysis fetches rate analysis
+func (c *APIClient) GetRateAnalysis(token string) (*RateAnalysis, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/rate/analyze", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var analysis RateAnalysis
+	if err := json.Unmarshal(body, &analysis); err != nil {
+		return nil, err
+	}
+
+	return &analysis, nil
+}
+
+// UserSettings represents user settings
+type UserSettings struct {
+	ID                uint    `json:"id"`
+	HoursPerWeek      float64 `json:"hours_per_week"`
+	WeeksPerYear      int     `json:"weeks_per_year"`
+	DefaultTaxPercent float64 `json:"default_tax_percent"`
+	DefaultMargin     float64 `json:"default_margin"`
+	AnnualExpenses    float64 `json:"annual_expenses"`
+	DefaultCurrency   string  `json:"default_currency"`
+}
+
+// GetSettings fetches user settings
+func (c *APIClient) GetSettings(token string) (*UserSettings, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/settings", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var settings UserSettings
+	if err := json.Unmarshal(body, &settings); err != nil {
+		return nil, err
+	}
+
+	return &settings, nil
+}
+
+// SearchResult represents a search result
+type SearchResult struct {
+	Type        string `json:"type"`
+	ID          uint   `json:"id"`
+	Title       string `json:"title"`
+	Subtitle    string `json:"subtitle"`
+	Description string `json:"description"`
+}
+
+// SearchResponse represents search response
+type SearchResponse struct {
+	Query   string         `json:"query"`
+	Results []SearchResult `json:"results"`
+	Counts  map[string]int `json:"counts"`
+}
+
+// Search performs a global search
+func (c *APIClient) Search(token string, query string) (*SearchResponse, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/search?q="+query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var searchResp SearchResponse
+	if err := json.Unmarshal(body, &searchResp); err != nil {
+		return nil, err
+	}
+
+	return &searchResp, nil
+}

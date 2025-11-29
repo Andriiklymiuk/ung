@@ -731,30 +731,24 @@ class AppState: ObservableObject {
         NSSound.beep()
         #endif
 
+        let isLongBreak = pomodoroState.sessionsCompleted % pomodoroState.sessionsUntilLongBreak == 0
+
         if pomodoroState.isBreak {
+            // Break just finished, back to work
             pomodoroState.isBreak = false
             pomodoroState.secondsRemaining = pomodoroState.workMinutes * 60
+            // Notify that break is complete
+            NotificationService.shared.schedulePomodoroComplete(isBreak: true, isLongBreak: isLongBreak, delay: 0.5)
         } else {
+            // Work session finished, start break
             pomodoroState.sessionsCompleted += 1
             pomodoroState.isBreak = true
-            let isLongBreak = pomodoroState.sessionsCompleted % pomodoroState.sessionsUntilLongBreak == 0
+            let isNowLongBreak = pomodoroState.sessionsCompleted % pomodoroState.sessionsUntilLongBreak == 0
             pomodoroState.secondsRemaining =
-                (isLongBreak ? pomodoroState.longBreakMinutes : pomodoroState.breakMinutes) * 60
-
-            sendPomodoroNotification(isLongBreak: isLongBreak)
+                (isNowLongBreak ? pomodoroState.longBreakMinutes : pomodoroState.breakMinutes) * 60
+            // Notify that work session is complete
+            NotificationService.shared.schedulePomodoroComplete(isBreak: false, isLongBreak: isNowLongBreak, delay: 0.5)
         }
-    }
-
-    private func sendPomodoroNotification(isLongBreak: Bool) {
-        let content = UNMutableNotificationContent()
-        content.title = "Pomodoro Complete!"
-        content.body =
-            isLongBreak ? "Great work! Take a long break." : "Nice focus session! Take a short break."
-        content.sound = .default
-
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
     }
 
     // MARK: - Password Management

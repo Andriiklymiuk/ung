@@ -40,6 +40,9 @@ struct SettingsSection: View {
       // iCloud Sync
       iCloudCard
 
+      // Notifications
+      notificationsCard
+
       // Security & Privacy - Most important first
       securityCard
 
@@ -64,6 +67,28 @@ struct SettingsSection: View {
       biometricsAvailable = true
       biometricType = context.biometryType
     }
+  }
+
+  // MARK: - Notifications Card
+  private var notificationsCard: some View {
+    NavigationLink {
+      NotificationSettingsView()
+    } label: {
+      SettingsCard(title: "Notifications", icon: "bell.badge.fill", color: .red) {
+        VStack(spacing: Design.Spacing.sm) {
+          SettingsRow(
+            icon: "bell.fill",
+            title: "Notification Settings",
+            subtitle: "Reminders, alerts & quiet hours"
+          ) {
+            Image(systemName: "chevron.right")
+              .font(.system(size: 10, weight: .semibold))
+              .foregroundColor(Design.Colors.textTertiary)
+          }
+        }
+      }
+    }
+    .buttonStyle(.plain)
   }
 
   // MARK: - iCloud Card

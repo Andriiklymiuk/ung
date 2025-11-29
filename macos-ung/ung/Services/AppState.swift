@@ -716,6 +716,18 @@ class AppState: ObservableObject {
                 clientId: clientId != nil ? Int64(clientId!) : nil
             )
             await checkActiveTracking()
+
+            // Start Live Activity for real-time display
+            #if os(iOS)
+            if let session = activeSession {
+                LiveActivityService.shared.startTrackingActivity(
+                    project: session.project,
+                    client: session.client,
+                    startTime: session.startTime
+                )
+            }
+            #endif
+
             showToastMessage("Started tracking: \(project)", type: .success)
         } catch {
             showError("Failed to start tracking: \(error.localizedDescription)")
@@ -729,6 +741,12 @@ class AppState: ObservableObject {
             isTracking = false
             activeSession = nil
             stopTrackingTimer()
+
+            // End Live Activity
+            #if os(iOS)
+            LiveActivityService.shared.endTrackingActivity()
+            #endif
+
             await refreshDashboard()
             showToastMessage("Tracking stopped", type: .success)
         } catch {
@@ -743,16 +761,45 @@ class AppState: ObservableObject {
         pomodoroState.isBreak = false
         pomodoroState.secondsRemaining = pomodoroState.workMinutes * 60
         startPomodoroTimer()
+
+        // Start Live Activity
+        #if os(iOS)
+        LiveActivityService.shared.startPomodoroActivity(
+            sessionsCompleted: pomodoroState.sessionsCompleted,
+            workMinutes: pomodoroState.workMinutes,
+            breakMinutes: pomodoroState.breakMinutes,
+            secondsRemaining: pomodoroState.secondsRemaining,
+            isBreak: false
+        )
+        #endif
     }
 
     func pausePomodoro() {
         pomodoroState.isPaused = true
+
+        // Update Live Activity
+        #if os(iOS)
+        LiveActivityService.shared.updatePomodoroActivity(
+            secondsRemaining: pomodoroState.secondsRemaining,
+            isBreak: pomodoroState.isBreak,
+            isPaused: true
+        )
+        #endif
         stopPomodoroTimer()
     }
 
     func resumePomodoro() {
         pomodoroState.isPaused = false
         startPomodoroTimer()
+
+        // Update Live Activity
+        #if os(iOS)
+        LiveActivityService.shared.updatePomodoroActivity(
+            secondsRemaining: pomodoroState.secondsRemaining,
+            isBreak: pomodoroState.isBreak,
+            isPaused: false
+        )
+        #endif
     }
 
     func stopPomodoro() {
@@ -761,6 +808,11 @@ class AppState: ObservableObject {
         pomodoroState.isBreak = false
         pomodoroState.secondsRemaining = pomodoroState.workMinutes * 60
         stopPomodoroTimer()
+
+        // End Live Activity
+        #if os(iOS)
+        LiveActivityService.shared.endPomodoroActivity()
+        #endif
     }
 
     func skipPomodoro() {
@@ -774,6 +826,15 @@ class AppState: ObservableObject {
             pomodoroState.secondsRemaining =
                 (isLongBreak ? pomodoroState.longBreakMinutes : pomodoroState.breakMinutes) * 60
         }
+
+        // Update Live Activity
+        #if os(iOS)
+        LiveActivityService.shared.updatePomodoroActivity(
+            secondsRemaining: pomodoroState.secondsRemaining,
+            isBreak: pomodoroState.isBreak,
+            isPaused: false
+        )
+        #endif
     }
 
     private func startPomodoroTimer() {
@@ -783,6 +844,15 @@ class AppState: ObservableObject {
                 guard let self = self else { return }
                 if self.pomodoroState.secondsRemaining > 0 {
                     self.pomodoroState.secondsRemaining -= 1
+
+                    // Update Live Activity every second
+                    #if os(iOS)
+                    LiveActivityService.shared.updatePomodoroActivity(
+                        secondsRemaining: self.pomodoroState.secondsRemaining,
+                        isBreak: self.pomodoroState.isBreak,
+                        isPaused: false
+                    )
+                    #endif
                 } else {
                     self.pomodoroCompleted()
                 }
@@ -818,6 +888,15 @@ class AppState: ObservableObject {
             // Notify that work session is complete
             NotificationService.shared.schedulePomodoroComplete(isBreak: false, isLongBreak: isNowLongBreak, delay: 0.5)
         }
+
+        // Update Live Activity with new state
+        #if os(iOS)
+        LiveActivityService.shared.updatePomodoroActivity(
+            secondsRemaining: pomodoroState.secondsRemaining,
+            isBreak: pomodoroState.isBreak,
+            isPaused: false
+        )
+        #endif
     }
 
     // MARK: - Password Management

@@ -901,6 +901,80 @@ actor DatabaseService {
         }
     }
 
+    // MARK: - Invoice Line Items
+
+    func getInvoiceLineItems(invoiceId: Int64) async throws -> [InvoiceLineItem] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try InvoiceLineItem
+                .filter(Column("invoice_id") == invoiceId)
+                .fetchAll(db)
+        }
+    }
+
+    func createInvoiceLineItem(_ item: InvoiceLineItem) async throws -> InvoiceLineItem {
+        let db = try getDatabase()
+        var newItem = item
+        return try await db.write { db in
+            try newItem.insert(db)
+            return newItem
+        }
+    }
+
+    func deleteInvoiceLineItems(invoiceId: Int64) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try InvoiceLineItem
+                .filter(Column("invoice_id") == invoiceId)
+                .deleteAll(db)
+        }
+    }
+
+    // MARK: - Invoice Recipients
+
+    func getInvoiceRecipients(invoiceId: Int64) async throws -> [InvoiceRecipient] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try InvoiceRecipient
+                .filter(Column("invoice_id") == invoiceId)
+                .fetchAll(db)
+        }
+    }
+
+    func getInvoiceClient(invoiceId: Int64) async throws -> ClientModel? {
+        let db = try getDatabase()
+        return try await db.read { db in
+            // Get the first recipient's client
+            guard let recipient = try InvoiceRecipient
+                .filter(Column("invoice_id") == invoiceId)
+                .fetchOne(db) else {
+                return nil
+            }
+            return try ClientModel.fetchOne(db, key: recipient.clientId)
+        }
+    }
+
+    func createInvoiceRecipient(_ recipient: InvoiceRecipient) async throws -> InvoiceRecipient {
+        let db = try getDatabase()
+        var newRecipient = recipient
+        return try await db.write { db in
+            try newRecipient.insert(db)
+            return newRecipient
+        }
+    }
+
+    // MARK: - Invoice PDF Generation
+
+    func updateInvoicePDFPath(id: Int64, pdfPath: String) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try db.execute(
+                sql: "UPDATE invoices SET pdf_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                arguments: [pdfPath, id]
+            )
+        }
+    }
+
     // MARK: - Expense Operations
 
     func getExpenses() async throws -> [Expense] {

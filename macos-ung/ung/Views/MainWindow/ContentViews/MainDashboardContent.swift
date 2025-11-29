@@ -195,10 +195,10 @@ struct MainDashboardContent: View {
       VStack(spacing: 8) {
         if appState.recentSessions.isEmpty && appState.recentInvoices.isEmpty {
           Text("No recent activity")
-            .font(.system(size: 13))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.bodyMedium)
+            .foregroundColor(Design.Colors.textSecondary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
+            .padding(.vertical, Design.Spacing.lg)
         } else {
           ForEach(appState.recentSessions.prefix(3)) { session in
             ActivityRow(
@@ -244,31 +244,31 @@ struct MainDashboardContent: View {
             )
             .rotationEffect(.degrees(-90))
 
-          VStack(spacing: 4) {
+          VStack(spacing: Design.Spacing.xxs) {
             Text(appState.formatHours(appState.metrics.weeklyHours))
-              .font(.system(size: 20, weight: .bold, design: .rounded))
-              .foregroundColor(.primary)
+              .font(Design.Typography.headingMedium)
+              .foregroundColor(Design.Colors.textPrimary)
 
             Text("of \(Int(appState.metrics.weeklyTarget))h")
-              .font(.system(size: 12))
-              .foregroundColor(.secondary)
+              .font(Design.Typography.bodySmall)
+              .foregroundColor(Design.Colors.textSecondary)
           }
         }
         .frame(width: 120, height: 120)
 
         // Streak badge
         if appState.metrics.trackingStreak > 0 {
-          HStack(spacing: 6) {
+          HStack(spacing: Design.Spacing.xs) {
             Image(systemName: "flame.fill")
-              .foregroundColor(.orange)
+              .foregroundColor(Design.Colors.warning)
             Text("\(appState.metrics.trackingStreak) day streak")
-              .font(.system(size: 12, weight: .medium))
-              .foregroundColor(.orange)
+              .font(Design.Typography.labelMedium)
+              .foregroundColor(Design.Colors.warning)
           }
-          .padding(.horizontal, 12)
-          .padding(.vertical, 6)
-          .background(Color.orange.opacity(0.15))
-          .cornerRadius(8)
+          .padding(.horizontal, Design.Spacing.sm)
+          .padding(.vertical, Design.Spacing.xs)
+          .background(Design.Colors.warningLight)
+          .cornerRadius(Design.Radius.sm)
         }
       }
       .frame(maxWidth: .infinity)
@@ -302,35 +302,35 @@ struct MainDashboardContent: View {
 
   // MARK: - Unpaid Invoices Card
   private var unpaidInvoicesCard: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: Design.Spacing.sm) {
       HStack {
         Image(systemName: "exclamationmark.triangle.fill")
-          .foregroundColor(.orange)
+          .foregroundColor(Design.Colors.warning)
         Text("Unpaid Invoices")
-          .font(.system(size: 14, weight: .semibold))
+          .font(Design.Typography.headingSmall)
         Spacer()
       }
 
-      HStack(spacing: 16) {
+      HStack(spacing: Design.Spacing.md) {
         if appState.metrics.pendingAmount > 0 {
-          VStack(alignment: .leading, spacing: 2) {
+          VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
             Text("Pending")
-              .font(.system(size: 11))
-              .foregroundColor(.secondary)
+              .font(Design.Typography.labelSmall)
+              .foregroundColor(Design.Colors.textSecondary)
             Text(appState.formatCurrency(appState.metrics.pendingAmount))
-              .font(.system(size: 16, weight: .bold))
-              .foregroundColor(.orange)
+              .font(Design.Typography.headingSmall)
+              .foregroundColor(Design.Colors.warning)
           }
         }
 
         if appState.metrics.overdueAmount > 0 {
-          VStack(alignment: .leading, spacing: 2) {
+          VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
             Text("Overdue")
-              .font(.system(size: 11))
-              .foregroundColor(.secondary)
+              .font(Design.Typography.labelSmall)
+              .foregroundColor(Design.Colors.textSecondary)
             Text(appState.formatCurrency(appState.metrics.overdueAmount))
-              .font(.system(size: 16, weight: .bold))
-              .foregroundColor(.red)
+              .font(Design.Typography.headingSmall)
+              .foregroundColor(Design.Colors.error)
           }
         }
 
@@ -340,27 +340,27 @@ struct MainDashboardContent: View {
           appState.selectedTab = .invoices
         }
         .buttonStyle(.plain)
-        .font(.system(size: 12, weight: .medium))
-        .foregroundColor(.blue)
+        .font(Design.Typography.labelMedium)
+        .foregroundColor(Design.Colors.primary)
       }
     }
-    .padding(16)
+    .padding(Design.Spacing.md)
     .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(Color.orange.opacity(0.1))
+      RoundedRectangle(cornerRadius: Design.Radius.md)
+        .fill(Design.Colors.warningLight)
         .overlay(
-          RoundedRectangle(cornerRadius: 12)
-            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+          RoundedRectangle(cornerRadius: Design.Radius.md)
+            .stroke(Design.Colors.warning.opacity(0.3), lineWidth: 1)
         )
     )
   }
 
   private func statusColor(_ status: String) -> Color {
     switch status.lowercased() {
-    case "paid": return .green
-    case "sent", "pending": return .orange
-    case "overdue": return .red
-    default: return .gray
+    case "paid": return Design.Colors.success
+    case "sent", "pending": return Design.Colors.warning
+    case "overdue": return Design.Colors.error
+    default: return Design.Colors.textTertiary
     }
   }
 }
@@ -375,38 +375,42 @@ struct MetricCardLarge: View {
   @Environment(\.colorScheme) var colorScheme
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: Design.Spacing.sm) {
       HStack {
         Image(systemName: icon)
-          .font(.system(size: 14))
+          .font(.system(size: Design.IconSize.sm))
           .foregroundColor(color)
 
         if let trend = trend {
           Spacer()
           Text(trend)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(.green)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.green.opacity(0.15))
-            .cornerRadius(4)
+            .font(Design.Typography.labelSmall)
+            .foregroundColor(Design.Colors.success)
+            .padding(.horizontal, Design.Spacing.xs)
+            .padding(.vertical, Design.Spacing.xxxs)
+            .background(Design.Colors.successLight)
+            .cornerRadius(Design.Radius.xs)
         }
       }
 
       Text(value)
-        .font(.system(size: 24, weight: .bold, design: .rounded))
-        .foregroundColor(.primary)
+        .font(Design.Typography.headingLarge)
+        .foregroundColor(Design.Colors.textPrimary)
 
       Text(title)
-        .font(.system(size: 12))
-        .foregroundColor(.secondary)
+        .font(Design.Typography.bodySmall)
+        .foregroundColor(Design.Colors.textSecondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(16)
+    .padding(Design.Spacing.md)
     .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(colorScheme == .dark ? Color(white: 0.12) : Color.white)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+      RoundedRectangle(cornerRadius: Design.Radius.md)
+        .fill(Design.Colors.surfaceElevated(colorScheme))
+        .shadow(
+          color: Design.Shadow.sm.color,
+          radius: Design.Shadow.sm.radius,
+          y: Design.Shadow.sm.y
+        )
     )
   }
 }
@@ -418,23 +422,28 @@ struct DashboardCard<Content: View>: View {
   @Environment(\.colorScheme) var colorScheme
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: Design.Spacing.md) {
       HStack {
         Image(systemName: icon)
-          .font(.system(size: 12))
-          .foregroundColor(.secondary)
+          .font(.system(size: Design.IconSize.xs))
+          .foregroundColor(Design.Colors.textSecondary)
         Text(title)
-          .font(.system(size: 14, weight: .semibold))
+          .font(Design.Typography.headingSmall)
         Spacer()
       }
+      .accessibleHeader(label: title)
 
       content()
     }
-    .padding(16)
+    .padding(Design.Spacing.md)
     .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(colorScheme == .dark ? Color(white: 0.12) : Color.white)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+      RoundedRectangle(cornerRadius: Design.Radius.md)
+        .fill(Design.Colors.surfaceElevated(colorScheme))
+        .shadow(
+          color: Design.Shadow.sm.color,
+          radius: Design.Shadow.sm.radius,
+          y: Design.Shadow.sm.y
+        )
     )
   }
 }
@@ -449,40 +458,42 @@ struct QuickActionCardButton: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 12) {
+      HStack(spacing: Design.Spacing.sm) {
         ZStack {
-          RoundedRectangle(cornerRadius: 10)
+          RoundedRectangle(cornerRadius: Design.Radius.sm)
             .fill(color.opacity(0.15))
             .frame(width: 40, height: 40)
 
           Image(systemName: icon)
-            .font(.system(size: 16))
+            .font(.system(size: Design.IconSize.md))
             .foregroundColor(color)
         }
 
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
           Text(title)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundColor(.primary)
+            .font(Design.Typography.bodyMedium)
+            .fontWeight(.medium)
+            .foregroundColor(Design.Colors.textPrimary)
 
           Text(subtitle)
-            .font(.system(size: 11))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
         }
 
         Spacer()
 
         Image(systemName: "chevron.right")
-          .font(.system(size: 11))
-          .foregroundColor(.secondary)
+          .font(.system(size: Design.IconSize.xs))
+          .foregroundColor(Design.Colors.textTertiary)
       }
-      .padding(12)
+      .padding(Design.Spacing.sm)
       .background(
-        RoundedRectangle(cornerRadius: 10)
-          .fill(colorScheme == .dark ? Color(white: 0.1) : Color(white: 0.97))
+        RoundedRectangle(cornerRadius: Design.Radius.sm)
+          .fill(Design.Colors.backgroundSecondary(colorScheme))
       )
     }
     .buttonStyle(.plain)
+    .accessibleButton(label: title, hint: subtitle)
   }
 }
 
@@ -494,30 +505,30 @@ struct ActivityRow: View {
   let trailing: String
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: Design.Spacing.sm) {
       Image(systemName: icon)
-        .font(.system(size: 12))
+        .font(.system(size: Design.IconSize.xs))
         .foregroundColor(iconColor)
-        .frame(width: 24)
+        .frame(width: Design.Spacing.lg)
 
-      VStack(alignment: .leading, spacing: 1) {
+      VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
         Text(title)
-          .font(.system(size: 12, weight: .medium))
-          .foregroundColor(.primary)
+          .font(Design.Typography.labelMedium)
+          .foregroundColor(Design.Colors.textPrimary)
           .lineLimit(1)
 
         Text(subtitle)
-          .font(.system(size: 10))
-          .foregroundColor(.secondary)
+          .font(Design.Typography.labelSmall)
+          .foregroundColor(Design.Colors.textSecondary)
       }
 
       Spacer()
 
       Text(trailing)
-        .font(.system(size: 11, weight: .medium, design: .monospaced))
-        .foregroundColor(.secondary)
+        .font(Design.Typography.monoSmall)
+        .foregroundColor(Design.Colors.textSecondary)
     }
-    .padding(.vertical, 6)
+    .padding(.vertical, Design.Spacing.xs)
   }
 }
 
@@ -528,27 +539,28 @@ struct SetupStepRow: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 10) {
+      HStack(spacing: Design.Spacing.sm) {
         Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
-          .font(.system(size: 16))
-          .foregroundColor(isComplete ? .green : .secondary)
+          .font(.system(size: Design.IconSize.md))
+          .foregroundColor(isComplete ? Design.Colors.success : Design.Colors.textSecondary)
 
         Text(title)
-          .font(.system(size: 13))
-          .foregroundColor(isComplete ? .secondary : .primary)
+          .font(Design.Typography.bodyMedium)
+          .foregroundColor(isComplete ? Design.Colors.textSecondary : Design.Colors.textPrimary)
           .strikethrough(isComplete)
 
         Spacer()
 
         if !isComplete {
           Image(systemName: "chevron.right")
-            .font(.system(size: 10))
-            .foregroundColor(.secondary)
+            .font(.system(size: Design.IconSize.xs))
+            .foregroundColor(Design.Colors.textSecondary)
         }
       }
     }
     .buttonStyle(.plain)
     .disabled(isComplete)
+    .accessibleButton(label: title, hint: isComplete ? "Completed" : "Tap to complete")
   }
 }
 

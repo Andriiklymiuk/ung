@@ -549,6 +549,8 @@ struct DSToast: View {
   let message: String
   let type: ToastType
   @Binding var isPresented: Bool
+  var autoDismiss: Bool = true
+  var dismissAfter: Double = 4.0
 
   enum ToastType {
     case success, error, warning, info
@@ -570,40 +572,192 @@ struct DSToast: View {
       case .info: return "info.circle.fill"
       }
     }
+
+    var accessibilityLabel: String {
+      switch self {
+      case .success: return "Success"
+      case .error: return "Error"
+      case .warning: return "Warning"
+      case .info: return "Information"
+      }
+    }
   }
 
   var body: some View {
     HStack(spacing: Design.Spacing.xs) {
       Image(systemName: type.icon)
-        .font(.system(size: 12, weight: .medium))
+        .font(Design.Typography.labelMedium)
         .foregroundColor(type.color)
 
       Text(message)
-        .font(.system(size: 12, weight: .medium))
+        .font(Design.Typography.labelMedium)
         .foregroundColor(Design.Colors.textPrimary)
-        .lineLimit(1)
+        .lineLimit(2)
 
-      Button(action: { isPresented = false }) {
+      Button(action: { withAnimation(Design.Animation.quick) { isPresented = false } }) {
         Image(systemName: "xmark")
-          .font(.system(size: 9, weight: .semibold))
+          .font(Design.Typography.labelSmall)
           .foregroundColor(Design.Colors.textTertiary)
-          .padding(4)
+          .padding(Design.Spacing.xxs)
       }
       .buttonStyle(.plain)
+      .accessibilityLabel("Dismiss notification")
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
+    .padding(.horizontal, Design.Spacing.sm)
+    .padding(.vertical, Design.Spacing.xs)
     .background(
-      RoundedRectangle(cornerRadius: 8)
+      RoundedRectangle(cornerRadius: Design.Radius.sm)
         .fill(.ultraThinMaterial)
         .overlay(
-          RoundedRectangle(cornerRadius: 8)
+          RoundedRectangle(cornerRadius: Design.Radius.sm)
             .stroke(type.color.opacity(0.5), lineWidth: 1.5)
         )
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        .shadow(color: Design.Shadow.md.color, radius: Design.Shadow.md.radius, y: Design.Shadow.md.y)
     )
     .fixedSize()
     .transition(.move(edge: .bottom).combined(with: .opacity))
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(type.accessibilityLabel): \(message)")
+    .accessibilityAddTraits(.isStaticText)
+    .onAppear {
+      if autoDismiss {
+        DispatchQueue.main.asyncAfter(deadline: .now() + dismissAfter) {
+          withAnimation(Design.Animation.smooth) {
+            isPresented = false
+          }
+        }
+      }
+    }
+  }
+}
+
+// MARK: - Skeleton Loading View
+struct DSSkeletonView: View {
+  var width: CGFloat? = nil
+  var height: CGFloat = 16
+  var cornerRadius: CGFloat = Design.Radius.xs
+  @State private var isAnimating = false
+  @Environment(\.colorScheme) var colorScheme
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: cornerRadius)
+      .fill(
+        LinearGradient(
+          colors: [
+            Design.Colors.backgroundSecondary(colorScheme),
+            Design.Colors.backgroundTertiary(colorScheme),
+            Design.Colors.backgroundSecondary(colorScheme)
+          ],
+          startPoint: .leading,
+          endPoint: .trailing
+        )
+      )
+      .frame(width: width, height: height)
+      .mask(
+        Rectangle()
+          .fill(
+            LinearGradient(
+              colors: [.clear, .white.opacity(0.5), .clear],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
+          .offset(x: isAnimating ? 200 : -200)
+      )
+      .onAppear {
+        withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+          isAnimating = true
+        }
+      }
+  }
+}
+
+// MARK: - Skeleton Card Loading
+struct DSSkeletonCard: View {
+  var lines: Int = 3
+  @Environment(\.colorScheme) var colorScheme
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+      DSSkeletonView(width: 120, height: 12)
+      ForEach(0..<lines, id: \.self) { index in
+        DSSkeletonView(
+          width: index == lines - 1 ? 180 : nil,
+          height: 14
+        )
+      }
+    }
+    .padding(Design.Spacing.md)
+    .background(
+      RoundedRectangle(cornerRadius: Design.Radius.md)
+        .fill(Design.Colors.surfaceElevated(colorScheme))
+        .shadow(
+          color: Design.Shadow.sm.color,
+          radius: Design.Shadow.sm.radius,
+          y: Design.Shadow.sm.y
+        )
+    )
+  }
+}
+
+// MARK: - Shimmer Effect Modifier
+struct ShimmerModifier: ViewModifier {
+  @State private var phase: CGFloat = 0
+  var duration: Double = 1.5
+
+  func body(content: Content) -> some View {
+    content
+      .overlay(
+        GeometryReader { geometry in
+          LinearGradient(
+            colors: [
+              .clear,
+              .white.opacity(0.2),
+              .clear
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+          )
+          .frame(width: geometry.size.width * 2)
+          .offset(x: -geometry.size.width + (geometry.size.width * 2 * phase))
+        }
+        .mask(content)
+      )
+      .onAppear {
+        withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+          phase = 1
+        }
+      }
+  }
+}
+
+// MARK: - Accessibility Helpers
+extension View {
+  /// Adds standard accessibility for interactive elements
+  func accessibleButton(label: String, hint: String? = nil) -> some View {
+    self
+      .accessibilityLabel(label)
+      .accessibilityHint(hint ?? "")
+      .accessibilityAddTraits(.isButton)
+  }
+
+  /// Adds accessibility for static text elements
+  func accessibleText(label: String) -> some View {
+    self
+      .accessibilityLabel(label)
+      .accessibilityAddTraits(.isStaticText)
+  }
+
+  /// Adds accessibility for header elements
+  func accessibleHeader(label: String) -> some View {
+    self
+      .accessibilityLabel(label)
+      .accessibilityAddTraits(.isHeader)
+  }
+
+  /// Adds shimmer loading effect
+  func shimmer(duration: Double = 1.5) -> some View {
+    modifier(ShimmerModifier(duration: duration))
   }
 }
 

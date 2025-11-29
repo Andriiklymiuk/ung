@@ -2,7 +2,7 @@
 //  PomodoroWidget.swift
 //  ungWidgets
 //
-//  Shows pomodoro timer status
+//  Premium pomodoro timer widget with Telegram-inspired design
 //
 
 import SwiftUI
@@ -32,7 +32,6 @@ struct PomodoroProvider: TimelineProvider {
         var entries: [PomodoroEntry] = []
 
         if data.pomodoroActive {
-            // Update every second for active timer (up to 60 entries)
             for secondOffset in stride(from: 0, to: min(data.pomodoroSecondsRemaining, 60), by: 1) {
                 let entryDate = Calendar.current.date(byAdding: .second, value: secondOffset, to: currentDate)!
                 var updatedData = data
@@ -52,7 +51,36 @@ struct PomodoroProvider: TimelineProvider {
 // MARK: - Widget View
 struct PomodoroWidgetView: View {
     @Environment(\.widgetFamily) var family
+    @Environment(\.colorScheme) var colorScheme
     var entry: PomodoroEntry
+
+    private var timerGradient: LinearGradient {
+        if !entry.data.pomodoroActive {
+            return LinearGradient(colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.3)], startPoint: .top, endPoint: .bottom)
+        }
+        return entry.data.pomodoroIsBreak ? WidgetColors.breakGradient : WidgetColors.focusGradient
+    }
+
+    private var timerColor: Color {
+        if !entry.data.pomodoroActive {
+            return .gray
+        }
+        return entry.data.pomodoroIsBreak ? WidgetColors.breakGreen : WidgetColors.focusOrange
+    }
+
+    private var statusIcon: String {
+        if !entry.data.pomodoroActive {
+            return "brain.head.profile"
+        }
+        return entry.data.pomodoroIsBreak ? "cup.and.saucer.fill" : "brain.head.profile.fill"
+    }
+
+    private var statusText: String {
+        if !entry.data.pomodoroActive {
+            return "Ready to Focus"
+        }
+        return entry.data.pomodoroIsBreak ? "Break Time" : "Stay Focused"
+    }
 
     var body: some View {
         switch family {
@@ -65,164 +93,184 @@ struct PomodoroWidgetView: View {
         }
     }
 
-    private var timerColor: Color {
-        if !entry.data.pomodoroActive {
-            return .gray
-        }
-        return entry.data.pomodoroIsBreak ? .green : .orange
-    }
-
-    private var statusIcon: String {
-        if !entry.data.pomodoroActive {
-            return "brain.head.profile"
-        }
-        return entry.data.pomodoroIsBreak ? "cup.and.saucer.fill" : "brain.head.profile.fill"
-    }
-
-    private var statusText: String {
-        if !entry.data.pomodoroActive {
-            return "Ready"
-        }
-        return entry.data.pomodoroIsBreak ? "Break Time" : "Focus Mode"
-    }
-
     // MARK: - Small View
     private var smallView: some View {
-        VStack(spacing: 8) {
-            // Status icon
-            ZStack {
-                Circle()
-                    .fill(timerColor.opacity(0.15))
-                    .frame(width: 50, height: 50)
+        ZStack {
+            // Background
+            ContainerRelativeShape()
+                .fill(colorScheme == .dark
+                    ? Color(hex: "1C1C1E")
+                    : Color(hex: "F8F9FA")
+                )
 
-                if entry.data.pomodoroActive {
-                    // Progress ring
+            VStack(spacing: 8) {
+                // Timer ring
+                ZStack {
+                    // Background ring
                     Circle()
-                        .trim(from: 0, to: calculateProgress())
-                        .stroke(timerColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .frame(width: 50, height: 50)
-                        .rotationEffect(.degrees(-90))
-                }
+                        .stroke(timerGradient.opacity(0.2), lineWidth: 6)
+                        .frame(width: 70, height: 70)
 
-                Image(systemName: statusIcon)
-                    .font(.system(size: 20))
-                    .foregroundColor(timerColor)
-            }
-
-            if entry.data.pomodoroActive {
-                Text(entry.data.pomodoroTimeFormatted)
-                    .font(.system(size: 24, weight: .bold, design: .monospaced))
-                    .foregroundColor(timerColor)
-                    .monospacedDigit()
-
-                Text(statusText)
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            } else {
-                Text("Pomodoro")
-                    .font(.system(size: 14, weight: .semibold))
-
-                Text("Tap to start")
-                    .font(.system(size: 11))
-                    .foregroundColor(.blue)
-            }
-
-            // Sessions completed
-            if entry.data.pomodoroSessionsCompleted > 0 {
-                HStack(spacing: 2) {
-                    ForEach(0..<min(entry.data.pomodoroSessionsCompleted, 4), id: \.self) { _ in
+                    if entry.data.pomodoroActive {
+                        // Progress ring
                         Circle()
-                            .fill(Color.orange)
-                            .frame(width: 6, height: 6)
+                            .trim(from: 0, to: calculateProgress())
+                            .stroke(timerGradient, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                            .frame(width: 70, height: 70)
+                            .rotationEffect(.degrees(-90))
+
+                        // Glow
+                        Circle()
+                            .trim(from: 0, to: calculateProgress())
+                            .stroke(timerGradient, style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                            .frame(width: 70, height: 70)
+                            .rotationEffect(.degrees(-90))
+                            .blur(radius: 6)
+                            .opacity(0.5)
                     }
-                    if entry.data.pomodoroSessionsCompleted > 4 {
-                        Text("+\(entry.data.pomodoroSessionsCompleted - 4)")
-                            .font(.system(size: 8))
-                            .foregroundColor(.secondary)
+
+                    // Center content
+                    VStack(spacing: 2) {
+                        Image(systemName: statusIcon)
+                            .font(.system(size: 18))
+                            .foregroundStyle(timerGradient)
+
+                        if entry.data.pomodoroActive {
+                            Text(entry.data.pomodoroTimeFormatted)
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                .foregroundColor(timerColor)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+
+                // Status
+                Text(statusText)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(entry.data.pomodoroActive ? timerColor : WidgetColors.textTertiary)
+
+                // Session dots
+                if entry.data.pomodoroSessionsCompleted > 0 || entry.data.pomodoroActive {
+                    HStack(spacing: 4) {
+                        ForEach(0..<4, id: \.self) { index in
+                            Circle()
+                                .fill(index < entry.data.pomodoroSessionsCompleted % 4 ? timerColor : Color.gray.opacity(0.2))
+                                .frame(width: 6, height: 6)
+                        }
                     }
                 }
             }
-        }
-        .padding()
-        .containerBackground(for: .widget) {
-            Color(.systemBackground)
+            .padding(12)
         }
         .widgetURL(URL(string: "ung://pomodoro"))
     }
 
     // MARK: - Medium View
     private var mediumView: some View {
-        HStack(spacing: 20) {
-            // Timer circle
-            ZStack {
-                Circle()
-                    .stroke(timerColor.opacity(0.2), lineWidth: 8)
-                    .frame(width: 90, height: 90)
+        ZStack {
+            // Background
+            ContainerRelativeShape()
+                .fill(colorScheme == .dark
+                    ? Color(hex: "1C1C1E")
+                    : Color(hex: "F8F9FA")
+                )
 
-                if entry.data.pomodoroActive {
+            HStack(spacing: 20) {
+                // Left - Timer ring
+                ZStack {
+                    // Background ring
                     Circle()
-                        .trim(from: 0, to: calculateProgress())
-                        .stroke(timerColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .stroke(timerGradient.opacity(0.2), lineWidth: 8)
                         .frame(width: 90, height: 90)
-                        .rotationEffect(.degrees(-90))
-                }
-
-                VStack(spacing: 2) {
-                    Image(systemName: statusIcon)
-                        .font(.system(size: 20))
-                        .foregroundColor(timerColor)
 
                     if entry.data.pomodoroActive {
-                        Text(entry.data.pomodoroTimeFormatted)
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundColor(timerColor)
-                            .monospacedDigit()
+                        // Progress ring
+                        Circle()
+                            .trim(from: 0, to: calculateProgress())
+                            .stroke(timerGradient, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                            .frame(width: 90, height: 90)
+                            .rotationEffect(.degrees(-90))
+
+                        // Glow
+                        Circle()
+                            .trim(from: 0, to: calculateProgress())
+                            .stroke(timerGradient, style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                            .frame(width: 90, height: 90)
+                            .rotationEffect(.degrees(-90))
+                            .blur(radius: 8)
+                            .opacity(0.5)
+                    }
+
+                    // Center content
+                    VStack(spacing: 2) {
+                        Image(systemName: statusIcon)
+                            .font(.system(size: 22))
+                            .foregroundStyle(timerGradient)
+
+                        if entry.data.pomodoroActive {
+                            Text(entry.data.pomodoroTimeFormatted)
+                                .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                .foregroundColor(timerColor)
+                                .monospacedDigit()
+                        }
                     }
                 }
-            }
 
-            // Status and info
-            VStack(alignment: .leading, spacing: 8) {
-                Text(statusText)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(entry.data.pomodoroActive ? timerColor : .primary)
+                // Right - Status and info
+                VStack(alignment: .leading, spacing: 8) {
+                    // Status header
+                    HStack(spacing: 6) {
+                        if entry.data.pomodoroActive {
+                            PulsingDot(color: timerColor, size: 6)
+                        } else {
+                            Circle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 6, height: 6)
+                        }
 
-                if entry.data.pomodoroActive {
-                    Text(entry.data.pomodoroIsBreak ? "Take a break!" : "Stay focused")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("Start a focus session")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
+                        Text(entry.data.pomodoroActive ? (entry.data.pomodoroIsBreak ? "BREAK" : "FOCUS") : "READY")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1)
+                            .foregroundColor(entry.data.pomodoroActive ? timerColor : WidgetColors.textTertiary)
+                    }
 
-                Spacer()
+                    // Status text
+                    Text(statusText)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(WidgetColors.textPrimary)
 
-                // Sessions today
-                HStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange)
-                    Text("\(entry.data.pomodoroSessionsCompleted) sessions")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
+                    if !entry.data.pomodoroActive {
+                        Text("Tap to start a focus session")
+                            .font(.system(size: 12))
+                            .foregroundColor(WidgetColors.textTertiary)
+                    }
 
-                // Session indicators
-                HStack(spacing: 3) {
-                    ForEach(0..<4, id: \.self) { index in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(index < entry.data.pomodoroSessionsCompleted % 4 ? Color.orange : Color.gray.opacity(0.3))
-                            .frame(width: 20, height: 4)
+                    Spacer()
+
+                    // Session progress
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.orange)
+                            Text("\(entry.data.pomodoroSessionsCompleted) sessions today")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(WidgetColors.textTertiary)
+                        }
+
+                        // Session indicators
+                        HStack(spacing: 4) {
+                            ForEach(0..<4, id: \.self) { index in
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(index < entry.data.pomodoroSessionsCompleted % 4 ? timerColor : Color.gray.opacity(0.2))
+                                    .frame(width: 24, height: 4)
+                            }
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding()
-        .containerBackground(for: .widget) {
-            Color(.systemBackground)
+            .padding(16)
         }
         .widgetURL(URL(string: "ung://pomodoro"))
     }
@@ -246,20 +294,21 @@ struct PomodoroWidget: Widget {
         StaticConfiguration(kind: kind, provider: PomodoroProvider()) { entry in
             PomodoroWidgetView(entry: entry)
         }
-        .configurationDisplayName("Pomodoro Timer")
-        .description("Quick access to your focus timer.")
+        .configurationDisplayName("Focus Timer")
+        .description("Track your Pomodoro sessions with style.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 
-#Preview(as: .systemSmall) {
+#Preview(as: .systemMedium) {
     PomodoroWidget()
 } timeline: {
     PomodoroEntry(date: .now, data: WidgetData())
     var active = WidgetData()
     active.pomodoroActive = true
     active.pomodoroIsBreak = false
-    active.pomodoroSecondsRemaining = 15 * 60 + 30
+    active.pomodoroSecondsRemaining = 18 * 60 + 45
     active.pomodoroSessionsCompleted = 3
     return PomodoroEntry(date: .now, data: active)
 }

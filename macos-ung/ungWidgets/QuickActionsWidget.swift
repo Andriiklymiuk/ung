@@ -2,7 +2,7 @@
 //  QuickActionsWidget.swift
 //  ungWidgets
 //
-//  Quick action buttons for common tasks
+//  Premium quick actions widget with Telegram-inspired design
 //
 
 import SwiftUI
@@ -29,7 +29,6 @@ struct QuickActionsProvider: TimelineProvider {
         let data = WidgetData.load()
         let entry = QuickActionsEntry(date: Date(), data: data)
 
-        // Refresh every 15 minutes
         let refreshDate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
         let timeline = Timeline(entries: [entry], policy: .after(refreshDate))
         completion(timeline)
@@ -39,6 +38,7 @@ struct QuickActionsProvider: TimelineProvider {
 // MARK: - Widget View
 struct QuickActionsWidgetView: View {
     @Environment(\.widgetFamily) var family
+    @Environment(\.colorScheme) var colorScheme
     var entry: QuickActionsEntry
 
     var body: some View {
@@ -54,174 +54,248 @@ struct QuickActionsWidgetView: View {
 
     // MARK: - Small View (2x2 Grid)
     private var smallView: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                actionButton(
-                    icon: entry.data.isTracking ? "stop.fill" : "play.fill",
-                    label: entry.data.isTracking ? "Stop" : "Track",
-                    color: entry.data.isTracking ? .red : .blue,
-                    url: "ung://tracking/toggle"
+        ZStack {
+            // Background
+            ContainerRelativeShape()
+                .fill(colorScheme == .dark
+                    ? Color(hex: "1C1C1E")
+                    : Color(hex: "F8F9FA")
                 )
 
-                actionButton(
-                    icon: "brain.head.profile.fill",
-                    label: "Focus",
-                    color: .orange,
-                    url: "ung://pomodoro/start"
-                )
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    // Track/Stop button
+                    Link(destination: URL(string: "ung://tracking/toggle")!) {
+                        actionTile(
+                            icon: entry.data.isTracking ? "stop.fill" : "play.fill",
+                            label: entry.data.isTracking ? "Stop" : "Track",
+                            gradient: entry.data.isTracking ? WidgetColors.trackingGradient : WidgetColors.statsGradient,
+                            isActive: entry.data.isTracking
+                        )
+                    }
+
+                    // Focus button
+                    Link(destination: URL(string: "ung://pomodoro/start")!) {
+                        actionTile(
+                            icon: entry.data.pomodoroActive ? "pause.fill" : "brain.head.profile.fill",
+                            label: entry.data.pomodoroActive ? "Pause" : "Focus",
+                            gradient: WidgetColors.focusGradient,
+                            isActive: entry.data.pomodoroActive
+                        )
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    // Invoices button
+                    Link(destination: URL(string: "ung://invoices")!) {
+                        actionTile(
+                            icon: "doc.text.fill",
+                            label: "Invoice",
+                            gradient: WidgetColors.invoiceGradient,
+                            badge: entry.data.pendingInvoices > 0 ? "\(entry.data.pendingInvoices)" : nil
+                        )
+                    }
+
+                    // Expenses button
+                    Link(destination: URL(string: "ung://expenses/add")!) {
+                        actionTile(
+                            icon: "plus.circle.fill",
+                            label: "Expense",
+                            gradient: LinearGradient(
+                                colors: [Color(hex: "A55EEA"), Color(hex: "8854D0")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    }
+                }
             }
-
-            HStack(spacing: 8) {
-                actionButton(
-                    icon: "doc.plaintext.fill",
-                    label: "Invoice",
-                    color: .green,
-                    url: "ung://invoices"
-                )
-
-                actionButton(
-                    icon: "chart.bar.fill",
-                    label: "Reports",
-                    color: .purple,
-                    url: "ung://reports"
-                )
-            }
-        }
-        .padding(8)
-        .containerBackground(for: .widget) {
-            Color(.systemBackground)
+            .padding(10)
         }
     }
 
-    // MARK: - Medium View (4 buttons in row)
+    // MARK: - Medium View (4 actions in row)
     private var mediumView: some View {
-        HStack(spacing: 12) {
-            Link(destination: URL(string: "ung://tracking/toggle")!) {
-                VStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(entry.data.isTracking ? Color.red.opacity(0.15) : Color.blue.opacity(0.15))
-                            .frame(width: 50, height: 50)
+        ZStack {
+            // Background
+            ContainerRelativeShape()
+                .fill(colorScheme == .dark
+                    ? Color(hex: "1C1C1E")
+                    : Color(hex: "F8F9FA")
+                )
 
-                        Image(systemName: entry.data.isTracking ? "stop.fill" : "play.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(entry.data.isTracking ? .red : .blue)
-                    }
+            HStack(spacing: 12) {
+                // Track/Stop
+                Link(destination: URL(string: "ung://tracking/toggle")!) {
+                    mediumActionCard(
+                        icon: entry.data.isTracking ? "stop.fill" : "play.fill",
+                        title: entry.data.isTracking ? "Stop" : "Start",
+                        subtitle: entry.data.isTracking ? entry.data.trackingDuration : "Tracking",
+                        gradient: entry.data.isTracking ? WidgetColors.trackingGradient : WidgetColors.statsGradient,
+                        isActive: entry.data.isTracking
+                    )
+                }
 
-                    Text(entry.data.isTracking ? "Stop" : "Start")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.primary)
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 1)
+                    .padding(.vertical, 12)
 
-                    if entry.data.isTracking {
-                        Text(entry.data.trackingDuration)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.red)
-                    }
+                // Focus
+                Link(destination: URL(string: "ung://pomodoro/start")!) {
+                    mediumActionCard(
+                        icon: entry.data.pomodoroActive ? "pause.fill" : "brain.head.profile.fill",
+                        title: entry.data.pomodoroActive ? "Pause" : "Focus",
+                        subtitle: entry.data.pomodoroActive ? entry.data.pomodoroTimeFormatted : "Timer",
+                        gradient: WidgetColors.focusGradient,
+                        isActive: entry.data.pomodoroActive
+                    )
+                }
+
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 1)
+                    .padding(.vertical, 12)
+
+                // Invoices
+                Link(destination: URL(string: "ung://invoices")!) {
+                    mediumActionCard(
+                        icon: "doc.text.fill",
+                        title: "Invoices",
+                        subtitle: entry.data.pendingInvoices > 0 ? "\(entry.data.pendingInvoices) pending" : "View all",
+                        gradient: WidgetColors.invoiceGradient,
+                        badge: entry.data.pendingInvoices > 0 ? "\(entry.data.pendingInvoices)" : nil
+                    )
+                }
+
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 1)
+                    .padding(.vertical, 12)
+
+                // Add Expense
+                Link(destination: URL(string: "ung://expenses/add")!) {
+                    mediumActionCard(
+                        icon: "plus.circle.fill",
+                        title: "Expense",
+                        subtitle: "Log new",
+                        gradient: LinearGradient(
+                            colors: [Color(hex: "A55EEA"), Color(hex: "8854D0")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                 }
             }
-
-            Divider()
-
-            Link(destination: URL(string: "ung://pomodoro/start")!) {
-                VStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.orange.opacity(0.15))
-                            .frame(width: 50, height: 50)
-
-                        Image(systemName: entry.data.pomodoroActive ? "pause.fill" : "brain.head.profile.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.orange)
-                    }
-
-                    Text(entry.data.pomodoroActive ? "Pause" : "Focus")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.primary)
-
-                    if entry.data.pomodoroActive {
-                        Text(entry.data.pomodoroTimeFormatted)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.orange)
-                    }
-                }
-            }
-
-            Divider()
-
-            Link(destination: URL(string: "ung://invoices")!) {
-                VStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.green.opacity(0.15))
-                            .frame(width: 50, height: 50)
-
-                        Image(systemName: "doc.plaintext.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.green)
-                    }
-
-                    Text("Invoices")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.primary)
-
-                    if entry.data.pendingInvoices > 0 {
-                        Text("\(entry.data.pendingInvoices) pending")
-                            .font(.system(size: 9))
-                            .foregroundColor(.green)
-                    }
-                }
-            }
-
-            Divider()
-
-            Link(destination: URL(string: "ung://expenses/add")!) {
-                VStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.purple.opacity(0.15))
-                            .frame(width: 50, height: 50)
-
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.purple)
-                    }
-
-                    Text("Expense")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.primary)
-
-                    Text("Log new")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-        .padding()
-        .containerBackground(for: .widget) {
-            Color(.systemBackground)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
     }
 
-    // MARK: - Helper
-    private func actionButton(icon: String, label: String, color: Color, url: String) -> some View {
-        Link(destination: URL(string: url)!) {
-            VStack(spacing: 4) {
+    // MARK: - Helper Views
+
+    private func actionTile(icon: String, label: String, gradient: LinearGradient, isActive: Bool = false, badge: String? = nil) -> some View {
+        VStack(spacing: 6) {
+            ZStack(alignment: .topTrailing) {
                 ZStack {
+                    // Background
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(color.opacity(0.15))
+                        .fill(gradient.opacity(isActive ? 0.25 : 0.15))
                         .frame(width: 44, height: 44)
 
+                    // Glow when active
+                    if isActive {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(gradient)
+                            .frame(width: 44, height: 44)
+                            .blur(radius: 10)
+                            .opacity(0.4)
+                    }
+
+                    // Icon
                     Image(systemName: icon)
-                        .font(.system(size: 18))
-                        .foregroundColor(color)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(gradient)
                 }
 
-                Text(label)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.primary)
+                // Badge
+                if let badge = badge {
+                    Text(badge)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(WidgetColors.trackingGradient)
+                        .clipShape(Capsule())
+                        .offset(x: 6, y: -6)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(WidgetColors.textPrimary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func mediumActionCard(icon: String, title: String, subtitle: String, gradient: LinearGradient, isActive: Bool = false, badge: String? = nil) -> some View {
+        VStack(spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    // Icon circle
+                    Circle()
+                        .fill(gradient.opacity(isActive ? 0.25 : 0.15))
+                        .frame(width: 48, height: 48)
+
+                    // Glow when active
+                    if isActive {
+                        Circle()
+                            .fill(gradient)
+                            .frame(width: 48, height: 48)
+                            .blur(radius: 12)
+                            .opacity(0.4)
+                    }
+
+                    // Icon
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(gradient)
+                }
+
+                // Badge
+                if let badge = badge {
+                    Text(badge)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(width: 18, height: 18)
+                        .background(WidgetColors.trackingGradient)
+                        .clipShape(Circle())
+                        .offset(x: 4, y: -4)
+                }
+            }
+
+            VStack(spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(WidgetColors.textPrimary)
+
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundColor(isActive ? Color(gradient.stops.first?.color ?? .gray) : WidgetColors.textTertiary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// Helper extension for gradient color extraction
+extension LinearGradient {
+    var stops: [Gradient.Stop] {
+        return []
     }
 }
 
@@ -234,8 +308,9 @@ struct QuickActionsWidget: Widget {
             QuickActionsWidgetView(entry: entry)
         }
         .configurationDisplayName("Quick Actions")
-        .description("Quick access to common tasks like tracking and invoicing.")
+        .description("Fast access to common tasks.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 

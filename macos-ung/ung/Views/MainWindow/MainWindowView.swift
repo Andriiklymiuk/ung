@@ -249,6 +249,13 @@ struct iPadSidebar: View {
         .listStyle(.sidebar)
         .navigationTitle("UNG")
         .toolbar {
+            // iCloud sync indicator
+            ToolbarItem(placement: .navigation) {
+                if appState.iCloudEnabled {
+                    iCloudStatusIcon
+                }
+            }
+
             ToolbarItem(placement: .primaryAction) {
                 if appState.isTracking {
                     HStack(spacing: 4) {
@@ -261,6 +268,23 @@ struct iPadSidebar: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var iCloudStatusIcon: some View {
+        Group {
+            if case .syncing = appState.syncStatus {
+                ProgressView()
+                    .scaleEffect(0.6)
+            } else if case .error = appState.syncStatus {
+                Image(systemName: "exclamationmark.icloud.fill")
+                    .foregroundColor(.orange)
+            } else {
+                Image(systemName: "checkmark.icloud.fill")
+                    .foregroundColor(.green)
+            }
+        }
+        .font(.system(size: 14))
     }
 }
 
@@ -492,23 +516,33 @@ struct SidebarView: View {
     private var appHeader: some View {
         VStack(spacing: 4) {
             ZStack(alignment: .bottomTrailing) {
-                if let appIcon = NSImage(named: "AppIcon") {
-                    Image(nsImage: appIcon)
-                        .resizable()
-                        .frame(width: 40, height: 40)
-                        .cornerRadius(10)
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.blue)
+                // App icon with sync indicator
+                ZStack(alignment: .topLeading) {
+                    if let appIcon = NSImage(named: "AppIcon") {
+                        Image(nsImage: appIcon)
+                            .resizable()
                             .frame(width: 40, height: 40)
+                            .cornerRadius(10)
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.blue)
+                                .frame(width: 40, height: 40)
 
-                        Image(systemName: "clock.badge.checkmark")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
+                            Image(systemName: "clock.badge.checkmark")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                    }
+
+                    // iCloud sync indicator (top-left corner)
+                    if appState.iCloudEnabled {
+                        syncStatusBadge
+                            .offset(x: -6, y: -6)
                     }
                 }
 
+                // Secure mode badge (bottom-right corner)
                 if appState.secureMode {
                     ZStack {
                         Circle()
@@ -534,9 +568,67 @@ struct SidebarView: View {
                 : "Secure Mode Disabled - All data visible"
             appState.showToastMessage(message, type: appState.secureMode ? .warning : .info)
         }
-        .help(
-            appState.secureMode
-                ? "Secure Mode: On (double-click to toggle)" : "Double-click to enable Secure Mode")
+        .help(syncStatusHelp)
+    }
+
+    @ViewBuilder
+    private var syncStatusBadge: some View {
+        ZStack {
+            Circle()
+                .fill(syncBadgeColor)
+                .frame(width: 18, height: 18)
+                .shadow(color: syncBadgeColor.opacity(0.4), radius: 3, x: 0, y: 1)
+
+            if case .syncing = appState.syncStatus {
+                // Spinning cloud icon when syncing
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+                    .rotationEffect(.degrees(syncRotation))
+                    .onAppear {
+                        withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+                            syncRotation = 360
+                        }
+                    }
+            } else if case .error = appState.syncStatus {
+                Image(systemName: "exclamationmark.icloud.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+            } else {
+                Image(systemName: "checkmark.icloud.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        }
+    }
+
+    @State private var syncRotation: Double = 0
+
+    private var syncBadgeColor: Color {
+        switch appState.syncStatus {
+        case .syncing:
+            return Color.blue
+        case .error:
+            return Color.orange
+        default:
+            return Color.green
+        }
+    }
+
+    private var syncStatusHelp: String {
+        if appState.iCloudEnabled {
+            switch appState.syncStatus {
+            case .syncing:
+                return "Syncing with iCloud..."
+            case .error(let msg):
+                return "Sync error: \(msg)"
+            default:
+                return "iCloud sync enabled. Double-click to toggle Secure Mode"
+            }
+        }
+        return appState.secureMode
+            ? "Secure Mode: On (double-click to toggle)"
+            : "Double-click to enable Secure Mode"
     }
 
     private var activeStatusBanner: some View {

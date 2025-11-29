@@ -283,24 +283,6 @@ struct SettingsSection: View {
 
         Divider().padding(.leading, 44)
 
-        // Links
-        HStack(spacing: Design.Spacing.lg) {
-          LinkButton(title: "Docs", icon: "book.fill") {
-            openURL("https://andriiklymiuk.github.io/ung/")
-          }
-
-          LinkButton(title: "GitHub", icon: "chevron.left.forwardslash.chevron.right") {
-            openURL("https://github.com/Andriiklymiuk/ung")
-          }
-
-          LinkButton(title: "Report Bug", icon: "ladybug.fill") {
-            openURL("https://github.com/Andriiklymiuk/ung/issues")
-          }
-        }
-        .padding(.vertical, Design.Spacing.sm)
-
-        Divider()
-
         // Quit
         SettingsActionRow(
           icon: "power",
@@ -351,12 +333,6 @@ struct SettingsSection: View {
   }
 
   // MARK: - Actions
-  private func openURL(_ urlString: String) {
-    if let url = URL(string: urlString) {
-      NSWorkspace.shared.open(url)
-    }
-  }
-
   private func checkForUpdates() {
     isCheckingForUpdates = true
 
@@ -674,32 +650,6 @@ struct SettingsActionRow: View {
         RoundedRectangle(cornerRadius: Design.Radius.xs)
           .fill(isHovered ? Color.secondary.opacity(0.08) : Color.clear)
       )
-    }
-    .buttonStyle(.plain)
-    .onHover { hovering in
-      withAnimation(Design.Animation.quick) {
-        isHovered = hovering
-      }
-    }
-  }
-}
-
-struct LinkButton: View {
-  let title: String
-  let icon: String
-  let action: () -> Void
-
-  @State private var isHovered = false
-
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: 4) {
-        Image(systemName: icon)
-          .font(.system(size: 10))
-        Text(title)
-          .font(Design.Typography.labelSmall)
-      }
-      .foregroundColor(isHovered ? .blue : Design.Colors.textSecondary)
     }
     .buttonStyle(.plain)
     .onHover { hovering in

@@ -300,6 +300,8 @@ struct ClientsContent: View {
   // Form fields
   @State private var clientName = ""
   @State private var clientEmail = ""
+  @State private var clientAddress = ""
+  @State private var clientTaxId = ""
 
   var filteredClients: [Client] {
     if searchQuery.isEmpty {
@@ -346,6 +348,8 @@ struct ClientsContent: View {
                     selectedClient = client
                     clientName = client.name
                     clientEmail = client.email
+                    clientAddress = client.address
+                    clientTaxId = client.taxId
                     showEditClient = true
                   },
                   onDelete: {
@@ -404,6 +408,8 @@ struct ClientsContent: View {
       if newValue {
         clientName = ""
         clientEmail = ""
+        clientAddress = ""
+        clientTaxId = ""
       }
     }
   }
@@ -416,6 +422,8 @@ struct ClientsContent: View {
       VStack(spacing: Design.Spacing.md) {
         FormField(label: "Name", text: $clientName, placeholder: "Client name")
         FormField(label: "Email", text: $clientEmail, placeholder: "client@example.com")
+        FormField(label: "Address", text: $clientAddress, placeholder: "123 Business St, City")
+        FormField(label: "Tax ID", text: $clientTaxId, placeholder: "XX-XXXXXXX")
 
         HStack(spacing: Design.Spacing.sm) {
           Button("Cancel") {
@@ -423,30 +431,41 @@ struct ClientsContent: View {
             showEditClient = false
           }
           .buttonStyle(DSSecondaryButtonStyle())
+          .keyboardShortcut(.escape, modifiers: [])
 
           Button(showEditClient ? "Save" : "Add Client") {
-            Task {
-              if showEditClient, let client = selectedClient {
-                _ = await appState.cliService.updateClient(
-                  id: client.id,
-                  name: clientName.isEmpty ? nil : clientName,
-                  email: clientEmail.isEmpty ? nil : clientEmail
-                )
-              } else {
-                _ = await appState.cliService.createClient(
-                  name: clientName,
-                  email: clientEmail.isEmpty ? nil : clientEmail
-                )
-              }
-              await appState.refreshDashboard()
-              showAddSheet = false
-              showEditClient = false
-            }
+            submitClient()
           }
           .buttonStyle(DSPrimaryButtonStyle())
           .disabled(clientName.isEmpty)
+          .keyboardShortcut(.return, modifiers: .command)
         }
       }
+    }
+  }
+
+  private func submitClient() {
+    guard !clientName.isEmpty else { return }
+    Task {
+      if showEditClient, let client = selectedClient {
+        _ = await appState.cliService.updateClient(
+          id: client.id,
+          name: clientName.isEmpty ? nil : clientName,
+          email: clientEmail.isEmpty ? nil : clientEmail,
+          address: clientAddress.isEmpty ? nil : clientAddress,
+          taxId: clientTaxId.isEmpty ? nil : clientTaxId
+        )
+      } else {
+        _ = await appState.cliService.createClient(
+          name: clientName,
+          email: clientEmail.isEmpty ? nil : clientEmail,
+          address: clientAddress.isEmpty ? nil : clientAddress,
+          taxId: clientTaxId.isEmpty ? nil : clientTaxId
+        )
+      }
+      await appState.refreshDashboard()
+      showAddSheet = false
+      showEditClient = false
     }
   }
 }
@@ -522,9 +541,13 @@ struct ContractsContent: View {
   @State private var contractName = ""
   @State private var selectedClientId: Int?
   @State private var rate: Double = 50
+  @State private var price: Double = 0
   @State private var contractType = "hourly"
+  @State private var contractCurrency = "USD"
+  @State private var contractNotes = ""
 
-  let contractTypes = ["hourly", "fixed", "retainer"]
+  let contractTypes = ["hourly", "fixed_price", "retainer"]
+  let currencies = ["USD", "EUR", "GBP", "CAD", "AUD", "CHF", "JPY", "PLN", "UAH"]
 
   var filteredContracts: [Contract] {
     if searchQuery.isEmpty {
@@ -581,7 +604,10 @@ struct ContractsContent: View {
                     selectedContract = contract
                     contractName = contract.name
                     rate = contract.rate
+                    price = contract.price
                     contractType = contract.type
+                    contractCurrency = contract.currency
+                    contractNotes = contract.notes
                     showEditContract = true
                   },
                   onDelete: {
@@ -640,7 +666,10 @@ struct ContractsContent: View {
         contractName = ""
         selectedClientId = appState.clients.first?.id
         rate = 50
+        price = 0
         contractType = "hourly"
+        contractCurrency = "USD"
+        contractNotes = ""
       }
     }
   }
@@ -669,20 +698,44 @@ struct ContractsContent: View {
           }
         }
 
-        NumberStepper(
-          label: "Hourly Rate ($)", value: $rate, range: 1...1000, step: 5, format: "$%.0f")
-
         VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
           Text("Contract Type")
             .font(Design.Typography.labelSmall)
             .foregroundColor(Design.Colors.textSecondary)
 
           Picker("", selection: $contractType) {
-            ForEach(contractTypes, id: \.self) { type in
-              Text(type.capitalized).tag(type)
-            }
+            Text("Hourly").tag("hourly")
+            Text("Fixed Price").tag("fixed_price")
+            Text("Retainer").tag("retainer")
           }
           .pickerStyle(.segmented)
+        }
+
+        if contractType == "hourly" || contractType == "retainer" {
+          NumberStepper(
+            label: "Hourly Rate", value: $rate, range: 1...1000, step: 5, format: "%.0f")
+        }
+
+        if contractType == "fixed_price" {
+          NumberStepper(
+            label: "Fixed Price", value: $price, range: 0...100000, step: 100, format: "%.0f")
+        }
+
+        VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
+          Text("Currency")
+            .font(Design.Typography.labelSmall)
+            .foregroundColor(Design.Colors.textSecondary)
+
+          Picker("", selection: $contractCurrency) {
+            ForEach(currencies, id: \.self) { currency in
+              Text(currency).tag(currency)
+            }
+          }
+          .pickerStyle(.menu)
+        }
+
+        if showEditContract {
+          FormField(label: "Notes", text: $contractNotes, placeholder: "Contract notes...")
         }
 
         HStack(spacing: Design.Spacing.sm) {
@@ -691,33 +744,46 @@ struct ContractsContent: View {
             showEditContract = false
           }
           .buttonStyle(DSSecondaryButtonStyle())
+          .keyboardShortcut(.escape, modifiers: [])
 
           Button(showEditContract ? "Save" : "Create") {
-            Task {
-              if showEditContract, let contract = selectedContract {
-                _ = await appState.cliService.updateContract(
-                  id: contract.id,
-                  name: contractName.isEmpty ? nil : contractName,
-                  rate: rate,
-                  type: contractType
-                )
-              } else if let clientId = selectedClientId {
-                _ = await appState.cliService.createContract(
-                  name: contractName,
-                  clientId: clientId,
-                  rate: rate,
-                  type: contractType
-                )
-              }
-              await appState.refreshDashboard()
-              showAddSheet = false
-              showEditContract = false
-            }
+            submitContract()
           }
           .buttonStyle(DSPrimaryButtonStyle())
           .disabled(contractName.isEmpty || (!showEditContract && selectedClientId == nil))
+          .keyboardShortcut(.return, modifiers: .command)
         }
       }
+    }
+  }
+
+  private func submitContract() {
+    guard !contractName.isEmpty else { return }
+    guard showEditContract || selectedClientId != nil else { return }
+    Task {
+      if showEditContract, let contract = selectedContract {
+        _ = await appState.cliService.updateContract(
+          id: contract.id,
+          name: contractName.isEmpty ? nil : contractName,
+          rate: contractType == "hourly" || contractType == "retainer" ? rate : nil,
+          price: contractType == "fixed_price" ? price : nil,
+          type: contractType,
+          currency: contractCurrency,
+          notes: contractNotes.isEmpty ? nil : contractNotes
+        )
+      } else if let clientId = selectedClientId {
+        _ = await appState.cliService.createContract(
+          name: contractName,
+          clientId: clientId,
+          rate: contractType == "hourly" || contractType == "retainer" ? rate : nil,
+          price: contractType == "fixed_price" ? price : nil,
+          type: contractType,
+          currency: contractCurrency
+        )
+      }
+      await appState.refreshDashboard()
+      showAddSheet = false
+      showEditContract = false
     }
   }
 }
@@ -975,20 +1041,25 @@ struct InvoicesContent: View {
             showAddSheet = false
           }
           .buttonStyle(DSSecondaryButtonStyle())
+          .keyboardShortcut(.escape, modifiers: [])
 
           Button("Create Invoice") {
-            Task {
-              if let clientId = selectedClientId {
-                _ = await appState.cliService.createInvoice(clientId: clientId)
-                await appState.refreshDashboard()
-              }
-              showAddSheet = false
-            }
+            submitInvoice()
           }
           .buttonStyle(DSPrimaryButtonStyle())
           .disabled(selectedClientId == nil)
+          .keyboardShortcut(.return, modifiers: .command)
         }
       }
+    }
+  }
+
+  private func submitInvoice() {
+    guard let clientId = selectedClientId else { return }
+    Task {
+      _ = await appState.cliService.createInvoice(clientId: clientId)
+      await appState.refreshDashboard()
+      showAddSheet = false
     }
   }
 
@@ -1275,32 +1346,39 @@ struct ExpensesContent: View {
             showEditExpense = false
           }
           .buttonStyle(DSSecondaryButtonStyle())
+          .keyboardShortcut(.escape, modifiers: [])
 
           Button(showEditExpense ? "Save" : "Log Expense") {
-            Task {
-              if showEditExpense, let expense = selectedExpense {
-                _ = await appState.cliService.updateExpense(
-                  id: expense.id,
-                  description: expenseDescription.isEmpty ? nil : expenseDescription,
-                  amount: expenseAmount > 0 ? expenseAmount : nil,
-                  category: expenseCategory
-                )
-              } else {
-                _ = await appState.cliService.logExpense(
-                  description: expenseDescription,
-                  amount: expenseAmount,
-                  category: expenseCategory
-                )
-              }
-              await appState.refreshDashboard()
-              showAddSheet = false
-              showEditExpense = false
-            }
+            submitExpense()
           }
           .buttonStyle(DSPrimaryButtonStyle(color: Design.Colors.warning))
           .disabled(expenseDescription.isEmpty || expenseAmount <= 0)
+          .keyboardShortcut(.return, modifiers: .command)
         }
       }
+    }
+  }
+
+  private func submitExpense() {
+    guard !expenseDescription.isEmpty && expenseAmount > 0 else { return }
+    Task {
+      if showEditExpense, let expense = selectedExpense {
+        _ = await appState.cliService.updateExpense(
+          id: expense.id,
+          description: expenseDescription.isEmpty ? nil : expenseDescription,
+          amount: expenseAmount > 0 ? expenseAmount : nil,
+          category: expenseCategory
+        )
+      } else {
+        _ = await appState.cliService.logExpense(
+          description: expenseDescription,
+          amount: expenseAmount,
+          category: expenseCategory
+        )
+      }
+      await appState.refreshDashboard()
+      showAddSheet = false
+      showEditExpense = false
     }
   }
 }
@@ -2017,8 +2095,10 @@ struct SettingsContent: View {
   @State private var companyName = ""
   @State private var companyEmail = ""
   @State private var companyAddress = ""
-  @State private var companyPhone = ""
   @State private var companyTaxId = ""
+  @State private var companyBankName = ""
+  @State private var companyBankAccount = ""
+  @State private var companyBankSwift = ""
 
   var body: some View {
     ZStack {
@@ -2033,14 +2113,18 @@ struct SettingsContent: View {
                   companyName = details.name
                   companyEmail = details.email
                   companyAddress = details.address
-                  companyPhone = details.phone
                   companyTaxId = details.taxId
+                  companyBankName = details.bankName
+                  companyBankAccount = details.bankAccount
+                  companyBankSwift = details.bankSwift
                 } else {
                   companyName = ""
                   companyEmail = ""
                   companyAddress = ""
-                  companyPhone = ""
                   companyTaxId = ""
+                  companyBankName = ""
+                  companyBankAccount = ""
+                  companyBankSwift = ""
                 }
                 showCompanyEditor = true
               }
@@ -2075,39 +2159,64 @@ struct SettingsContent: View {
         FormField(label: "Company Name", text: $companyName, placeholder: "Your Company LLC")
         FormField(label: "Email", text: $companyEmail, placeholder: "contact@company.com")
         FormField(label: "Address", text: $companyAddress, placeholder: "123 Business St, City")
-        FormField(label: "Phone", text: $companyPhone, placeholder: "+1 (555) 123-4567")
         FormField(label: "Tax ID / VAT", text: $companyTaxId, placeholder: "XX-XXXXXXX")
+
+        Divider()
+
+        Text("Bank Details")
+          .font(Design.Typography.labelSmall)
+          .foregroundColor(Design.Colors.textSecondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+
+        FormField(label: "Bank Name", text: $companyBankName, placeholder: "Bank of America")
+        FormField(
+          label: "Account / IBAN", text: $companyBankAccount, placeholder: "DE89370400440532013000")
+        FormField(label: "SWIFT / BIC", text: $companyBankSwift, placeholder: "COBADEFFXXX")
 
         HStack(spacing: Design.Spacing.sm) {
           Button("Cancel") {
             showCompanyEditor = false
           }
           .buttonStyle(DSSecondaryButtonStyle())
+          .keyboardShortcut(.escape, modifiers: [])
 
           Button(appState.setupStatus.hasCompany ? "Save" : "Create") {
-            Task {
-              if appState.setupStatus.hasCompany {
-                _ = await appState.cliService.updateCompany(
-                  name: companyName.isEmpty ? nil : companyName,
-                  email: companyEmail.isEmpty ? nil : companyEmail,
-                  address: companyAddress.isEmpty ? nil : companyAddress,
-                  phone: companyPhone.isEmpty ? nil : companyPhone,
-                  taxId: companyTaxId.isEmpty ? nil : companyTaxId
-                )
-              } else {
-                _ = await appState.cliService.createCompany(
-                  name: companyName,
-                  email: companyEmail.isEmpty ? nil : companyEmail
-                )
-              }
-              await appState.refreshDashboard()
-              showCompanyEditor = false
-            }
+            submitCompany()
           }
           .buttonStyle(DSPrimaryButtonStyle())
           .disabled(companyName.isEmpty)
+          .keyboardShortcut(.return, modifiers: .command)
         }
       }
+    }
+  }
+
+  private func submitCompany() {
+    guard !companyName.isEmpty else { return }
+    Task {
+      if appState.setupStatus.hasCompany {
+        _ = await appState.cliService.updateCompany(
+          name: companyName.isEmpty ? nil : companyName,
+          email: companyEmail.isEmpty ? nil : companyEmail,
+          address: companyAddress.isEmpty ? nil : companyAddress,
+          taxId: companyTaxId.isEmpty ? nil : companyTaxId,
+          bankName: companyBankName.isEmpty ? nil : companyBankName,
+          bankAccount: companyBankAccount.isEmpty ? nil : companyBankAccount,
+          bankSwift: companyBankSwift.isEmpty ? nil : companyBankSwift
+        )
+      } else {
+        _ = await appState.cliService.createCompany(
+          name: companyName,
+          email: companyEmail.isEmpty ? nil : companyEmail,
+          address: companyAddress.isEmpty ? nil : companyAddress,
+          taxId: companyTaxId.isEmpty ? nil : companyTaxId,
+          bankName: companyBankName.isEmpty ? nil : companyBankName,
+          bankAccount: companyBankAccount.isEmpty ? nil : companyBankAccount,
+          bankSwift: companyBankSwift.isEmpty ? nil : companyBankSwift
+        )
+      }
+      await appState.refreshDashboard()
+      showCompanyEditor = false
     }
   }
 }

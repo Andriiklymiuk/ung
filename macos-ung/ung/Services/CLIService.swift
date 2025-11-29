@@ -275,20 +275,39 @@ actor CLIService {
   }
 
   // MARK: - Company
-  func createCompany(name: String, email: String?) async -> Bool {
-    var args = ["company", "create", name]
-    if let email = email {
+  func createCompany(
+    name: String, email: String?, address: String?, taxId: String?, bankName: String?,
+    bankAccount: String?, bankSwift: String?
+  ) async -> Bool {
+    var args = ["company", "add", "--name", name]
+    if let email = email, !email.isEmpty {
       args.append(contentsOf: ["--email", email])
+    }
+    if let address = address, !address.isEmpty {
+      args.append(contentsOf: ["--address", address])
+    }
+    if let taxId = taxId, !taxId.isEmpty {
+      args.append(contentsOf: ["--tax-id", taxId])
+    }
+    if let bankName = bankName, !bankName.isEmpty {
+      args.append(contentsOf: ["--bank-name", bankName])
+    }
+    if let bankAccount = bankAccount, !bankAccount.isEmpty {
+      args.append(contentsOf: ["--bank-account", bankAccount])
+    }
+    if let bankSwift = bankSwift, !bankSwift.isEmpty {
+      args.append(contentsOf: ["--bank-swift", bankSwift])
     }
     let result = await execute(args)
     return result.exitCode == 0
   }
 
   func updateCompany(
-    name: String?, email: String?, address: String?, phone: String?, taxId: String?
+    name: String?, email: String?, address: String?, taxId: String?, bankName: String?,
+    bankAccount: String?, bankSwift: String?
   ) async -> Bool {
-    var args = ["company", "update"]
-    if let name = name {
+    var args = ["company", "edit", "1"]
+    if let name = name, !name.isEmpty {
       args.append(contentsOf: ["--name", name])
     }
     if let email = email {
@@ -297,20 +316,27 @@ actor CLIService {
     if let address = address {
       args.append(contentsOf: ["--address", address])
     }
-    if let phone = phone {
-      args.append(contentsOf: ["--phone", phone])
-    }
     if let taxId = taxId {
       args.append(contentsOf: ["--tax-id", taxId])
+    }
+    if let bankName = bankName {
+      args.append(contentsOf: ["--bank-name", bankName])
+    }
+    if let bankAccount = bankAccount {
+      args.append(contentsOf: ["--bank-account", bankAccount])
+    }
+    if let bankSwift = bankSwift {
+      args.append(contentsOf: ["--bank-swift", bankSwift])
     }
     let result = await execute(args)
     return result.exitCode == 0
   }
 
   func getCompanyDetails() async -> (
-    name: String, email: String, address: String, phone: String, taxId: String
+    name: String, email: String, address: String, taxId: String, bankName: String,
+    bankAccount: String, bankSwift: String
   )? {
-    let result = await execute(["company", "view"])
+    let result = await execute(["company", "ls"])
     if result.exitCode == 0 && !result.output.contains("No company") {
       return parseCompanyDetails(result.output)
     }
@@ -318,22 +344,36 @@ actor CLIService {
   }
 
   // MARK: - Clients
-  func createClient(name: String, email: String?) async -> Bool {
-    var args = ["client", "create", name]
-    if let email = email {
+  func createClient(name: String, email: String?, address: String?, taxId: String?) async -> Bool {
+    var args = ["client", "add", "--name", name]
+    if let email = email, !email.isEmpty {
       args.append(contentsOf: ["--email", email])
+    }
+    if let address = address, !address.isEmpty {
+      args.append(contentsOf: ["--address", address])
+    }
+    if let taxId = taxId, !taxId.isEmpty {
+      args.append(contentsOf: ["--tax-id", taxId])
     }
     let result = await execute(args)
     return result.exitCode == 0
   }
 
-  func updateClient(id: Int, name: String?, email: String?) async -> Bool {
-    var args = ["client", "update", "\(id)"]
-    if let name = name {
+  func updateClient(id: Int, name: String?, email: String?, address: String?, taxId: String?) async
+    -> Bool
+  {
+    var args = ["client", "edit", "\(id)"]
+    if let name = name, !name.isEmpty {
       args.append(contentsOf: ["--name", name])
     }
     if let email = email {
       args.append(contentsOf: ["--email", email])
+    }
+    if let address = address {
+      args.append(contentsOf: ["--address", address])
+    }
+    if let taxId = taxId {
+      args.append(contentsOf: ["--tax-id", taxId])
     }
     let result = await execute(args)
     return result.exitCode == 0
@@ -355,24 +395,45 @@ actor CLIService {
   }
 
   // MARK: - Contracts
-  func createContract(name: String, clientId: Int, rate: Double, type: String) async -> Bool {
-    let args = [
-      "contract", "create", name, "--client", "\(clientId)", "--rate", "\(rate)", "--type", type,
+  func createContract(
+    name: String, clientId: Int, rate: Double?, price: Double?, type: String, currency: String
+  ) async -> Bool {
+    var args = [
+      "contract", "add", "--name", name, "--client", "\(clientId)", "--type", type, "--currency",
+      currency,
     ]
+    if let rate = rate, rate > 0 {
+      args.append(contentsOf: ["--rate", "\(rate)"])
+    }
+    if let price = price, price > 0 {
+      args.append(contentsOf: ["--price", "\(price)"])
+    }
     let result = await execute(args)
     return result.exitCode == 0
   }
 
-  func updateContract(id: Int, name: String?, rate: Double?, type: String?) async -> Bool {
-    var args = ["contract", "update", "\(id)"]
-    if let name = name {
+  func updateContract(
+    id: Int, name: String?, rate: Double?, price: Double?, type: String?, currency: String?,
+    notes: String?
+  ) async -> Bool {
+    var args = ["contract", "edit", "\(id)"]
+    if let name = name, !name.isEmpty {
       args.append(contentsOf: ["--name", name])
     }
     if let rate = rate {
       args.append(contentsOf: ["--rate", "\(rate)"])
     }
-    if let type = type {
+    if let price = price {
+      args.append(contentsOf: ["--price", "\(price)"])
+    }
+    if let type = type, !type.isEmpty {
       args.append(contentsOf: ["--type", type])
+    }
+    if let currency = currency, !currency.isEmpty {
+      args.append(contentsOf: ["--currency", currency])
+    }
+    if let notes = notes {
+      args.append(contentsOf: ["--notes", notes])
     }
     let result = await execute(args)
     return result.exitCode == 0
@@ -764,13 +825,16 @@ actor CLIService {
   }
 
   private func parseCompanyDetails(_ output: String) -> (
-    name: String, email: String, address: String, phone: String, taxId: String
+    name: String, email: String, address: String, taxId: String, bankName: String,
+    bankAccount: String, bankSwift: String
   )? {
     var name = ""
     var email = ""
     var address = ""
-    var phone = ""
     var taxId = ""
+    var bankName = ""
+    var bankAccount = ""
+    var bankSwift = ""
 
     let lines = output.components(separatedBy: "\n")
     for line in lines {
@@ -784,18 +848,32 @@ actor CLIService {
       } else if trimmed.hasPrefix("Address:") {
         address = trimmed.replacingOccurrences(of: "Address:", with: "").trimmingCharacters(
           in: .whitespaces)
-      } else if trimmed.hasPrefix("Phone:") {
-        phone = trimmed.replacingOccurrences(of: "Phone:", with: "").trimmingCharacters(
-          in: .whitespaces)
       } else if trimmed.hasPrefix("Tax ID:") || trimmed.hasPrefix("TaxID:") {
         taxId = trimmed.replacingOccurrences(of: "Tax ID:", with: "").replacingOccurrences(
           of: "TaxID:", with: ""
         ).trimmingCharacters(in: .whitespaces)
+      } else if trimmed.hasPrefix("Bank Name:") || trimmed.hasPrefix("BankName:") {
+        bankName = trimmed.replacingOccurrences(of: "Bank Name:", with: "").replacingOccurrences(
+          of: "BankName:", with: ""
+        ).trimmingCharacters(in: .whitespaces)
+      } else if trimmed.hasPrefix("Bank Account:") || trimmed.hasPrefix("BankAccount:")
+        || trimmed.hasPrefix("IBAN:")
+      {
+        bankAccount = trimmed.replacingOccurrences(of: "Bank Account:", with: "")
+          .replacingOccurrences(
+            of: "BankAccount:", with: ""
+          ).replacingOccurrences(of: "IBAN:", with: "").trimmingCharacters(in: .whitespaces)
+      } else if trimmed.hasPrefix("SWIFT:") || trimmed.hasPrefix("BIC:")
+        || trimmed.hasPrefix("Bank SWIFT:")
+      {
+        bankSwift = trimmed.replacingOccurrences(of: "SWIFT:", with: "").replacingOccurrences(
+          of: "BIC:", with: ""
+        ).replacingOccurrences(of: "Bank SWIFT:", with: "").trimmingCharacters(in: .whitespaces)
       }
     }
 
     if name.isEmpty { return nil }
-    return (name, email, address, phone, taxId)
+    return (name, email, address, taxId, bankName, bankAccount, bankSwift)
   }
 
   private func parseClientDetails(_ output: String) -> (

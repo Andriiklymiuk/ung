@@ -64,18 +64,23 @@ enum Design {
 
   // MARK: - Colors (Semantic)
   enum Colors {
-    // Primary
-    static let primary = Color.blue
-    static let primaryLight = Color.blue.opacity(0.1)
-    static let primaryMuted = Color.blue.opacity(0.6)
+    // Brand - Professional blue
+    static let brand = Color(red: 0.20, green: 0.45, blue: 0.90)
+    static let brandLight = Color(red: 0.20, green: 0.45, blue: 0.90).opacity(0.15)
+    static let brandDark = Color(red: 0.15, green: 0.35, blue: 0.75)
 
-    // Accent colors
-    static let success = Color.green
-    static let successLight = Color.green.opacity(0.1)
-    static let warning = Color.orange
-    static let warningLight = Color.orange.opacity(0.1)
-    static let error = Color.red
-    static let errorLight = Color.red.opacity(0.1)
+    // Primary (using brand color)
+    static let primary = brand
+    static let primaryLight = brandLight
+    static let primaryMuted = brand.opacity(0.6)
+
+    // Accent colors - refined, warmer palette
+    static let success = Color(red: 0.20, green: 0.65, blue: 0.45)
+    static let successLight = Color(red: 0.20, green: 0.65, blue: 0.45).opacity(0.1)
+    static let warning = Color(red: 0.95, green: 0.60, blue: 0.25)
+    static let warningLight = Color(red: 0.95, green: 0.60, blue: 0.25).opacity(0.1)
+    static let error = Color(red: 0.90, green: 0.35, blue: 0.35)
+    static let errorLight = Color(red: 0.90, green: 0.35, blue: 0.35).opacity(0.1)
 
     // Neutrals
     static func backgroundPrimary(_ scheme: ColorScheme) -> Color {
@@ -101,18 +106,18 @@ enum Design {
     static let border = Color.gray.opacity(0.2)
     static let divider = Color.gray.opacity(0.15)
 
-    // Additional accent colors
-    static let purple = Color.purple
-    static let indigo = Color.indigo
-    static let teal = Color.teal
+    // Additional accent colors - refined palette
+    static let purple = Color(red: 0.55, green: 0.35, blue: 0.70)
+    static let indigo = Color(red: 0.35, green: 0.40, blue: 0.75)
+    static let teal = brand
 
-    // Feature colors
-    static let tracking = Color.green
-    static let pomodoro = Color.orange
-    static let invoice = Color.teal
-    static let expense = Color.orange
-    static let client = Color.purple
-    static let contract = Color.indigo
+    // Feature colors - cohesive with brand
+    static let tracking = success
+    static let pomodoro = warning
+    static let invoice = brand
+    static let expense = warning
+    static let client = purple
+    static let contract = indigo
   }
 
   // MARK: - Shadows

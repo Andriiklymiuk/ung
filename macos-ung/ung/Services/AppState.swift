@@ -124,6 +124,8 @@ struct Client: Identifiable, Equatable, Hashable {
   let id: Int
   let name: String
   var email: String = ""
+  var address: String = ""
+  var taxId: String = ""
 }
 
 struct Contract: Identifiable, Equatable {
@@ -131,7 +133,10 @@ struct Contract: Identifiable, Equatable {
   let name: String
   let clientName: String
   var rate: Double = 0
+  var price: Double = 0
   var type: String = "hourly"
+  var currency: String = "USD"
+  var notes: String = ""
 }
 
 // MARK: - Keychain Manager
@@ -724,6 +729,6 @@ enum SidebarTab: String, CaseIterable, Identifiable {
     }
   }
 
-  /// Single accent color for selected state (Slack-style)
-  static let accentColor = Color.accentColor
+  /// Single accent color for selected state (Slack-style) - brand blue
+  static let accentColor = Color(red: 0.20, green: 0.45, blue: 0.90)
 }

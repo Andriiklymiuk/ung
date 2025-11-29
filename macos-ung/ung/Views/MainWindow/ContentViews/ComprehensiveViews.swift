@@ -406,15 +406,18 @@ struct ActionMenu<Content: View>: View {
   let title: String
   let content: Content
   @Binding var isPresented: Bool
+  var onSubmit: (() -> Void)?
   @Environment(\.colorScheme) var colorScheme
 
   init(
     title: String,
     isPresented: Binding<Bool>,
+    onSubmit: (() -> Void)? = nil,
     @ViewBuilder content: @escaping () -> Content
   ) {
     self.title = title
     self._isPresented = isPresented
+    self.onSubmit = onSubmit
     self.content = content()
   }
 
@@ -433,6 +436,7 @@ struct ActionMenu<Content: View>: View {
             .foregroundColor(Design.Colors.textTertiary)
         }
         .buttonStyle(.plain)
+        .keyboardShortcut(.escape, modifiers: [])
       }
       .padding(Design.Spacing.md)
 
@@ -449,6 +453,7 @@ struct ActionMenu<Content: View>: View {
           color: Design.Shadow.lg.color, radius: Design.Shadow.lg.radius, y: Design.Shadow.lg.y)
     )
     .frame(width: 360)
+    .onExitCommand { isPresented = false }
   }
 }
 
@@ -491,10 +496,13 @@ struct ConfirmationDialog: View {
       HStack(spacing: Design.Spacing.sm) {
         Button("Cancel", action: onCancel)
           .buttonStyle(DSSecondaryButtonStyle())
+          .keyboardShortcut(.escape, modifiers: [])
 
         Button(confirmTitle, action: onConfirm)
           .buttonStyle(
-            DSPrimaryButtonStyle(color: destructive ? Design.Colors.error : Design.Colors.primary))
+            DSPrimaryButtonStyle(color: destructive ? Design.Colors.error : Design.Colors.primary)
+          )
+          .keyboardShortcut(.return, modifiers: .command)
       }
     }
     .padding(Design.Spacing.lg)
@@ -503,6 +511,7 @@ struct ConfirmationDialog: View {
         .fill(Design.Colors.surfaceElevated(colorScheme))
     )
     .frame(width: 320)
+    .onExitCommand(perform: onCancel)
   }
 }
 

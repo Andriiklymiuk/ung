@@ -94,6 +94,14 @@ struct ungApp: App {
         .keyboardShortcut("i", modifiers: [.command, .shift])
       }
 
+      // Search command
+      CommandGroup(after: .textEditing) {
+        Button("Search Everything") {
+          appState.showGlobalSearch = true
+        }
+        .keyboardShortcut("k", modifiers: [.command])
+      }
+
       // Navigation commands
       CommandMenu("Navigate") {
         Button("Dashboard") {

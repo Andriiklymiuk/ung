@@ -244,6 +244,7 @@ class AppState: ObservableObject {
     @Published var showToast: Bool = false
     @Published var toastMessage: String = ""
     @Published var toastType: ToastType = .info
+    @Published var showGlobalSearch: Bool = false
 
     enum ToastType {
         case success, info, warning, error

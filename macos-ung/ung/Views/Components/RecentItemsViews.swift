@@ -38,7 +38,7 @@ struct RecentSessionsCard: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Design.Colors.controlBackground)
         )
     }
 }
@@ -103,7 +103,7 @@ struct RecentInvoicesCard: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Design.Colors.controlBackground)
         )
     }
 }
@@ -190,7 +190,7 @@ struct RecentExpensesCard: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Design.Colors.controlBackground)
         )
     }
 }

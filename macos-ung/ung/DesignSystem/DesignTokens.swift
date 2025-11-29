@@ -118,6 +118,31 @@ enum Design {
     static let expense = warning
     static let client = purple
     static let contract = indigo
+
+    // Cross-platform system colors
+    static var windowBackground: Color {
+      #if os(macOS)
+      Color(nsColor: .windowBackgroundColor)
+      #else
+      Color(uiColor: .systemBackground)
+      #endif
+    }
+
+    static var controlBackground: Color {
+      #if os(macOS)
+      Color(nsColor: .controlBackgroundColor)
+      #else
+      Color(uiColor: .secondarySystemBackground)
+      #endif
+    }
+
+    static var tertiaryBackground: Color {
+      #if os(macOS)
+      Color(nsColor: .underPageBackgroundColor)
+      #else
+      Color(uiColor: .tertiarySystemBackground)
+      #endif
+    }
   }
 
   // MARK: - Shadows

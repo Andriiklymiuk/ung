@@ -145,13 +145,7 @@ struct MainWindowView: View {
     }
 
     private var backgroundColor: Color {
-        #if os(macOS)
-        colorScheme == .dark
-            ? Color(nsColor: .windowBackgroundColor)
-            : Color(nsColor: .windowBackgroundColor)
-        #else
-        Color(uiColor: .systemBackground)
-        #endif
+        Design.Colors.windowBackground
     }
 }
 

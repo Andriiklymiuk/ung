@@ -644,6 +644,7 @@ struct AnimatedStatCard: View {
         .shadow(
           color: Design.Shadow.sm.color, radius: Design.Shadow.sm.radius, y: Design.Shadow.sm.y)
     )
+    .drawingGroup() // Performance: Flatten view hierarchy for faster rendering
     .onAppear {
       withAnimation(Design.Animation.smooth.delay(0.1)) {
         appeared = true

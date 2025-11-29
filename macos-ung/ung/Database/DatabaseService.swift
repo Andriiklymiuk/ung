@@ -731,6 +731,26 @@ actor DatabaseService {
         }
     }
 
+    /// Optimized: Gets active session with client name in a single query (avoids N+1)
+    func getActiveSessionWithClient() async throws -> (session: TrackingSession, clientName: String?)? {
+        let db = try getDatabase()
+        return try await db.read { db in
+            let sql = """
+                SELECT s.*, c.name as client_name
+                FROM tracking_sessions s
+                LEFT JOIN clients c ON s.client_id = c.id
+                WHERE s.end_time IS NULL AND s.deleted_at IS NULL
+                ORDER BY s.start_time DESC
+                LIMIT 1
+            """
+
+            guard let row = try Row.fetchOne(db, sql: sql) else { return nil }
+            let session = try TrackingSession(row: row)
+            let clientName: String? = row["client_name"]
+            return (session, clientName)
+        }
+    }
+
     func getRecentSessions(limit: Int = 5) async throws -> [TrackingSession] {
         let db = try getDatabase()
         return try await db.read { db in

@@ -33,7 +33,6 @@ func (s *ScraperService) ScrapeJobs(skills []string) ([]models.Job, error) {
 	// Scrape HackerNews Who's Hiring
 	hnJobs, err := s.scrapeHackerNews(skills)
 	if err != nil {
-		// Log error but continue with other sources
 		fmt.Printf("HackerNews scrape error: %v\n", err)
 	} else {
 		allJobs = append(allJobs, hnJobs...)
@@ -45,6 +44,30 @@ func (s *ScraperService) ScrapeJobs(skills []string) ([]models.Job, error) {
 		fmt.Printf("RemoteOK scrape error: %v\n", err)
 	} else {
 		allJobs = append(allJobs, remoteOKJobs...)
+	}
+
+	// Scrape WeWorkRemotely
+	wwrJobs, err := s.scrapeWeWorkRemotely(skills)
+	if err != nil {
+		fmt.Printf("WeWorkRemotely scrape error: %v\n", err)
+	} else {
+		allJobs = append(allJobs, wwrJobs...)
+	}
+
+	// Scrape Jobicy
+	jobicyJobs, err := s.scrapeJobicy(skills)
+	if err != nil {
+		fmt.Printf("Jobicy scrape error: %v\n", err)
+	} else {
+		allJobs = append(allJobs, jobicyJobs...)
+	}
+
+	// Scrape Arbeitnow
+	arbeitnowJobs, err := s.scrapeArbeitnow(skills)
+	if err != nil {
+		fmt.Printf("Arbeitnow scrape error: %v\n", err)
+	} else {
+		allJobs = append(allJobs, arbeitnowJobs...)
 	}
 
 	return allJobs, nil
@@ -225,6 +248,262 @@ type RemoteOKJob struct {
 	SalaryMin    int      `json:"salary_min"`
 	SalaryMax    int      `json:"salary_max"`
 	Date         string   `json:"date"`
+}
+
+// WeWorkRemotelyJob represents a job from WeWorkRemotely
+type WeWorkRemotelyJob struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Company     string `json:"company"`
+	Description string `json:"description"`
+	URL         string `json:"url"`
+	Category    string `json:"category"`
+	PublishedAt string `json:"published_at"`
+}
+
+// scrapeWeWorkRemotely scrapes jobs from WeWorkRemotely RSS feed
+func (s *ScraperService) scrapeWeWorkRemotely(skills []string) ([]models.Job, error) {
+	categories := []string{
+		"programming",
+		"devops-sysadmin",
+		"product",
+	}
+
+	var allJobs []models.Job
+
+	for _, category := range categories {
+		url := fmt.Sprintf("https://weworkremotely.com/categories/%s.json", category)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "UNG Job Hunter/1.0")
+
+		resp, err := s.client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		var result struct {
+			Jobs []struct {
+				ID          int    `json:"id"`
+				Title       string `json:"title"`
+				CompanyName string `json:"company_name"`
+				Description string `json:"description"`
+				URL         string `json:"url"`
+				PublishedAt string `json:"published_at"`
+			} `json:"jobs"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
+			continue
+		}
+		resp.Body.Close()
+
+		for _, wj := range result.Jobs {
+			if wj.Title == "" {
+				continue
+			}
+
+			matchScore := s.calculateMatchScore(wj.Description+" "+wj.Title, skills)
+			if len(skills) > 0 && matchScore == 0 {
+				continue
+			}
+
+			foundSkills := s.extractSkills(wj.Description)
+			skillsJSON, _ := json.Marshal(foundSkills)
+
+			postedAt, _ := time.Parse("2006-01-02T15:04:05Z", wj.PublishedAt)
+			if postedAt.IsZero() {
+				postedAt = time.Now()
+			}
+
+			job := models.Job{
+				Source:      models.JobSourceWeWorkRemotely,
+				SourceID:    fmt.Sprintf("%d", wj.ID),
+				SourceURL:   wj.URL,
+				Title:       wj.Title,
+				Company:     wj.CompanyName,
+				Description: wj.Description,
+				Skills:      string(skillsJSON),
+				Remote:      true,
+				JobType:     "fulltime",
+				MatchScore:  matchScore,
+				PostedAt:    postedAt,
+			}
+			allJobs = append(allJobs, job)
+		}
+	}
+
+	return allJobs, nil
+}
+
+// JobicyJob represents a job from Jobicy API
+type JobicyJob struct {
+	ID          int    `json:"id"`
+	URL         string `json:"url"`
+	JobTitle    string `json:"jobTitle"`
+	CompanyName string `json:"companyName"`
+	JobExcerpt  string `json:"jobExcerpt"`
+	JobType     string `json:"jobType"`
+	JobGeo      string `json:"jobGeo"`
+	PubDate     string `json:"pubDate"`
+}
+
+// scrapeJobicy scrapes jobs from Jobicy API
+func (s *ScraperService) scrapeJobicy(skills []string) ([]models.Job, error) {
+	req, err := http.NewRequest("GET", "https://jobicy.com/api/v2/remote-jobs?count=50", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "UNG Job Hunter/1.0")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Jobicy: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Jobs []JobicyJob `json:"jobs"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode Jobicy response: %w", err)
+	}
+
+	var jobs []models.Job
+	for _, jj := range result.Jobs {
+		if jj.JobTitle == "" {
+			continue
+		}
+
+		matchScore := s.calculateMatchScore(jj.JobExcerpt+" "+jj.JobTitle, skills)
+		if len(skills) > 0 && matchScore == 0 {
+			continue
+		}
+
+		foundSkills := s.extractSkills(jj.JobExcerpt)
+		skillsJSON, _ := json.Marshal(foundSkills)
+
+		postedAt, _ := time.Parse("2006-01-02 15:04:05", jj.PubDate)
+		if postedAt.IsZero() {
+			postedAt = time.Now()
+		}
+
+		jobType := "fulltime"
+		if strings.Contains(strings.ToLower(jj.JobType), "contract") {
+			jobType = "contract"
+		} else if strings.Contains(strings.ToLower(jj.JobType), "part") {
+			jobType = "parttime"
+		}
+
+		job := models.Job{
+			Source:      models.JobSourceJobicy,
+			SourceID:    fmt.Sprintf("%d", jj.ID),
+			SourceURL:   jj.URL,
+			Title:       jj.JobTitle,
+			Company:     jj.CompanyName,
+			Description: jj.JobExcerpt,
+			Skills:      string(skillsJSON),
+			Remote:      true,
+			Location:    jj.JobGeo,
+			JobType:     jobType,
+			MatchScore:  matchScore,
+			PostedAt:    postedAt,
+		}
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
+}
+
+// ArbeitnowJob represents a job from Arbeitnow API
+type ArbeitnowJob struct {
+	Slug        string   `json:"slug"`
+	CompanyName string   `json:"company_name"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Remote      bool     `json:"remote"`
+	URL         string   `json:"url"`
+	Tags        []string `json:"tags"`
+	JobTypes    []string `json:"job_types"`
+	Location    string   `json:"location"`
+	CreatedAt   int64    `json:"created_at"`
+}
+
+// scrapeArbeitnow scrapes jobs from Arbeitnow API
+func (s *ScraperService) scrapeArbeitnow(skills []string) ([]models.Job, error) {
+	req, err := http.NewRequest("GET", "https://www.arbeitnow.com/api/job-board-api", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "UNG Job Hunter/1.0")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Arbeitnow: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data []ArbeitnowJob `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode Arbeitnow response: %w", err)
+	}
+
+	var jobs []models.Job
+	for _, aj := range result.Data {
+		if aj.Title == "" {
+			continue
+		}
+
+		// Prefer remote jobs
+		if !aj.Remote {
+			continue
+		}
+
+		matchScore := s.calculateMatchScore(aj.Description+" "+strings.Join(aj.Tags, " "), skills)
+		if len(skills) > 0 && matchScore == 0 {
+			continue
+		}
+
+		tagsJSON, _ := json.Marshal(aj.Tags)
+
+		postedAt := time.Unix(aj.CreatedAt, 0)
+
+		jobType := "fulltime"
+		for _, jt := range aj.JobTypes {
+			if strings.Contains(strings.ToLower(jt), "contract") {
+				jobType = "contract"
+				break
+			} else if strings.Contains(strings.ToLower(jt), "part") {
+				jobType = "parttime"
+				break
+			}
+		}
+
+		job := models.Job{
+			Source:      models.JobSourceArbeitnow,
+			SourceID:    aj.Slug,
+			SourceURL:   aj.URL,
+			Title:       aj.Title,
+			Company:     aj.CompanyName,
+			Description: aj.Description,
+			Skills:      string(tagsJSON),
+			Remote:      aj.Remote,
+			Location:    aj.Location,
+			JobType:     jobType,
+			MatchScore:  matchScore,
+			PostedAt:    postedAt,
+		}
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
 }
 
 // scrapeRemoteOK scrapes jobs from RemoteOK API

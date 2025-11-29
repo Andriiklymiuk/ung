@@ -313,6 +313,8 @@ struct iPadDetailView: View {
                 ExpensesContent(showAddSheet: $showAddSheet)
             case .pomodoro:
                 PomodoroContent()
+            case .hunter:
+                HunterContent()
             case .reports:
                 ReportsContent()
             case .settings:
@@ -900,6 +902,8 @@ struct ContentAreaView: View {
             ExpensesContent(showAddSheet: $showAddExpense)
         case .pomodoro:
             PomodoroContent()
+        case .hunter:
+            HunterContent()
         case .reports:
             ReportsContent()
         case .settings:
@@ -990,6 +994,7 @@ struct ContentAreaView: View {
             return "\(appState.invoiceCount) invoices"
         case .expenses: return "Track your business expenses"
         case .pomodoro: return "Focus sessions: \(appState.pomodoroState.sessionsCompleted)"
+        case .hunter: return "Find and apply to freelance jobs"
         case .reports: return "Analytics and insights"
         case .settings: return "Configure your preferences"
         }

@@ -530,3 +530,298 @@ struct SchemaMigration: Codable, FetchableRecord, PersistableRecord {
         case appliedAt = "applied_at"
     }
 }
+
+// MARK: - Job Hunter Profile
+
+struct HunterProfile: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: Int64?
+    var name: String
+    var title: String?
+    var bio: String?
+    var skills: String?      // JSON array of skills
+    var experience: Int?     // Years of experience
+    var rate: Double?        // Desired hourly rate
+    var currency: String?
+    var location: String?
+    var remote: Bool
+    var languages: String?   // JSON array of languages
+    var education: String?   // JSON array of education
+    var projects: String?    // JSON array of notable projects
+    var links: String?       // JSON: github, linkedin, portfolio
+    var pdfPath: String?     // Original CV path
+    var pdfContent: String?  // Extracted text from PDF
+    var createdAt: Date?
+    var updatedAt: Date?
+
+    static let databaseTableName = "profiles"
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case title
+        case bio
+        case skills
+        case experience
+        case rate
+        case currency
+        case location
+        case remote
+        case languages
+        case education
+        case projects
+        case links
+        case pdfPath = "pdf_path"
+        case pdfContent = "pdf_content"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+
+    // Helper to parse skills from JSON
+    var skillsList: [String] {
+        guard let skills = skills,
+              let data = skills.data(using: .utf8),
+              let array = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return array
+    }
+}
+
+// MARK: - Job Source
+
+enum JobSource: String, Codable, CaseIterable {
+    case hackernews
+    case remoteok
+    case weworkremotely
+    case jobicy
+    case arbeitnow
+    case upwork
+    case linkedin
+    case manual
+
+    var displayName: String {
+        switch self {
+        case .hackernews: return "Hacker News"
+        case .remoteok: return "RemoteOK"
+        case .weworkremotely: return "WeWorkRemotely"
+        case .jobicy: return "Jobicy"
+        case .arbeitnow: return "Arbeitnow"
+        case .upwork: return "Upwork"
+        case .linkedin: return "LinkedIn"
+        case .manual: return "Manual"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .hackernews: return "y.square.fill"
+        case .remoteok: return "globe"
+        case .weworkremotely: return "laptopcomputer"
+        case .jobicy: return "briefcase.fill"
+        case .arbeitnow: return "building.2"
+        case .upwork: return "person.2.fill"
+        case .linkedin: return "person.crop.square.fill"
+        case .manual: return "square.and.pencil"
+        }
+    }
+}
+
+// MARK: - Job
+
+struct HunterJob: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: Int64?
+    var source: String       // JobSource raw value
+    var sourceId: String?
+    var sourceUrl: String?
+    var title: String
+    var company: String?
+    var description: String?
+    var skills: String?      // JSON array of required skills
+    var rateMin: Double?
+    var rateMax: Double?
+    var rateType: String?    // hourly, monthly, yearly
+    var currency: String?
+    var remote: Bool
+    var location: String?
+    var jobType: String?     // contract, fulltime, parttime
+    var matchScore: Double?  // 0-100 match with profile
+    var postedAt: Date?
+    var expiresAt: Date?
+    var createdAt: Date?
+    var updatedAt: Date?
+
+    static let databaseTableName = "jobs"
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case source
+        case sourceId = "source_id"
+        case sourceUrl = "source_url"
+        case title
+        case company
+        case description
+        case skills
+        case rateMin = "rate_min"
+        case rateMax = "rate_max"
+        case rateType = "rate_type"
+        case currency
+        case remote
+        case location
+        case jobType = "job_type"
+        case matchScore = "match_score"
+        case postedAt = "posted_at"
+        case expiresAt = "expires_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+
+    var jobSource: JobSource {
+        JobSource(rawValue: source) ?? .manual
+    }
+
+    var skillsList: [String] {
+        guard let skills = skills,
+              let data = skills.data(using: .utf8),
+              let array = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return array
+    }
+
+    var formattedRate: String? {
+        guard let min = rateMin, min > 0 else { return nil }
+        let curr = currency ?? "USD"
+        let type = rateType ?? "yearly"
+
+        if let max = rateMax, max > 0 && max != min {
+            return "\(curr) \(Int(min))-\(Int(max))/\(type)"
+        }
+        return "\(curr) \(Int(min))/\(type)"
+    }
+}
+
+// MARK: - Application Status
+
+enum ApplicationStatus: String, Codable, CaseIterable {
+    case draft
+    case applied
+    case viewed
+    case response
+    case interview
+    case offer
+    case rejected
+    case withdrawn
+
+    var displayName: String {
+        switch self {
+        case .draft: return "Draft"
+        case .applied: return "Applied"
+        case .viewed: return "Viewed"
+        case .response: return "Response"
+        case .interview: return "Interview"
+        case .offer: return "Offer"
+        case .rejected: return "Rejected"
+        case .withdrawn: return "Withdrawn"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .draft: return "gray"
+        case .applied: return "blue"
+        case .viewed: return "purple"
+        case .response: return "cyan"
+        case .interview: return "orange"
+        case .offer: return "green"
+        case .rejected: return "red"
+        case .withdrawn: return "gray"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .draft: return "doc"
+        case .applied: return "paperplane.fill"
+        case .viewed: return "eye.fill"
+        case .response: return "envelope.fill"
+        case .interview: return "person.2.fill"
+        case .offer: return "checkmark.seal.fill"
+        case .rejected: return "xmark.circle.fill"
+        case .withdrawn: return "arrow.uturn.backward"
+        }
+    }
+}
+
+// MARK: - Application
+
+struct HunterApplication: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: Int64?
+    var jobId: Int64
+    var profileId: Int64?
+    var proposal: String?
+    var proposalPdf: String?
+    var coverLetter: String?
+    var status: String       // ApplicationStatus raw value
+    var notes: String?
+    var appliedAt: Date?
+    var responseAt: Date?
+    var createdAt: Date?
+    var updatedAt: Date?
+
+    static let databaseTableName = "applications"
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case jobId = "job_id"
+        case profileId = "profile_id"
+        case proposal
+        case proposalPdf = "proposal_pdf"
+        case coverLetter = "cover_letter"
+        case status
+        case notes
+        case appliedAt = "applied_at"
+        case responseAt = "response_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+
+    var applicationStatus: ApplicationStatus {
+        ApplicationStatus(rawValue: status) ?? .draft
+    }
+
+    // Relationships
+    static let job = belongsTo(HunterJob.self)
+    static let profile = belongsTo(HunterProfile.self)
+}
+
+// MARK: - Hunter Statistics
+
+struct HunterStats: Codable {
+    var totalJobs: Int
+    var totalApplications: Int
+    var statusCounts: [String: Int]
+    var topSkills: [String]
+    var averageMatchScore: Double
+    var recentJobs: [HunterJob]
+
+    init(totalJobs: Int = 0, totalApplications: Int = 0, statusCounts: [String: Int] = [:], topSkills: [String] = [], averageMatchScore: Double = 0, recentJobs: [HunterJob] = []) {
+        self.totalJobs = totalJobs
+        self.totalApplications = totalApplications
+        self.statusCounts = statusCounts
+        self.topSkills = topSkills
+        self.averageMatchScore = averageMatchScore
+        self.recentJobs = recentJobs
+    }
+}

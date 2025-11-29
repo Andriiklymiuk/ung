@@ -9,6 +9,12 @@ import LocalAuthentication
 import SwiftUI
 import UniformTypeIdentifiers
 
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
+
 struct SettingsSection: View {
   @EnvironmentObject var appState: AppState
   @Environment(\.colorScheme) var colorScheme
@@ -21,6 +27,7 @@ struct SettingsSection: View {
   @State private var showUpdateAlert = false
   @State private var biometricsAvailable = false
   @State private var biometricType: LABiometryType = .none
+  @State private var isTogglingICloud = false
 
   enum UpdateCheckResult {
     case upToDate
@@ -30,6 +37,9 @@ struct SettingsSection: View {
 
   var body: some View {
     VStack(spacing: Design.Spacing.md) {
+      // iCloud Sync
+      iCloudCard
+
       // Security & Privacy - Most important first
       securityCard
 
@@ -53,6 +63,66 @@ struct SettingsSection: View {
     if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
       biometricsAvailable = true
       biometricType = context.biometryType
+    }
+  }
+
+  // MARK: - iCloud Card
+  private var iCloudCard: some View {
+    SettingsCard(title: "iCloud Sync", icon: "icloud.fill", color: .blue) {
+      VStack(spacing: Design.Spacing.sm) {
+        SettingsRow(
+          icon: "icloud.fill",
+          title: "Sync with iCloud",
+          subtitle: appState.iCloudAvailable
+            ? (appState.iCloudEnabled ? "Your data syncs across devices" : "Enable to sync across devices")
+            : "iCloud not available"
+        ) {
+          if isTogglingICloud {
+            ProgressView()
+              .scaleEffect(0.7)
+          } else {
+            Toggle(
+              "",
+              isOn: Binding(
+                get: { appState.iCloudEnabled },
+                set: { newValue in
+                  isTogglingICloud = true
+                  Task {
+                    await appState.setICloudEnabled(newValue)
+                    isTogglingICloud = false
+                  }
+                }
+              )
+            )
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .labelsHidden()
+            .disabled(!appState.iCloudAvailable)
+          }
+        }
+
+        if appState.iCloudEnabled {
+          HStack(spacing: Design.Spacing.xs) {
+            Image(systemName: "checkmark.icloud.fill")
+              .font(.system(size: 12))
+              .foregroundColor(.green)
+            Text("Database synced to iCloud")
+              .font(Design.Typography.bodySmall)
+              .foregroundColor(Design.Colors.textSecondary)
+          }
+          .padding(.top, 4)
+        } else if !appState.iCloudAvailable {
+          HStack(spacing: Design.Spacing.xs) {
+            Image(systemName: "exclamationmark.triangle.fill")
+              .font(.system(size: 12))
+              .foregroundColor(.orange)
+            Text("Sign in to iCloud in System Settings")
+              .font(Design.Typography.bodySmall)
+              .foregroundColor(Design.Colors.textSecondary)
+          }
+          .padding(.top, 4)
+        }
+      }
     }
   }
 
@@ -228,21 +298,9 @@ struct SettingsSection: View {
       VStack(spacing: 0) {
         // App info
         HStack(spacing: Design.Spacing.sm) {
-          if let appIcon = NSImage(named: "AppIcon") {
-            Image(nsImage: appIcon)
-              .resizable()
-              .frame(width: 48, height: 48)
-              .cornerRadius(12)
-          } else {
-            RoundedRectangle(cornerRadius: 12)
-              .fill(Color.blue)
-              .frame(width: 48, height: 48)
-              .overlay(
-                Image(systemName: "clock.badge.checkmark")
-                  .font(.system(size: 20))
-                  .foregroundColor(.white)
-              )
-          }
+          appIconView
+            .frame(width: 48, height: 48)
+            .cornerRadius(12)
 
           VStack(alignment: .leading, spacing: 2) {
             Text("UNG")
@@ -281,9 +339,10 @@ struct SettingsSection: View {
         }
         .disabled(isCheckingForUpdates)
 
+        #if os(macOS)
         Divider().padding(.leading, 44)
 
-        // Quit
+        // Quit - macOS only
         SettingsActionRow(
           icon: "power",
           title: "Quit UNG",
@@ -292,13 +351,14 @@ struct SettingsSection: View {
         ) {
           NSApplication.shared.terminate(nil)
         }
+        #endif
       }
     }
     .alert(updateAlertTitle, isPresented: $showUpdateAlert) {
       if case .updateAvailable(_, let url) = updateCheckResult {
         Button("Download") {
           if let downloadUrl = URL(string: url) {
-            NSWorkspace.shared.open(downloadUrl)
+            openURL(downloadUrl)
           }
         }
         Button("Later", role: .cancel) {}
@@ -308,6 +368,43 @@ struct SettingsSection: View {
     } message: {
       Text(updateAlertMessage)
     }
+  }
+
+  @ViewBuilder
+  private var appIconView: some View {
+    #if os(macOS)
+    if let appIcon = NSImage(named: "AppIcon") {
+      Image(nsImage: appIcon)
+        .resizable()
+    } else {
+      appIconFallback
+    }
+    #else
+    if let appIcon = UIImage(named: "AppIcon") {
+      Image(uiImage: appIcon)
+        .resizable()
+    } else {
+      appIconFallback
+    }
+    #endif
+  }
+
+  private var appIconFallback: some View {
+    RoundedRectangle(cornerRadius: 12)
+      .fill(Color.blue)
+      .overlay(
+        Image(systemName: "clock.badge.checkmark")
+          .font(.system(size: 20))
+          .foregroundColor(.white)
+      )
+  }
+
+  private func openURL(_ url: URL) {
+    #if os(macOS)
+    NSWorkspace.shared.open(url)
+    #else
+    UIApplication.shared.open(url)
+    #endif
   }
 
   private var updateAlertTitle: String {
@@ -407,11 +504,11 @@ struct SettingsSection: View {
       defer { url.stopAccessingSecurityScopedResource() }
 
       Task {
-        let success = await appState.cliService.importDatabase(from: url.path)
-        if success {
+        do {
+          try await appState.database.importDatabase(from: url)
           showImportSuccess = true
-        } else {
-          importError = "Failed to import database."
+        } catch {
+          importError = "Failed to import database: \(error.localizedDescription)"
         }
       }
 
@@ -421,23 +518,49 @@ struct SettingsSection: View {
   }
 
   private func exportDatabase() {
+    #if os(macOS)
     Task {
       let panel = NSSavePanel()
       panel.title = "Export Database"
-      panel.nameFieldStringValue = "ung_export.sql"
-      panel.allowedContentTypes = [.init(filenameExtension: "sql")!]
+      panel.nameFieldStringValue = "ung_export.db"
+      panel.allowedContentTypes = [.database]
 
       let response = await panel.beginSheetModal(for: NSApp.keyWindow ?? NSWindow())
       if response == .OK, let url = panel.url {
-        let success = await appState.cliService.exportDatabase(to: url.path)
-        if !success {
-          importError = "Failed to export database"
+        do {
+          try await appState.database.exportDatabase(to: url)
+          appState.showToastMessage("Database exported successfully", type: .success)
+        } catch {
+          importError = "Failed to export database: \(error.localizedDescription)"
         }
       }
     }
+    #else
+    // iOS: Use share sheet
+    Task {
+      let dbPath = await appState.database.databasePath
+      let dbURL = URL(fileURLWithPath: dbPath)
+
+      let dateFormatter = DateFormatter()
+      dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
+      let timestamp = dateFormatter.string(from: Date())
+
+      let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("ung_export_\(timestamp).db")
+      try? FileManager.default.copyItem(at: dbURL, to: tempURL)
+
+      await MainActor.run {
+        let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+          rootVC.present(activityVC, animated: true)
+        }
+      }
+    }
+    #endif
   }
 
   private func createBackup() {
+    #if os(macOS)
     Task {
       let dateFormatter = DateFormatter()
       dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
@@ -450,21 +573,28 @@ struct SettingsSection: View {
 
       let response = await panel.beginSheetModal(for: NSApp.keyWindow ?? NSWindow())
       if response == .OK, let url = panel.url {
-        let success = await appState.cliService.backupDatabase(to: url.path)
-        if !success {
-          importError = "Failed to create backup"
+        do {
+          try await appState.database.exportDatabase(to: url)
+          appState.showToastMessage("Backup created successfully", type: .success)
+        } catch {
+          importError = "Failed to create backup: \(error.localizedDescription)"
         }
       }
     }
+    #else
+    // iOS: Use share sheet (same as export)
+    exportDatabase()
+    #endif
   }
 
   private func resetDatabase() {
     Task {
-      let success = await appState.cliService.resetDatabase()
-      if success {
+      do {
+        try await appState.database.resetDatabase()
         appState.checkStatus()
-      } else {
-        importError = "Failed to reset database"
+        appState.showToastMessage("Database reset successfully", type: .success)
+      } catch {
+        importError = "Failed to reset database: \(error.localizedDescription)"
       }
     }
   }

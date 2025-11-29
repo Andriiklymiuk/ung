@@ -81,7 +81,7 @@ struct TrackingContent: View {
           confirmTitle: "Delete",
           onConfirm: {
             Task {
-              _ = await appState.cliService.deleteSession(id: session.id)
+              try? await appState.database.deleteSession(id: Int64(session.id))
               await appState.refreshDashboard()
             }
             showDeleteConfirmation = false
@@ -391,7 +391,7 @@ struct ClientsContent: View {
           confirmTitle: "Delete",
           onConfirm: {
             Task {
-              _ = await appState.cliService.deleteClient(id: client.id)
+              try? await appState.database.deleteClient(id: Int64(client.id))
               await appState.refreshDashboard()
             }
             showDeleteConfirmation = false
@@ -448,20 +448,22 @@ struct ClientsContent: View {
     guard !clientName.isEmpty else { return }
     Task {
       if showEditClient, let client = selectedClient {
-        _ = await appState.cliService.updateClient(
-          id: client.id,
-          name: clientName.isEmpty ? nil : clientName,
-          email: clientEmail.isEmpty ? nil : clientEmail,
-          address: clientAddress.isEmpty ? nil : clientAddress,
-          taxId: clientTaxId.isEmpty ? nil : clientTaxId
-        )
-      } else {
-        _ = await appState.cliService.createClient(
+        var updatedClient = ClientModel(
+          id: Int64(client.id),
           name: clientName,
-          email: clientEmail.isEmpty ? nil : clientEmail,
-          address: clientAddress.isEmpty ? nil : clientAddress,
-          taxId: clientTaxId.isEmpty ? nil : clientTaxId
+          email: clientEmail
         )
+        updatedClient.address = clientAddress.isEmpty ? nil : clientAddress
+        updatedClient.taxId = clientTaxId.isEmpty ? nil : clientTaxId
+        try? await appState.database.updateClient(updatedClient)
+      } else {
+        var newClient = ClientModel(
+          name: clientName,
+          email: clientEmail.isEmpty ? "" : clientEmail
+        )
+        newClient.address = clientAddress.isEmpty ? nil : clientAddress
+        newClient.taxId = clientTaxId.isEmpty ? nil : clientTaxId
+        _ = try? await appState.database.createClient(newClient)
       }
       await appState.refreshDashboard()
       showAddSheet = false
@@ -648,7 +650,7 @@ struct ContractsContent: View {
           confirmTitle: "Delete",
           onConfirm: {
             Task {
-              _ = await appState.cliService.deleteContract(id: contract.id)
+              try? await appState.database.deleteContract(id: Int64(contract.id))
               await appState.refreshDashboard()
             }
             showDeleteConfirmation = false
@@ -762,24 +764,33 @@ struct ContractsContent: View {
     guard showEditContract || selectedClientId != nil else { return }
     Task {
       if showEditContract, let contract = selectedContract {
-        _ = await appState.cliService.updateContract(
-          id: contract.id,
-          name: contractName.isEmpty ? nil : contractName,
-          rate: contractType == "hourly" || contractType == "retainer" ? rate : nil,
-          price: contractType == "fixed_price" ? price : nil,
-          type: contractType,
-          currency: contractCurrency,
-          notes: contractNotes.isEmpty ? nil : contractNotes
-        )
-      } else if let clientId = selectedClientId {
-        _ = await appState.cliService.createContract(
+        var updatedContract = ContractModel(
+          id: Int64(contract.id),
+          contractNum: "",
+          clientId: Int64(selectedClientId ?? 0),
           name: contractName,
-          clientId: clientId,
-          rate: contractType == "hourly" || contractType == "retainer" ? rate : nil,
-          price: contractType == "fixed_price" ? price : nil,
-          type: contractType,
-          currency: contractCurrency
+          contractType: contractType,
+          currency: contractCurrency,
+          startDate: Date(),
+          active: true
         )
+        updatedContract.hourlyRate = (contractType == "hourly" || contractType == "retainer") ? rate : nil
+        updatedContract.fixedPrice = contractType == "fixed_price" ? price : nil
+        updatedContract.notes = contractNotes.isEmpty ? nil : contractNotes
+        try? await appState.database.updateContract(updatedContract)
+      } else if let clientId = selectedClientId {
+        var newContract = ContractModel(
+          contractNum: "",
+          clientId: Int64(clientId),
+          name: contractName,
+          contractType: contractType,
+          currency: contractCurrency,
+          startDate: Date(),
+          active: true
+        )
+        newContract.hourlyRate = (contractType == "hourly" || contractType == "retainer") ? rate : nil
+        newContract.fixedPrice = contractType == "fixed_price" ? price : nil
+        _ = try? await appState.database.createContract(newContract)
       }
       await appState.refreshDashboard()
       showAddSheet = false
@@ -955,13 +966,13 @@ struct InvoicesContent: View {
                     invoice: invoice,
                     onMarkPaid: {
                       Task {
-                        _ = await appState.cliService.markInvoicePaid(invoiceId: invoice.id)
+                        try? await appState.database.updateInvoiceStatus(id: Int64(invoice.id), status: "paid")
                         await appState.refreshDashboard()
                       }
                     },
                     onMarkSent: {
                       Task {
-                        _ = await appState.cliService.markInvoiceSent(invoiceId: invoice.id)
+                        try? await appState.database.updateInvoiceStatus(id: Int64(invoice.id), status: "sent")
                         await appState.refreshDashboard()
                       }
                     },
@@ -1000,7 +1011,7 @@ struct InvoicesContent: View {
           confirmTitle: "Delete",
           onConfirm: {
             Task {
-              _ = await appState.cliService.deleteInvoice(id: invoice.id)
+              try? await appState.database.deleteInvoice(id: Int64(invoice.id))
               await appState.refreshDashboard()
             }
             showDeleteConfirmation = false
@@ -1057,7 +1068,22 @@ struct InvoicesContent: View {
   private func submitInvoice() {
     guard let clientId = selectedClientId else { return }
     Task {
-      _ = await appState.cliService.createInvoice(clientId: clientId)
+      guard let company = try? await appState.database.getCompany(), let companyId = company?.id else {
+        return
+      }
+      let year = Calendar.current.component(.year, from: Date())
+      let count = try? await appState.database.getInvoiceCount()
+      let invoiceNum = "INV-\(year)-\(String(format: "%04d", (count ?? 0) + 1))"
+
+      var invoice = Invoice(
+        invoiceNum: invoiceNum,
+        companyId: companyId,
+        amount: 0,
+        currency: "USD",
+        status: "pending"
+      )
+      invoice.issuedDate = Date()
+      _ = try? await appState.database.createInvoice(invoice)
       await appState.refreshDashboard()
       showAddSheet = false
     }
@@ -1294,7 +1320,7 @@ struct ExpensesContent: View {
           confirmTitle: "Delete",
           onConfirm: {
             Task {
-              _ = await appState.cliService.deleteExpense(id: expense.id)
+              try? await appState.database.deleteExpense(id: Int64(expense.id))
               await appState.refreshDashboard()
             }
             showDeleteConfirmation = false
@@ -1363,18 +1389,24 @@ struct ExpensesContent: View {
     guard !expenseDescription.isEmpty && expenseAmount > 0 else { return }
     Task {
       if showEditExpense, let expense = selectedExpense {
-        _ = await appState.cliService.updateExpense(
-          id: expense.id,
-          description: expenseDescription.isEmpty ? nil : expenseDescription,
-          amount: expenseAmount > 0 ? expenseAmount : nil,
-          category: expenseCategory
-        )
-      } else {
-        _ = await appState.cliService.logExpense(
+        var updatedExpense = Expense(
+          id: Int64(expense.id),
           description: expenseDescription,
           amount: expenseAmount,
-          category: expenseCategory
+          currency: "USD",
+          category: expenseCategory,
+          date: Date()
         )
+        try? await appState.database.updateExpense(updatedExpense)
+      } else {
+        let newExpense = Expense(
+          description: expenseDescription,
+          amount: expenseAmount,
+          currency: "USD",
+          category: expenseCategory,
+          date: Date()
+        )
+        _ = try? await appState.database.createExpense(newExpense)
       }
       await appState.refreshDashboard()
       showAddSheet = false
@@ -2109,14 +2141,14 @@ struct SettingsContent: View {
             hasCompany: appState.setupStatus.hasCompany,
             onEdit: {
               Task {
-                if let details = await appState.cliService.getCompanyDetails() {
+                if let details = try? await appState.database.getCompany() {
                   companyName = details.name
                   companyEmail = details.email
-                  companyAddress = details.address
-                  companyTaxId = details.taxId
-                  companyBankName = details.bankName
-                  companyBankAccount = details.bankAccount
-                  companyBankSwift = details.bankSwift
+                  companyAddress = details.address ?? ""
+                  companyTaxId = details.taxId ?? ""
+                  companyBankName = details.bankName ?? ""
+                  companyBankAccount = details.bankAccount ?? ""
+                  companyBankSwift = details.bankSwift ?? ""
                 } else {
                   companyName = ""
                   companyEmail = ""
@@ -2195,25 +2227,28 @@ struct SettingsContent: View {
     guard !companyName.isEmpty else { return }
     Task {
       if appState.setupStatus.hasCompany {
-        _ = await appState.cliService.updateCompany(
-          name: companyName.isEmpty ? nil : companyName,
-          email: companyEmail.isEmpty ? nil : companyEmail,
-          address: companyAddress.isEmpty ? nil : companyAddress,
-          taxId: companyTaxId.isEmpty ? nil : companyTaxId,
-          bankName: companyBankName.isEmpty ? nil : companyBankName,
-          bankAccount: companyBankAccount.isEmpty ? nil : companyBankAccount,
-          bankSwift: companyBankSwift.isEmpty ? nil : companyBankSwift
-        )
+        // Get existing company and update it
+        if var existingCompany = try? await appState.database.getCompany() {
+          existingCompany.name = companyName
+          existingCompany.email = companyEmail
+          existingCompany.address = companyAddress.isEmpty ? nil : companyAddress
+          existingCompany.taxId = companyTaxId.isEmpty ? nil : companyTaxId
+          existingCompany.bankName = companyBankName.isEmpty ? nil : companyBankName
+          existingCompany.bankAccount = companyBankAccount.isEmpty ? nil : companyBankAccount
+          existingCompany.bankSwift = companyBankSwift.isEmpty ? nil : companyBankSwift
+          try? await appState.database.updateCompany(existingCompany)
+        }
       } else {
-        _ = await appState.cliService.createCompany(
+        var newCompany = Company(
           name: companyName,
-          email: companyEmail.isEmpty ? nil : companyEmail,
-          address: companyAddress.isEmpty ? nil : companyAddress,
-          taxId: companyTaxId.isEmpty ? nil : companyTaxId,
-          bankName: companyBankName.isEmpty ? nil : companyBankName,
-          bankAccount: companyBankAccount.isEmpty ? nil : companyBankAccount,
-          bankSwift: companyBankSwift.isEmpty ? nil : companyBankSwift
+          email: companyEmail.isEmpty ? "" : companyEmail
         )
+        newCompany.address = companyAddress.isEmpty ? nil : companyAddress
+        newCompany.taxId = companyTaxId.isEmpty ? nil : companyTaxId
+        newCompany.bankName = companyBankName.isEmpty ? nil : companyBankName
+        newCompany.bankAccount = companyBankAccount.isEmpty ? nil : companyBankAccount
+        newCompany.bankSwift = companyBankSwift.isEmpty ? nil : companyBankSwift
+        _ = try? await appState.database.createCompany(newCompany)
       }
       await appState.refreshDashboard()
       showCompanyEditor = false

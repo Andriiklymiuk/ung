@@ -258,6 +258,12 @@ class AppState: ObservableObject {
     @Published var hasStoredPassword: Bool = false
     @Published var databaseEncrypted: Bool = false
 
+    // iCloud Sync
+    @Published var iCloudEnabled: Bool = false
+    @Published var iCloudAvailable: Bool = false
+    @Published var syncStatus: SyncStatus = .idle
+    @Published var showSyncBanner: Bool = false
+
     // Main window navigation
     @Published var selectedTab: SidebarTab = .dashboard {
         willSet {
@@ -279,7 +285,47 @@ class AppState: ObservableObject {
     init() {
         hasStoredPassword = keychain.hasPassword()
         loadAppLockSettings()
+        loadICloudSettings()
         checkStatus()
+    }
+
+    // MARK: - iCloud Settings
+    private func loadICloudSettings() {
+        iCloudEnabled = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+        Task {
+            iCloudAvailable = await database.isICloudAvailable
+        }
+    }
+
+    func setICloudEnabled(_ enabled: Bool) async {
+        do {
+            try await database.setICloudEnabled(enabled)
+            iCloudEnabled = enabled
+            await refreshDashboard()
+            showToastMessage(enabled ? "iCloud sync enabled" : "iCloud sync disabled", type: .success)
+        } catch {
+            showError("Failed to \(enabled ? "enable" : "disable") iCloud sync: \(error.localizedDescription)")
+        }
+    }
+
+    func checkICloudSync() {
+        guard iCloudEnabled else { return }
+
+        Task {
+            showSyncBanner = true
+            syncStatus = .syncing
+
+            let status = await database.triggerSync()
+            syncStatus = status
+
+            // Keep banner visible for a moment
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            showSyncBanner = false
+
+            if case .completed = status {
+                await refreshDashboard()
+            }
+        }
     }
 
     // MARK: - App Lock Settings

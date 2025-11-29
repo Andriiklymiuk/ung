@@ -43,6 +43,14 @@ struct MainWindowView: View {
             guard appState.status == .ready, appState.metrics.totalRevenue == 0 else { return }
             await appState.refreshDashboard()
         }
+        .overlay(alignment: .top) {
+            // iCloud sync banner at TOP of screen
+            if appState.showSyncBanner {
+                iCloudSyncBanner
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: appState.showSyncBanner)
+            }
+        }
         .overlay(alignment: .bottom) {
             if appState.showToast {
                 DSToast(
@@ -57,6 +65,58 @@ struct MainWindowView: View {
                 )
                 .animation(.spring(response: 0.4, dampingFraction: 0.7), value: appState.showToast)
             }
+        }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // Trigger iCloud sync when app becomes active (from background)
+            appState.checkICloudSync()
+        }
+        #else
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Trigger iCloud sync when app becomes active (from background)
+            appState.checkICloudSync()
+        }
+        #endif
+    }
+
+    // MARK: - iCloud Sync Banner
+    private var iCloudSyncBanner: some View {
+        HStack(spacing: 8) {
+            if case .syncing = appState.syncStatus {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    #if os(macOS)
+                    .controlSize(.small)
+                    #endif
+            } else {
+                Image(systemName: "checkmark.icloud.fill")
+                    .foregroundColor(.green)
+            }
+
+            Text(syncStatusText)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(Color.blue.opacity(0.9))
+                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+        )
+        .padding(.top, 8)
+    }
+
+    private var syncStatusText: String {
+        switch appState.syncStatus {
+        case .syncing:
+            return "Syncing with iCloud..."
+        case .completed:
+            return "iCloud sync complete"
+        case .error(let message):
+            return "Sync error: \(message)"
+        case .idle:
+            return ""
         }
     }
 

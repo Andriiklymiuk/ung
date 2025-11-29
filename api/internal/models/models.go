@@ -359,11 +359,14 @@ type Profile struct {
 type JobSource string
 
 const (
-	JobSourceHN       JobSource = "hackernews"
-	JobSourceRemoteOK JobSource = "remoteok"
-	JobSourceUpwork   JobSource = "upwork"
-	JobSourceLinkedIn JobSource = "linkedin"
-	JobSourceManual   JobSource = "manual"
+	JobSourceHN             JobSource = "hackernews"
+	JobSourceRemoteOK       JobSource = "remoteok"
+	JobSourceWeWorkRemotely JobSource = "weworkremotely"
+	JobSourceJobicy         JobSource = "jobicy"
+	JobSourceArbeitnow      JobSource = "arbeitnow"
+	JobSourceUpwork         JobSource = "upwork"
+	JobSourceLinkedIn       JobSource = "linkedin"
+	JobSourceManual         JobSource = "manual"
 )
 
 // Job represents a scraped job posting

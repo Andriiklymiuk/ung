@@ -999,6 +999,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
     case invoices = "Invoices"
     case expenses = "Expenses"
     case pomodoro = "Focus Timer"
+    case hunter = "Job Hunter"
     case reports = "Reports"
     case settings = "Settings"
 
@@ -1013,6 +1014,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         case .invoices: return "doc.plaintext"
         case .expenses: return "dollarsign.circle"
         case .pomodoro: return "brain.head.profile"
+        case .hunter: return "magnifyingglass"
         case .reports: return "chart.bar"
         case .settings: return "gearshape"
         }
@@ -1027,6 +1029,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         case .invoices: return "doc.plaintext.fill"
         case .expenses: return "dollarsign.circle.fill"
         case .pomodoro: return "brain.head.profile.fill"
+        case .hunter: return "magnifyingglass.circle.fill"
         case .reports: return "chart.bar.fill"
         case .settings: return "gearshape.fill"
         }
@@ -1041,6 +1044,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         case .invoices: return "Invoices"
         case .expenses: return "Expenses"
         case .pomodoro: return "Focus"
+        case .hunter: return "Jobs"
         case .reports: return "Reports"
         case .settings: return "Settings"
         }

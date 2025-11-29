@@ -531,6 +531,15 @@ actor DatabaseService {
             CREATE INDEX IF NOT EXISTS idx_recurring_invoices_next_date ON recurring_invoices(next_generation_date);
             CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
             CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
+
+            -- Performance optimization indexes
+            CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+            CREATE INDEX IF NOT EXISTS idx_invoices_status_amount ON invoices(status, amount);
+            CREATE INDEX IF NOT EXISTS idx_invoices_created_at ON invoices(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_tracking_sessions_active ON tracking_sessions(end_time) WHERE end_time IS NULL;
+            CREATE INDEX IF NOT EXISTS idx_tracking_sessions_start_time ON tracking_sessions(start_time DESC);
+            CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(name);
             """
 
         // Execute each statement
@@ -885,19 +894,23 @@ actor DatabaseService {
         }
     }
 
+    /// Optimized: Single query with CASE statements instead of 3 separate queries
     func getInvoiceTotals() async throws -> (total: Double, pending: Double, overdue: Double) {
         let db = try getDatabase()
         return try await db.read { db in
-            let total = try Double.fetchOne(db, sql: "SELECT COALESCE(SUM(amount), 0) FROM invoices") ?? 0
-            let pending = try Double.fetchOne(
-                db,
-                sql: "SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE status IN ('pending', 'sent')"
-            ) ?? 0
-            let overdue = try Double.fetchOne(
-                db,
-                sql: "SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE status = 'overdue'"
-            ) ?? 0
-            return (total, pending, overdue)
+            let sql = """
+                SELECT
+                    COALESCE(SUM(amount), 0) as total,
+                    COALESCE(SUM(CASE WHEN status IN ('pending', 'sent') THEN amount ELSE 0 END), 0) as pending,
+                    COALESCE(SUM(CASE WHEN status = 'overdue' THEN amount ELSE 0 END), 0) as overdue
+                FROM invoices
+            """
+            let row = try Row.fetchOne(db, sql: sql)
+            return (
+                row?["total"] as? Double ?? 0,
+                row?["pending"] as? Double ?? 0,
+                row?["overdue"] as? Double ?? 0
+            )
         }
     }
 

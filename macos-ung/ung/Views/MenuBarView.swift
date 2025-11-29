@@ -80,20 +80,20 @@ struct CompactDashboardView: View {
 
   // MARK: - Active Tracking Banner
   private func activeTrackingBanner(_ session: ActiveSession) -> some View {
-    HStack(spacing: 10) {
+    HStack(spacing: Design.Spacing.xs) {
       Circle()
-        .fill(Color.red)
+        .fill(Color.white)
         .frame(width: 8, height: 8)
 
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
         Text(session.project)
-          .font(.system(size: 12, weight: .semibold))
+          .font(Design.Typography.labelMedium)
           .foregroundColor(.white)
           .lineLimit(1)
 
         if !session.client.isEmpty {
           Text(session.client)
-            .font(.system(size: 10))
+            .font(Design.Typography.labelSmall)
             .foregroundColor(.white.opacity(0.8))
             .lineLimit(1)
         }
@@ -102,49 +102,50 @@ struct CompactDashboardView: View {
       Spacer()
 
       Text(session.formattedDuration)
-        .font(.system(size: 14, weight: .bold, design: .monospaced))
+        .font(Design.Typography.monoSmall)
         .foregroundColor(.white)
 
       Button(action: { Task { await appState.stopTracking() } }) {
         Image(systemName: "stop.fill")
-          .font(.system(size: 12))
+          .font(.system(size: Design.IconSize.xs))
           .foregroundColor(.white)
-          .padding(6)
+          .padding(Design.Spacing.xxs)
           .background(Circle().fill(Color.white.opacity(0.2)))
       }
       .buttonStyle(.plain)
+      .accessibleButton(label: "Stop tracking", hint: "Stops the current time tracking session")
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 10)
+    .padding(.horizontal, Design.Spacing.sm)
+    .padding(.vertical, Design.Spacing.xs)
     .background(
-      LinearGradient(colors: [.red, .orange], startPoint: .leading, endPoint: .trailing)
+      LinearGradient(colors: [Design.Colors.error, Design.Colors.warning], startPoint: .leading, endPoint: .trailing)
     )
   }
 
   // MARK: - Pomodoro Banner
   private var pomodoroBanner: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: Design.Spacing.xs) {
       Circle()
-        .fill(appState.pomodoroState.isBreak ? Color.green : Color.orange)
+        .fill(Color.white)
         .frame(width: 8, height: 8)
 
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
         Text(appState.pomodoroState.statusText)
-          .font(.system(size: 12, weight: .semibold))
+          .font(Design.Typography.labelMedium)
           .foregroundColor(.white)
 
         Text("Session \(appState.pomodoroState.sessionsCompleted + 1)")
-          .font(.system(size: 10))
+          .font(Design.Typography.labelSmall)
           .foregroundColor(.white.opacity(0.8))
       }
 
       Spacer()
 
       Text(appState.pomodoroState.formattedTime)
-        .font(.system(size: 14, weight: .bold, design: .monospaced))
+        .font(Design.Typography.monoSmall)
         .foregroundColor(.white)
 
-      HStack(spacing: 4) {
+      HStack(spacing: Design.Spacing.xxs) {
         Button(action: {
           if appState.pomodoroState.isPaused {
             appState.resumePomodoro()
@@ -153,28 +154,30 @@ struct CompactDashboardView: View {
           }
         }) {
           Image(systemName: appState.pomodoroState.isPaused ? "play.fill" : "pause.fill")
-            .font(.system(size: 10))
+            .font(.system(size: Design.IconSize.xs))
             .foregroundColor(.white)
-            .padding(5)
+            .padding(Design.Spacing.xxs)
             .background(Circle().fill(Color.white.opacity(0.2)))
         }
         .buttonStyle(.plain)
+        .accessibleButton(label: appState.pomodoroState.isPaused ? "Resume focus" : "Pause focus")
 
         Button(action: { appState.stopPomodoro() }) {
           Image(systemName: "stop.fill")
-            .font(.system(size: 10))
+            .font(.system(size: Design.IconSize.xs))
             .foregroundColor(.white)
-            .padding(5)
+            .padding(Design.Spacing.xxs)
             .background(Circle().fill(Color.white.opacity(0.2)))
         }
         .buttonStyle(.plain)
+        .accessibleButton(label: "Stop focus session")
       }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 10)
+    .padding(.horizontal, Design.Spacing.sm)
+    .padding(.vertical, Design.Spacing.xs)
     .background(
       LinearGradient(
-        colors: appState.pomodoroState.isBreak ? [.green, .mint] : [.orange, .red],
+        colors: appState.pomodoroState.isBreak ? [Design.Colors.success, Design.Colors.success.opacity(0.7)] : [Design.Colors.warning, Design.Colors.error],
         startPoint: .leading,
         endPoint: .trailing
       )
@@ -186,45 +189,48 @@ struct CompactDashboardView: View {
     HStack(spacing: 0) {
       ForEach(CompactTab.allCases, id: \.self) { tab in
         Text(tab.rawValue)
-          .font(.system(size: 12, weight: currentTab == tab ? .semibold : .regular))
-          .foregroundColor(currentTab == tab ? .primary : .secondary)
-          .padding(.vertical, 8)
+          .font(currentTab == tab ? Design.Typography.labelMedium : Design.Typography.bodySmall)
+          .foregroundColor(currentTab == tab ? Design.Colors.textPrimary : Design.Colors.textSecondary)
+          .padding(.vertical, Design.Spacing.xs)
           .frame(maxWidth: .infinity)
           .background(
             Group {
               if currentTab == tab {
-                RoundedRectangle(cornerRadius: 6)
-                  .fill(Color(nsColor: .controlBackgroundColor))
-                  .shadow(color: .black.opacity(0.05), radius: 1, y: 1)
+                RoundedRectangle(cornerRadius: Design.Radius.xs)
+                  .fill(Design.Colors.controlBackground)
+                  .shadow(color: Design.Shadow.sm.color, radius: Design.Shadow.sm.radius, y: Design.Shadow.sm.y)
               }
             }
           )
           .contentShape(Rectangle())
           .onTapGesture {
-            withAnimation(.spring(response: 0.25)) {
+            withAnimation(Design.Animation.smooth) {
               currentTab = tab
             }
           }
+          .accessibilityAddTraits(currentTab == tab ? .isSelected : [])
       }
     }
-    .padding(4)
+    .padding(Design.Spacing.xxs)
     .background(
-      RoundedRectangle(cornerRadius: 8)
-        .fill(Color(nsColor: .separatorColor).opacity(0.3))
+      RoundedRectangle(cornerRadius: Design.Radius.sm)
+        .fill(Design.Colors.divider)
     )
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
+    .padding(.horizontal, Design.Spacing.sm)
+    .padding(.vertical, Design.Spacing.xs)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Tab selector")
   }
 
   // MARK: - Overview Content
   private var overviewContent: some View {
-    VStack(spacing: 12) {
+    VStack(spacing: Design.Spacing.sm) {
       // Quick actions
-      HStack(spacing: 8) {
+      HStack(spacing: Design.Spacing.xs) {
         CompactActionButton(
           icon: "play.fill",
           title: "Track",
-          color: .green,
+          color: Design.Colors.success,
           disabled: appState.isTracking
         ) {
           showStartTracking = true
@@ -233,7 +239,7 @@ struct CompactDashboardView: View {
         CompactActionButton(
           icon: "brain.head.profile",
           title: "Focus",
-          color: .orange,
+          color: Design.Colors.warning,
           disabled: appState.pomodoroState.isActive
         ) {
           currentTab = .pomodoro
@@ -242,7 +248,7 @@ struct CompactDashboardView: View {
         CompactActionButton(
           icon: "rectangle.expand.vertical",
           title: "Expand",
-          color: .blue,
+          color: Design.Colors.brand,
           disabled: false
         ) {
           openMainWindow()
@@ -251,72 +257,74 @@ struct CompactDashboardView: View {
       }
 
       // Metrics
-      HStack(spacing: 8) {
+      HStack(spacing: Design.Spacing.xs) {
         CompactMetricCard(
           title: "This Week",
           value: appState.formatHours(appState.metrics.weeklyHours),
           icon: "clock.fill",
-          color: .blue
+          color: Design.Colors.brand
         )
 
         CompactMetricCard(
           title: "Pending",
           value: appState.formatCurrency(appState.metrics.pendingAmount),
           icon: "hourglass",
-          color: .orange
+          color: Design.Colors.warning
         )
       }
 
       // Recent sessions
       if !appState.recentSessions.isEmpty {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
           Text("Recent")
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.labelSmall)
+            .foregroundColor(Design.Colors.textSecondary)
 
           ForEach(appState.recentSessions.prefix(3)) { session in
             HStack {
               Circle()
-                .fill(Color.blue.opacity(0.3))
+                .fill(Design.Colors.brand.opacity(0.3))
                 .frame(width: 6, height: 6)
 
               Text(session.project)
-                .font(.system(size: 11))
-                .foregroundColor(.primary)
+                .font(Design.Typography.bodySmall)
+                .foregroundColor(Design.Colors.textPrimary)
                 .lineLimit(1)
 
               Spacer()
 
               Text(appState.secureMode ? "**:**" : session.duration)
                 .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.secondary)
+                .foregroundColor(Design.Colors.textSecondary)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, Design.Spacing.xxs)
           }
         }
-        .padding(10)
+        .padding(Design.Spacing.xs)
         .background(
-          RoundedRectangle(cornerRadius: 8)
-            .fill(Color(nsColor: .controlBackgroundColor))
+          RoundedRectangle(cornerRadius: Design.Radius.sm)
+            .fill(Design.Colors.controlBackground)
         )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Recent sessions")
       }
     }
   }
 
   // MARK: - Pomodoro Content
   private var pomodoroContent: some View {
-    VStack(spacing: 16) {
+    VStack(spacing: Design.Spacing.md) {
       // Timer display
       ZStack {
         Circle()
-          .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+          .stroke(Design.Colors.border, lineWidth: 8)
           .frame(width: 140, height: 140)
 
         Circle()
           .trim(from: 0, to: appState.pomodoroState.progress)
           .stroke(
             LinearGradient(
-              colors: appState.pomodoroState.isBreak ? [.green, .mint] : [.red, .orange],
+              colors: appState.pomodoroState.isBreak ? [Design.Colors.success, Design.Colors.success.opacity(0.7)] : [Design.Colors.error, Design.Colors.warning],
               startPoint: .topLeading,
               endPoint: .bottomTrailing
             ),
@@ -324,22 +332,25 @@ struct CompactDashboardView: View {
           )
           .frame(width: 140, height: 140)
           .rotationEffect(.degrees(-90))
+          .animation(Design.Animation.smooth, value: appState.pomodoroState.progress)
 
-        VStack(spacing: 4) {
+        VStack(spacing: Design.Spacing.xxs) {
           Text(appState.pomodoroState.formattedTime)
-            .font(.system(size: 28, weight: .bold, design: .rounded))
+            .font(Design.Typography.displaySmall)
             .monospacedDigit()
 
           Text(appState.pomodoroState.statusText)
-            .font(.system(size: 11))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
         }
       }
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("Timer: \(appState.pomodoroState.formattedTime), \(appState.pomodoroState.statusText)")
 
       // Controls - fixed height to prevent jumping
       Group {
         if appState.pomodoroState.isActive {
-          HStack(spacing: 12) {
+          HStack(spacing: Design.Spacing.sm) {
             Button(action: {
               if appState.pomodoroState.isPaused {
                 appState.resumePomodoro()
@@ -348,72 +359,78 @@ struct CompactDashboardView: View {
               }
             }) {
               Image(systemName: appState.pomodoroState.isPaused ? "play.fill" : "pause.fill")
-                .font(.system(size: 14))
+                .font(.system(size: Design.IconSize.sm))
                 .frame(width: 40, height: 40)
-                .background(Circle().fill(Color(nsColor: .controlBackgroundColor)))
+                .background(Circle().fill(Design.Colors.controlBackground))
             }
             .buttonStyle(.plain)
+            .accessibleButton(label: appState.pomodoroState.isPaused ? "Resume" : "Pause")
 
             Button(action: { appState.skipPomodoro() }) {
               Image(systemName: "forward.fill")
-                .font(.system(size: 14))
+                .font(.system(size: Design.IconSize.sm))
                 .frame(width: 40, height: 40)
-                .background(Circle().fill(Color(nsColor: .controlBackgroundColor)))
+                .background(Circle().fill(Design.Colors.controlBackground))
             }
             .buttonStyle(.plain)
+            .accessibleButton(label: "Skip to next session")
 
             Button(action: { appState.stopPomodoro() }) {
               Image(systemName: "stop.fill")
-                .font(.system(size: 14))
-                .foregroundColor(.red)
+                .font(.system(size: Design.IconSize.sm))
+                .foregroundColor(Design.Colors.error)
                 .frame(width: 40, height: 40)
-                .background(Circle().stroke(Color.red.opacity(0.3), lineWidth: 1))
+                .background(Circle().stroke(Design.Colors.error.opacity(0.3), lineWidth: 1))
             }
             .buttonStyle(.plain)
+            .accessibleButton(label: "Stop focus session")
           }
         } else {
           Button(action: { appState.startPomodoro() }) {
-            HStack(spacing: 8) {
+            HStack(spacing: Design.Spacing.xs) {
               Image(systemName: "play.fill")
               Text("Start Focus")
             }
-            .font(.system(size: 13, weight: .semibold))
+            .font(Design.Typography.labelMedium)
             .foregroundColor(.white)
             .frame(width: 140, height: 40)
             .background(
-              RoundedRectangle(cornerRadius: 10)
-                .fill(Color.red)
+              RoundedRectangle(cornerRadius: Design.Radius.sm)
+                .fill(Design.Colors.error)
             )
           }
           .buttonStyle(.plain)
+          .accessibleButton(label: "Start focus session")
         }
       }
       .frame(height: 44)
 
       // Stats
-      HStack(spacing: 20) {
-        VStack(spacing: 2) {
+      HStack(spacing: Design.Spacing.lg) {
+        VStack(spacing: Design.Spacing.xxxs) {
           Text("\(appState.pomodoroState.sessionsCompleted)")
-            .font(.system(size: 18, weight: .bold))
+            .font(Design.Typography.headingSmall)
             .frame(minWidth: 40)
           Text("Sessions")
-            .font(.system(size: 10))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.labelSmall)
+            .foregroundColor(Design.Colors.textSecondary)
         }
         .frame(minWidth: 70)
 
         Divider().frame(height: 30)
 
-        VStack(spacing: 2) {
+        VStack(spacing: Design.Spacing.xxxs) {
           Text("\(appState.pomodoroState.sessionsCompleted * appState.pomodoroState.workMinutes)m")
-            .font(.system(size: 18, weight: .bold))
+            .font(Design.Typography.headingSmall)
             .frame(minWidth: 50)
           Text("Focus Time")
-            .font(.system(size: 10))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.labelSmall)
+            .foregroundColor(Design.Colors.textSecondary)
         }
         .frame(minWidth: 80)
       }
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("\(appState.pomodoroState.sessionsCompleted) sessions, \(appState.pomodoroState.sessionsCompleted * appState.pomodoroState.workMinutes) minutes focus time")
     }
   }
 
@@ -422,11 +439,12 @@ struct CompactDashboardView: View {
     HStack {
       Button(action: { Task { await appState.refreshDashboard() } }) {
         Image(systemName: "arrow.clockwise")
-          .font(.system(size: 11))
-          .foregroundColor(.secondary)
+          .font(.system(size: Design.IconSize.xs))
+          .foregroundColor(Design.Colors.textSecondary)
       }
       .buttonStyle(.plain)
       .disabled(appState.isRefreshing)
+      .accessibleButton(label: "Refresh", hint: "Refreshes dashboard data")
 
       if appState.isRefreshing {
         ProgressView().scaleEffect(0.6)
@@ -439,35 +457,38 @@ struct CompactDashboardView: View {
         openMainWindow()
         dismiss()
       }) {
-        HStack(spacing: 4) {
+        HStack(spacing: Design.Spacing.xxs) {
           Image(systemName: "macwindow")
-            .font(.system(size: 10))
+            .font(.system(size: Design.IconSize.xs))
           Text("Open App")
-            .font(.system(size: 10))
+            .font(Design.Typography.labelSmall)
         }
-        .foregroundColor(.blue)
+        .foregroundColor(Design.Colors.brand)
       }
       .buttonStyle(.plain)
+      .accessibleButton(label: "Open main window")
 
       Spacer()
 
       // Secure mode indicator
       if appState.secureMode {
         Image(systemName: "eye.slash.fill")
-          .font(.system(size: 10))
-          .foregroundColor(.orange)
+          .font(.system(size: Design.IconSize.xs))
+          .foregroundColor(Design.Colors.warning)
+          .accessibilityLabel("Secure mode enabled")
       }
 
       Button(action: { NSApplication.shared.terminate(nil) }) {
         Text("Quit")
-          .font(.system(size: 11))
-          .foregroundColor(.secondary)
+          .font(Design.Typography.bodySmall)
+          .foregroundColor(Design.Colors.textSecondary)
       }
       .buttonStyle(.plain)
+      .accessibleButton(label: "Quit application")
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
-    .background(Color(nsColor: .separatorColor).opacity(0.2))
+    .padding(.horizontal, Design.Spacing.sm)
+    .padding(.vertical, Design.Spacing.xs)
+    .background(Design.Colors.divider)
   }
 }
 
@@ -481,24 +502,25 @@ struct CompactActionButton: View {
 
   var body: some View {
     Button(action: action) {
-      VStack(spacing: 6) {
+      VStack(spacing: Design.Spacing.xxs) {
         Image(systemName: icon)
-          .font(.system(size: 16))
-          .foregroundColor(disabled ? .secondary : color)
+          .font(.system(size: Design.IconSize.sm))
+          .foregroundColor(disabled ? Design.Colors.textSecondary : color)
 
         Text(title)
-          .font(.system(size: 10, weight: .medium))
-          .foregroundColor(disabled ? .secondary : .primary)
+          .font(Design.Typography.labelSmall)
+          .foregroundColor(disabled ? Design.Colors.textSecondary : Design.Colors.textPrimary)
       }
       .frame(maxWidth: .infinity)
-      .padding(.vertical, 12)
+      .padding(.vertical, Design.Spacing.sm)
       .background(
-        RoundedRectangle(cornerRadius: 10)
-          .fill(disabled ? Color.gray.opacity(0.1) : color.opacity(0.1))
+        RoundedRectangle(cornerRadius: Design.Radius.sm)
+          .fill(disabled ? Design.Colors.border : color.opacity(0.1))
       )
     }
     .buttonStyle(.plain)
     .disabled(disabled)
+    .accessibleButton(label: title, hint: disabled ? "Currently unavailable" : nil)
   }
 }
 
@@ -510,26 +532,28 @@ struct CompactMetricCard: View {
   let color: Color
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack(spacing: 4) {
+    VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
+      HStack(spacing: Design.Spacing.xxs) {
         Image(systemName: icon)
-          .font(.system(size: 10))
+          .font(.system(size: Design.IconSize.xs))
           .foregroundColor(color)
         Text(title)
-          .font(.system(size: 10))
-          .foregroundColor(.secondary)
+          .font(Design.Typography.labelSmall)
+          .foregroundColor(Design.Colors.textSecondary)
       }
 
       Text(value)
-        .font(.system(size: 14, weight: .bold, design: .rounded))
-        .foregroundColor(.primary)
+        .font(Design.Typography.labelLarge)
+        .foregroundColor(Design.Colors.textPrimary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(10)
+    .padding(Design.Spacing.xs)
     .background(
-      RoundedRectangle(cornerRadius: 8)
-        .fill(Color(nsColor: .controlBackgroundColor))
+      RoundedRectangle(cornerRadius: Design.Radius.sm)
+        .fill(Design.Colors.controlBackground)
     )
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(title): \(value)")
   }
 }
 

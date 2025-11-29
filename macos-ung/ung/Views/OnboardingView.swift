@@ -15,34 +15,35 @@ struct DatabaseErrorView: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-                .frame(height: 32)
+                .frame(height: Design.Spacing.xl)
 
             // App icon
             appIcon
 
             Spacer()
-                .frame(height: 16)
+                .frame(height: Design.Spacing.md)
 
             // Title
             Text("Database Error")
-                .font(.system(size: 22, weight: .bold))
+                .font(Design.Typography.headingMedium)
+                .accessibleHeader(label: "Database Error")
 
             Spacer()
-                .frame(height: 6)
+                .frame(height: Design.Spacing.xxs)
 
             // Subtitle
             Text("Failed to initialize database")
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.bodyMedium)
+                .foregroundColor(Design.Colors.textSecondary)
 
             Spacer()
-                .frame(height: 24)
+                .frame(height: Design.Spacing.lg)
 
             // Error info
-            VStack(spacing: 16) {
+            VStack(spacing: Design.Spacing.md) {
                 Text("The app couldn't create or access the database. This might be due to permissions or disk space issues.")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
+                    .font(Design.Typography.bodyMedium)
+                    .foregroundColor(Design.Colors.textSecondary)
                     .multilineTextAlignment(.center)
 
                 // Retry button
@@ -59,15 +60,16 @@ struct DatabaseErrorView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(isRetrying)
+                .accessibleButton(label: isRetrying ? "Retrying database initialization" : "Retry database initialization")
             }
 
             Spacer()
 
             // Footer
             footerSection
-                .padding(.bottom, 20)
+                .padding(.bottom, Design.Spacing.lg)
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, Design.Spacing.xl)
     }
 
     // MARK: - App Icon
@@ -96,8 +98,9 @@ struct DatabaseErrorView: View {
     private var fallbackIcon: some View {
         Image(systemName: "exclamationmark.triangle")
             .font(.system(size: 48, weight: .light))
-            .foregroundColor(.orange)
+            .foregroundColor(Design.Colors.warning)
             .frame(width: 80, height: 80)
+            .accessibilityLabel("Warning icon")
     }
 
     // MARK: - Footer
@@ -115,14 +118,15 @@ struct DatabaseErrorView: View {
                 #endif
             }
             .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
-            .font(.system(size: 12))
+            .foregroundColor(Design.Colors.brand)
+            .font(Design.Typography.bodySmall)
+            .accessibleButton(label: "Learn more about UNG")
 
             Spacer()
 
             Text("v1.0")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.bodySmall)
+                .foregroundColor(Design.Colors.textSecondary)
         }
     }
 

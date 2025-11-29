@@ -32,6 +32,7 @@ func SetupRouter(
 	templateController *controllers.TemplateController,
 	searchController *controllers.SearchController,
 	exportController *controllers.ExportController,
+	hunterController *controllers.HunterController,
 	authMiddleware func(http.Handler) http.Handler,
 	tenantMiddleware func(http.Handler) http.Handler,
 	subscriptionMiddleware func(http.Handler) http.Handler,
@@ -237,6 +238,30 @@ func SetupRouter(
 					r.Post("/all", exportController.ImportAllJSON)
 					r.Post("/clients/csv", exportController.ImportClientsCSV)
 					r.Post("/expenses/csv", exportController.ImportExpensesCSV)
+				})
+
+				// Job Hunter
+				r.Route("/hunter", func(r chi.Router) {
+					// Profile
+					r.Post("/profile/import", hunterController.ImportProfile)
+					r.Get("/profile", hunterController.GetProfile)
+					r.Put("/profile", hunterController.UpdateProfile)
+
+					// Jobs
+					r.Post("/hunt", hunterController.Hunt)
+					r.Get("/jobs", hunterController.ListJobs)
+					r.Get("/jobs/{id}", hunterController.GetJob)
+					r.Delete("/jobs/{id}", hunterController.DeleteJob)
+
+					// Applications
+					r.Get("/applications", hunterController.ListApplications)
+					r.Post("/applications", hunterController.CreateApplication)
+					r.Get("/applications/{id}", hunterController.GetApplication)
+					r.Put("/applications/{id}", hunterController.UpdateApplication)
+					r.Delete("/applications/{id}", hunterController.DeleteApplication)
+
+					// Stats
+					r.Get("/stats", hunterController.GetStats)
 				})
 			})
 

@@ -328,3 +328,96 @@ type InvoiceTemplate struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// =====================================
+// Job Hunter Models
+// =====================================
+
+// Profile represents the user's professional profile extracted from CV/resume
+type Profile struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	Name       string    `json:"name"`
+	Title      string    `json:"title"`      // e.g., "Senior Go Developer"
+	Bio        string    `json:"bio"`        // Professional summary
+	Skills     string    `json:"skills"`     // JSON array of skills
+	Experience int       `json:"experience"` // Years of experience
+	Rate       float64   `json:"rate"`       // Desired hourly rate
+	Currency   string    `gorm:"default:USD" json:"currency"`
+	Location   string    `json:"location"`
+	Remote     bool      `gorm:"default:true" json:"remote"`
+	Languages  string    `json:"languages"`  // JSON array of languages
+	Education  string    `json:"education"`  // JSON array of education
+	Projects   string    `json:"projects"`   // JSON array of notable projects
+	Links      string    `json:"links"`      // JSON: github, linkedin, portfolio
+	PDFPath    string    `gorm:"column:pdf_path" json:"pdf_path"`
+	PDFContent string    `json:"pdf_content"` // Extracted text from PDF
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// JobSource represents where jobs are scraped from
+type JobSource string
+
+const (
+	JobSourceHN       JobSource = "hackernews"
+	JobSourceRemoteOK JobSource = "remoteok"
+	JobSourceUpwork   JobSource = "upwork"
+	JobSourceLinkedIn JobSource = "linkedin"
+	JobSourceManual   JobSource = "manual"
+)
+
+// Job represents a scraped job posting
+type Job struct {
+	ID          uint       `gorm:"primaryKey" json:"id"`
+	Source      JobSource  `gorm:"not null" json:"source"`
+	SourceID    string     `json:"source_id"`
+	SourceURL   string     `json:"source_url"`
+	Title       string     `gorm:"not null" json:"title"`
+	Company     string     `json:"company"`
+	Description string     `json:"description"`
+	Skills      string     `json:"skills"`    // JSON array of required skills
+	RateMin     float64    `json:"rate_min"`
+	RateMax     float64    `json:"rate_max"`
+	RateType    string     `json:"rate_type"` // hourly, monthly, yearly
+	Currency    string     `gorm:"default:USD" json:"currency"`
+	Remote      bool       `gorm:"default:true" json:"remote"`
+	Location    string     `json:"location"`
+	JobType     string     `json:"job_type"`    // contract, fulltime, parttime
+	MatchScore  float64    `json:"match_score"` // 0-100 match with profile
+	PostedAt    time.Time  `json:"posted_at"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// ApplicationStatus represents the status of a job application
+type ApplicationStatus string
+
+const (
+	AppStatusDraft     ApplicationStatus = "draft"
+	AppStatusApplied   ApplicationStatus = "applied"
+	AppStatusViewed    ApplicationStatus = "viewed"
+	AppStatusResponse  ApplicationStatus = "response"
+	AppStatusInterview ApplicationStatus = "interview"
+	AppStatusOffer     ApplicationStatus = "offer"
+	AppStatusRejected  ApplicationStatus = "rejected"
+	AppStatusWithdrawn ApplicationStatus = "withdrawn"
+)
+
+// Application represents a job application
+type Application struct {
+	ID          uint              `gorm:"primaryKey" json:"id"`
+	JobID       uint              `gorm:"not null;index" json:"job_id"`
+	Job         Job               `gorm:"foreignKey:JobID" json:"job,omitempty"`
+	ProfileID   uint              `gorm:"index" json:"profile_id"`
+	Profile     Profile           `gorm:"foreignKey:ProfileID" json:"-"`
+	Proposal    string            `json:"proposal"`
+	ProposalPDF string            `json:"proposal_pdf"`
+	CoverLetter string            `json:"cover_letter"`
+	Status      ApplicationStatus `gorm:"default:draft" json:"status"`
+	Notes       string            `json:"notes"`
+	AppliedAt   *time.Time        `json:"applied_at"`
+	ResponseAt  *time.Time        `json:"response_at"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+}

@@ -81,7 +81,7 @@ struct MainWindowView: View {
 
     // MARK: - iCloud Sync Banner
     private var iCloudSyncBanner: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Design.Spacing.xs) {
             if case .syncing = appState.syncStatus {
                 ProgressView()
                     .scaleEffect(0.7)
@@ -90,21 +90,23 @@ struct MainWindowView: View {
                     #endif
             } else {
                 Image(systemName: "checkmark.icloud.fill")
-                    .foregroundColor(.green)
+                    .foregroundColor(Design.Colors.success)
             }
 
             Text(syncStatusText)
-                .font(.system(size: 13, weight: .medium))
+                .font(Design.Typography.labelMedium)
                 .foregroundColor(.white)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Design.Spacing.md)
+        .padding(.vertical, Design.Spacing.xs)
         .background(
             Capsule()
-                .fill(Color.blue.opacity(0.9))
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                .fill(Design.Colors.brand.opacity(0.9))
+                .shadow(color: Design.Shadow.md.color, radius: Design.Shadow.md.radius, y: Design.Shadow.md.y)
         )
-        .padding(.top, 8)
+        .padding(.top, Design.Spacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("iCloud sync: \(syncStatusText)")
     }
 
     private var syncStatusText: String {
@@ -258,13 +260,14 @@ struct iPadSidebar: View {
 
             ToolbarItem(placement: .primaryAction) {
                 if appState.isTracking {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Design.Spacing.xxs) {
                         Circle()
-                            .fill(Color.red)
+                            .fill(Design.Colors.error)
                             .frame(width: 8, height: 8)
                         Text(appState.activeSession?.formattedDuration ?? "")
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .font(Design.Typography.monoSmall)
                     }
+                    .accessibilityLabel("Tracking: \(appState.activeSession?.formattedDuration ?? "")")
                 }
             }
         }
@@ -278,13 +281,14 @@ struct iPadSidebar: View {
                     .scaleEffect(0.6)
             } else if case .error = appState.syncStatus {
                 Image(systemName: "exclamationmark.icloud.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(Design.Colors.warning)
             } else {
                 Image(systemName: "checkmark.icloud.fill")
-                    .foregroundColor(.green)
+                    .foregroundColor(Design.Colors.success)
             }
         }
-        .font(.system(size: 14))
+        .font(.system(size: Design.IconSize.sm))
+        .accessibilityLabel("iCloud sync status")
     }
 }
 
@@ -904,23 +908,24 @@ struct ContentAreaView: View {
     }
 
     private var contentHeader: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: Design.Spacing.sm) {
+            VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
                 Text(appState.selectedTab.rawValue)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundColor(.primary)
+                    .font(Design.Typography.headingMedium)
+                    .foregroundColor(Design.Colors.textPrimary)
+                    .accessibleHeader(label: appState.selectedTab.rawValue)
 
                 Text(headerSubtitle)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .font(Design.Typography.bodySmall)
+                    .foregroundColor(Design.Colors.textSecondary)
             }
 
             Spacer()
 
             Button(action: { Task { await appState.refreshDashboard() } }) {
-                Image(systemName: appState.isRefreshing ? "arrow.clockwise" : "arrow.clockwise")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: Design.IconSize.sm))
+                    .foregroundColor(Design.Colors.textSecondary)
                     .rotationEffect(.degrees(appState.isRefreshing ? 360 : 0))
                     .animation(
                         appState.isRefreshing
@@ -929,20 +934,21 @@ struct ContentAreaView: View {
             }
             .buttonStyle(.plain)
             .disabled(appState.isRefreshing)
+            .accessibleButton(label: "Refresh", hint: "Refreshes dashboard data")
 
             if let action = primaryAction {
                 Button(action: action.action) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Design.Spacing.xxs) {
                         Image(systemName: action.icon)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: Design.IconSize.xs, weight: .semibold))
                         Text(action.title)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Design.Typography.labelMedium)
                     }
                     .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, Design.Spacing.md)
+                    .padding(.vertical, Design.Spacing.xs)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: Design.Radius.sm)
                             .fill(
                                 LinearGradient(
                                     colors: [action.color, action.color.opacity(0.8)],
@@ -950,14 +956,15 @@ struct ContentAreaView: View {
                                     endPoint: .bottom
                                 )
                             )
-                            .shadow(color: action.color.opacity(0.3), radius: 4, y: 2)
+                            .shadow(color: action.color.opacity(0.3), radius: Design.Shadow.sm.radius, y: Design.Shadow.sm.y)
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibleButton(label: action.title)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
+        .padding(.horizontal, Design.Spacing.lg)
+        .padding(.vertical, Design.Spacing.md)
     }
 
     private var headerSubtitle: String {

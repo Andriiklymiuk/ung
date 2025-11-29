@@ -779,6 +779,52 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UNG Dashboard</title>
     <style>
+        /* ==============================================
+           UNG Design System - VSCode Extension
+           Aligned with macOS DesignTokens.swift
+           ============================================== */
+
+        /* Design Tokens - Colors matching macOS app */
+        :root {
+            /* Brand Colors - Professional blue palette */
+            --ung-brand: #3373E8;
+            --ung-brand-light: rgba(51, 115, 232, 0.15);
+            --ung-brand-dark: #2660CC;
+
+            /* Semantic Colors - Matching macOS DesignTokens */
+            --ung-success: #33A756;
+            --ung-success-light: rgba(51, 167, 86, 0.12);
+            --ung-warning: #F29932;
+            --ung-warning-light: rgba(242, 153, 50, 0.12);
+            --ung-error: #E65A5A;
+            --ung-error-light: rgba(230, 90, 90, 0.12);
+            --ung-info: #3373E8;
+            --ung-info-light: rgba(51, 115, 232, 0.12);
+
+            /* Accent Colors */
+            --ung-purple: #8C59B2;
+            --ung-purple-light: rgba(140, 89, 178, 0.12);
+            --ung-indigo: #5966BF;
+
+            /* Spacing - 8pt grid system */
+            --space-xxs: 4px;
+            --space-xs: 8px;
+            --space-sm: 12px;
+            --space-md: 16px;
+            --space-lg: 24px;
+
+            /* Border Radius */
+            --radius-xs: 4px;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-full: 9999px;
+
+            /* Transitions */
+            --transition-quick: 0.15s ease-out;
+            --transition-standard: 0.25s ease-in-out;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -789,8 +835,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
             background-color: var(--vscode-sideBar-background);
-            padding: 12px;
-            line-height: 1.4;
+            padding: var(--space-sm);
+            line-height: 1.5;
+            font-size: 13px;
         }
 
         .container {
@@ -803,16 +850,16 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 40px 20px;
+            padding: 48px var(--space-md);
         }
 
         .spinner {
-            width: 32px;
-            height: 32px;
-            border: 3px solid var(--vscode-input-background);
-            border-top: 3px solid var(--vscode-textLink-foreground);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+            width: 28px;
+            height: 28px;
+            border: 2px solid var(--vscode-input-background);
+            border-top: 2px solid var(--ung-brand);
+            border-radius: var(--radius-full);
+            animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin {
@@ -821,32 +868,32 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .loading-text {
-            margin-top: 12px;
+            margin-top: var(--space-sm);
             color: var(--vscode-descriptionForeground);
             font-size: 12px;
         }
 
-        /* Alert Banner */
+        /* Alert Banner - Unpaid invoices warning */
         .alert-banner {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            background-color: color-mix(in srgb, var(--vscode-charts-red, #f44336) 15%, var(--vscode-sideBar-background));
-            border: 1px solid var(--vscode-charts-red, #f44336);
-            border-radius: 6px;
-            margin-bottom: 10px;
-            font-size: 11px;
+            gap: var(--space-xs);
+            padding: var(--space-xs) var(--space-sm);
+            background-color: var(--ung-error-light);
+            border: 1px solid var(--ung-error);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--space-sm);
+            font-size: 12px;
             cursor: pointer;
-            transition: background-color 0.15s;
+            transition: all var(--transition-quick);
         }
 
         .alert-banner:hover {
-            background-color: color-mix(in srgb, var(--vscode-charts-red, #f44336) 25%, var(--vscode-sideBar-background));
+            background-color: rgba(230, 90, 90, 0.2);
         }
 
         .alert-icon {
-            font-size: 16px;
+            font-size: 14px;
         }
 
         .alert-text {
@@ -855,32 +902,33 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         .alert-value {
             font-weight: 600;
-            color: var(--vscode-charts-red, #f44336);
+            color: var(--ung-error);
         }
 
         /* Active Tracking Banner */
         .tracking-banner {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            background: linear-gradient(135deg, color-mix(in srgb, var(--vscode-charts-green, #4caf50) 15%, var(--vscode-sideBar-background)), var(--vscode-sideBar-background));
-            border: 1px solid var(--vscode-charts-green, #4caf50);
-            border-radius: 6px;
-            margin-bottom: 10px;
+            gap: var(--space-xs);
+            padding: var(--space-sm);
+            background-color: var(--ung-success-light);
+            border: 1px solid var(--ung-success);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--space-sm);
         }
 
         .tracking-indicator {
             width: 8px;
             height: 8px;
-            background-color: var(--vscode-charts-green, #4caf50);
-            border-radius: 50%;
+            background-color: var(--ung-success);
+            border-radius: var(--radius-full);
             animation: pulse 2s infinite;
+            flex-shrink: 0;
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.9); }
         }
 
         .tracking-info {
@@ -890,39 +938,40 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         .tracking-project {
             font-weight: 600;
-            font-size: 12px;
+            font-size: 13px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
         .tracking-meta {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--vscode-descriptionForeground);
         }
 
         .tracking-duration {
-            font-size: 16px;
-            font-weight: 600;
-            font-family: monospace;
-            color: var(--vscode-charts-green, #4caf50);
+            font-size: 18px;
+            font-weight: 700;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+            color: var(--ung-success);
+            letter-spacing: -0.5px;
         }
 
         .stop-btn {
-            background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
-            border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
-            color: var(--vscode-errorForeground, #f48771);
-            padding: 5px 10px;
-            border-radius: 5px;
+            background-color: var(--ung-error);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 500;
-            transition: all 0.15s;
+            transition: all var(--transition-quick);
         }
 
         .stop-btn:hover {
-            background-color: var(--vscode-inputValidation-errorBorder, #be1100);
-            color: white;
+            background-color: #D14545;
+            transform: scale(1.02);
         }
 
         /* Revenue Bar */
@@ -930,47 +979,48 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 10px;
+            padding: var(--space-sm);
             background-color: var(--vscode-input-background);
-            border-radius: 6px;
-            margin-bottom: 8px;
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--space-xs);
             cursor: pointer;
-            transition: all 0.15s;
+            transition: all var(--transition-quick);
             border: 1px solid transparent;
         }
 
         .revenue-bar:hover {
             background-color: var(--vscode-list-hoverBackground);
-            border-color: var(--vscode-focusBorder);
+            border-color: var(--ung-brand);
         }
 
         .revenue-label {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--vscode-descriptionForeground);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            font-weight: 500;
         }
 
         .revenue-value {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--vscode-charts-green, #4caf50);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--ung-success);
         }
 
         /* Section */
         .section {
-            margin-bottom: 12px;
+            margin-bottom: var(--space-md);
         }
 
         .section-header {
             display: flex;
             align-items: center;
             gap: 6px;
-            margin-bottom: 6px;
+            margin-bottom: var(--space-xs);
         }
 
         .section-title {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--vscode-descriptionForeground);
             text-transform: uppercase;
@@ -981,38 +1031,41 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .quick-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            gap: var(--space-xs);
         }
 
         .action-btn {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 10px;
+            justify-content: center;
+            gap: var(--space-xs);
+            padding: var(--space-sm);
             background-color: var(--vscode-input-background);
             border: 1px solid transparent;
-            border-radius: 6px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
-            transition: all 0.15s;
-            text-align: left;
+            transition: all var(--transition-quick);
+            text-align: center;
+            font-weight: 500;
         }
 
         .action-btn:hover {
             background-color: var(--vscode-list-hoverBackground);
-            border-color: var(--vscode-focusBorder);
+            border-color: var(--ung-brand);
+            transform: translateY(-1px);
         }
 
         .action-btn.primary {
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+            background-color: var(--ung-brand);
+            color: white;
             grid-column: span 2;
         }
 
         .action-btn.primary:hover {
-            background-color: var(--vscode-button-hoverBackground);
+            background-color: var(--ung-brand-dark);
         }
 
         .action-icon {
@@ -1029,39 +1082,39 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .nav-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
+            gap: var(--space-xs);
         }
 
         .nav-grid-compact {
             display: flex;
-            gap: 6px;
+            gap: var(--space-xs);
         }
 
         .nav-grid-compact .nav-item {
             flex: 1;
-            padding: 8px 6px;
+            padding: var(--space-sm) var(--space-xs);
         }
 
         .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
-            padding: 10px 6px;
+            gap: var(--space-xxs);
+            padding: var(--space-sm) var(--space-xs);
             background-color: var(--vscode-input-background);
             border: 1px solid transparent;
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            font-size: 10px;
+            font-size: 11px;
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
-            transition: all 0.15s;
+            transition: all var(--transition-quick);
             position: relative;
         }
 
         .nav-item:hover {
             background-color: var(--vscode-list-hoverBackground);
-            border-color: var(--vscode-focusBorder);
+            border-color: var(--ung-brand);
             transform: translateY(-1px);
         }
 
@@ -1075,15 +1128,15 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         .nav-badge {
             position: absolute;
-            top: 6px;
-            right: 6px;
-            min-width: 16px;
-            height: 16px;
-            padding: 0 4px;
-            background-color: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-            border-radius: 8px;
-            font-size: 9px;
+            top: var(--space-xxs);
+            right: var(--space-xxs);
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            background-color: var(--ung-brand);
+            color: white;
+            border-radius: var(--radius-full);
+            font-size: 10px;
             font-weight: 600;
             display: flex;
             align-items: center;
@@ -1092,37 +1145,37 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         /* Setup Section */
         .setup-section {
-            background-color: color-mix(in srgb, var(--vscode-textLink-foreground) 8%, var(--vscode-input-background));
-            border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground) 25%, transparent);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 16px;
+            background-color: var(--ung-brand-light);
+            border: 1px solid rgba(51, 115, 232, 0.3);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+            margin-bottom: var(--space-md);
         }
 
         .setup-title {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
-            margin-bottom: 10px;
+            margin-bottom: var(--space-sm);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: var(--space-xs);
         }
 
         .setup-steps {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: var(--space-xs);
         }
 
         .setup-step {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
+            gap: var(--space-sm);
+            padding: var(--space-sm);
             background-color: var(--vscode-sideBar-background);
-            border-radius: 6px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            transition: all 0.15s;
+            transition: all var(--transition-quick);
         }
 
         .setup-step:hover {
@@ -1130,28 +1183,29 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .setup-step.completed {
-            opacity: 0.5;
+            opacity: 0.6;
         }
 
         .step-icon {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            border-radius: var(--radius-full);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 11px;
+            font-weight: 600;
             flex-shrink: 0;
         }
 
         .step-icon.pending {
-            background-color: var(--vscode-input-background);
-            border: 2px solid var(--vscode-textLink-foreground);
-            color: var(--vscode-textLink-foreground);
+            background-color: transparent;
+            border: 2px solid var(--ung-brand);
+            color: var(--ung-brand);
         }
 
         .step-icon.done {
-            background-color: var(--vscode-charts-green, #4caf50);
+            background-color: var(--ung-success);
             color: white;
         }
 
@@ -1160,51 +1214,51 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .step-label {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 500;
         }
 
         .step-desc {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--vscode-descriptionForeground);
         }
 
         /* Divider */
         .divider {
             height: 1px;
-            background: linear-gradient(to right, transparent, var(--vscode-panel-border), transparent);
-            margin: 10px 0;
+            background: var(--vscode-panel-border);
+            margin: var(--space-md) 0;
+            opacity: 0.5;
         }
 
-        /* Tools Grid - improved styling */
+        /* Tools Grid */
         .tools-grid {
             display: flex;
-            gap: 8px;
+            gap: var(--space-xs);
         }
 
         .tool-item {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            padding: 10px 14px;
-            background: linear-gradient(135deg, var(--vscode-input-background) 0%, color-mix(in srgb, var(--vscode-input-background) 90%, var(--vscode-textLink-foreground)) 100%);
-            border-radius: 8px;
+            gap: var(--space-xs);
+            padding: var(--space-sm) var(--space-md);
+            background-color: var(--vscode-input-background);
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 500;
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
-            transition: all 0.2s;
-            border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 50%, transparent);
+            transition: all var(--transition-quick);
+            border: 1px solid transparent;
             flex: 1;
         }
 
         .tool-item:hover {
-            background: linear-gradient(135deg, var(--vscode-list-hoverBackground) 0%, color-mix(in srgb, var(--vscode-list-hoverBackground) 80%, var(--vscode-textLink-foreground)) 100%);
-            border-color: var(--vscode-focusBorder);
+            background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--ung-brand);
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
 
         .tool-icon {
@@ -1215,24 +1269,24 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         .recent-list {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: var(--space-xxs);
         }
 
         .recent-item {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 8px;
+            gap: var(--space-xs);
+            padding: var(--space-xs) var(--space-sm);
             background-color: var(--vscode-input-background);
-            border-radius: 6px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            transition: all 0.15s;
+            transition: all var(--transition-quick);
             border: 1px solid transparent;
         }
 
         .recent-item:hover {
             background-color: var(--vscode-list-hoverBackground);
-            border-color: var(--vscode-focusBorder);
+            border-color: var(--ung-brand);
         }
 
         .recent-item-icon {
@@ -1247,7 +1301,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .recent-item-title {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
@@ -1255,57 +1309,58 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .recent-item-subtitle {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--vscode-descriptionForeground);
         }
 
         .recent-item-badge {
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 4px;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: var(--radius-xs);
             font-weight: 500;
+            text-transform: capitalize;
         }
 
         .recent-item-badge.paid {
-            background-color: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 20%, transparent);
-            color: var(--vscode-charts-green, #4caf50);
+            background-color: var(--ung-success-light);
+            color: var(--ung-success);
         }
 
         .recent-item-badge.pending, .recent-item-badge.sent {
-            background-color: color-mix(in srgb, var(--vscode-charts-orange, #ff9800) 20%, transparent);
-            color: var(--vscode-charts-orange, #ff9800);
+            background-color: var(--ung-warning-light);
+            color: var(--ung-warning);
         }
 
         .recent-item-badge.draft {
-            background-color: color-mix(in srgb, var(--vscode-descriptionForeground) 20%, transparent);
+            background-color: rgba(128, 128, 128, 0.15);
             color: var(--vscode-descriptionForeground);
         }
 
         .recent-item-badge.overdue {
-            background-color: color-mix(in srgb, var(--vscode-charts-red, #f44336) 20%, transparent);
-            color: var(--vscode-charts-red, #f44336);
+            background-color: var(--ung-error-light);
+            color: var(--ung-error);
         }
 
         /* Session duration */
         .session-duration {
             font-size: 11px;
             font-weight: 600;
-            font-family: monospace;
-            color: var(--vscode-charts-blue, #2196f3);
-            padding: 2px 6px;
-            background: color-mix(in srgb, var(--vscode-charts-blue, #2196f3) 15%, transparent);
-            border-radius: 4px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+            color: var(--ung-info);
+            padding: 3px 8px;
+            background: var(--ung-info-light);
+            border-radius: var(--radius-xs);
         }
 
         /* Expense amount */
         .expense-amount {
             font-size: 11px;
             font-weight: 600;
-            font-family: monospace;
-            color: var(--vscode-charts-red, #f44336);
-            padding: 2px 6px;
-            background: color-mix(in srgb, var(--vscode-charts-red, #f44336) 15%, transparent);
-            border-radius: 4px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+            color: var(--ung-warning);
+            padding: 3px 8px;
+            background: var(--ung-warning-light);
+            border-radius: var(--radius-xs);
         }
 
         /* Delete button */
@@ -1313,17 +1368,17 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: none;
             align-items: center;
             justify-content: center;
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             border: none;
-            background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
-            color: var(--vscode-errorForeground, #f48771);
-            border-radius: 4px;
+            background: var(--ung-error-light);
+            color: var(--ung-error);
+            border-radius: var(--radius-xs);
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
-            margin-left: 4px;
-            transition: all 0.15s;
+            margin-left: var(--space-xxs);
+            transition: all var(--transition-quick);
         }
 
         .recent-item:hover .delete-btn {
@@ -1331,76 +1386,77 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .delete-btn:hover {
-            background: var(--vscode-inputValidation-errorBorder, #be1100);
+            background: var(--ung-error);
             color: white;
         }
 
         /* Weekly Progress Widget */
         .weekly-progress {
-            padding: 8px 10px;
+            padding: var(--space-sm);
             background-color: var(--vscode-input-background);
-            border-radius: 6px;
-            margin-bottom: 8px;
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--space-xs);
             cursor: pointer;
-            transition: all 0.15s;
+            transition: all var(--transition-quick);
             border: 1px solid transparent;
         }
 
         .weekly-progress:hover {
             background-color: var(--vscode-list-hoverBackground);
-            border-color: var(--vscode-focusBorder);
+            border-color: var(--ung-brand);
         }
 
         .weekly-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 6px;
+            margin-bottom: var(--space-xs);
         }
 
         .weekly-label {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--vscode-descriptionForeground);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            font-weight: 500;
         }
 
         .weekly-hours {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--vscode-charts-blue, #2196f3);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--ung-info);
         }
 
         .weekly-bar {
             height: 4px;
-            background-color: var(--vscode-input-border, var(--vscode-panel-border));
-            border-radius: 2px;
+            background-color: rgba(128, 128, 128, 0.2);
+            border-radius: var(--radius-full);
             overflow: hidden;
         }
 
         .weekly-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--vscode-charts-blue, #2196f3), var(--vscode-charts-green, #4caf50));
-            border-radius: 2px;
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, var(--ung-info), var(--ung-success));
+            border-radius: var(--radius-full);
+            transition: width 0.4s ease-out;
         }
 
         .weekly-target {
-            margin-top: 4px;
+            margin-top: var(--space-xxs);
             text-align: right;
         }
 
         .target-text {
-            font-size: 9px;
+            font-size: 10px;
             color: var(--vscode-descriptionForeground);
             cursor: pointer;
             opacity: 0.7;
-            transition: opacity 0.15s;
+            transition: all var(--transition-quick);
         }
 
         .target-text:hover {
             opacity: 1;
-            text-decoration: underline;
+            color: var(--ung-brand);
         }
 
         /* Streak Badge */
@@ -1408,13 +1464,13 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 1px 5px;
-            background: linear-gradient(135deg, var(--vscode-charts-orange, #ff9800), var(--vscode-charts-yellow, #ffeb3b));
-            color: #000;
+            padding: 2px 6px;
+            background: linear-gradient(135deg, var(--ung-warning), #FFD93D);
+            color: #1a1a1a;
             font-size: 9px;
             font-weight: 700;
-            border-radius: 8px;
-            margin-left: 6px;
+            border-radius: var(--radius-full);
+            margin-left: var(--space-xs);
             text-transform: none;
             letter-spacing: 0;
         }
@@ -1422,23 +1478,23 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         /* Invoice Action Buttons */
         .invoice-actions {
             display: flex;
-            gap: 4px;
+            gap: var(--space-xxs);
             margin-left: auto;
-            margin-right: 8px;
+            margin-right: var(--space-xs);
         }
 
         .invoice-action-btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 3px 8px;
+            padding: 4px 10px;
             border: none;
-            background: var(--vscode-input-background);
-            border-radius: 4px;
+            background: rgba(128, 128, 128, 0.1);
+            border-radius: var(--radius-xs);
             cursor: pointer;
             color: var(--vscode-descriptionForeground);
-            transition: all 0.15s;
-            font-size: 10px;
+            transition: all var(--transition-quick);
+            font-size: 11px;
             font-family: var(--vscode-font-family);
             font-weight: 500;
         }
@@ -1449,8 +1505,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .invoice-action-btn.send:hover {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+            background: var(--ung-brand);
+            color: white;
         }
 
         .invoice-item .recent-item-content {
@@ -1459,7 +1515,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         .invoice-item .recent-item-content:hover .recent-item-title {
-            color: var(--vscode-textLink-foreground);
+            color: var(--ung-brand);
         }
 
         /* Empty State */
@@ -1467,17 +1523,17 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
-            padding: 12px;
-            background-color: color-mix(in srgb, var(--vscode-input-background) 50%, transparent);
+            gap: var(--space-xs);
+            padding: var(--space-md);
+            background-color: rgba(128, 128, 128, 0.05);
             border: 1px dashed var(--vscode-panel-border);
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             text-align: center;
         }
 
         .empty-state.compact {
-            padding: 10px;
-            gap: 4px;
+            padding: var(--space-sm);
+            gap: var(--space-xxs);
         }
 
         .empty-state.compact .empty-state-icon {
@@ -1486,29 +1542,29 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         .empty-state-icon {
             font-size: 20px;
-            opacity: 0.6;
+            opacity: 0.5;
         }
 
         .empty-state-text {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--vscode-descriptionForeground);
         }
 
         .empty-state-action {
-            font-size: 10px;
-            color: var(--vscode-textLink-foreground);
+            font-size: 11px;
             cursor: pointer;
-            padding: 4px 8px;
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border-radius: 4px;
+            padding: 6px 12px;
+            background-color: var(--ung-brand);
+            color: white;
+            border-radius: var(--radius-sm);
             border: none;
             font-weight: 500;
-            margin-top: 2px;
+            margin-top: var(--space-xxs);
+            transition: all var(--transition-quick);
         }
 
         .empty-state-action:hover {
-            background-color: var(--vscode-button-hoverBackground);
+            background-color: var(--ung-brand-dark);
         }
 
         /* Section with view all link */
@@ -1516,21 +1572,23 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: var(--space-xs);
         }
 
         .section-link {
-            font-size: 10px;
-            color: var(--vscode-textLink-foreground);
+            font-size: 11px;
+            color: var(--ung-brand);
             cursor: pointer;
             border: none;
             background: none;
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 2px var(--space-xs);
+            border-radius: var(--radius-xs);
+            font-weight: 500;
+            transition: all var(--transition-quick);
         }
 
         .section-link:hover {
-            background-color: var(--vscode-list-hoverBackground);
+            background-color: var(--ung-brand-light);
         }
     </style>
 </head>

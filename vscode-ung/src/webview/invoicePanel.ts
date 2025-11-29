@@ -372,19 +372,50 @@ export class InvoicePanel {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Invoice ${invoiceNum}</title>
             <style>
+                /* ==============================================
+                   UNG Design System - Invoice Panel
+                   Aligned with macOS DesignTokens.swift
+                   ============================================== */
                 :root {
+                    /* Brand Colors */
+                    --ung-brand: #3373E8;
+                    --ung-brand-light: rgba(51, 115, 232, 0.15);
+                    --ung-brand-dark: #2660CC;
+
+                    /* Semantic Colors */
+                    --ung-success: #33A756;
+                    --ung-success-light: rgba(51, 167, 86, 0.12);
+                    --ung-warning: #F29932;
+                    --ung-warning-light: rgba(242, 153, 50, 0.12);
+                    --ung-error: #E65A5A;
+                    --ung-error-light: rgba(230, 90, 90, 0.12);
+                    --ung-info: #3373E8;
+                    --ung-info-light: rgba(51, 115, 232, 0.12);
+
+                    /* VSCode Integration */
                     --bg-primary: var(--vscode-editor-background);
                     --bg-secondary: var(--vscode-sideBar-background);
                     --bg-tertiary: var(--vscode-input-background);
                     --text-primary: var(--vscode-editor-foreground);
                     --text-secondary: var(--vscode-descriptionForeground);
                     --border: var(--vscode-panel-border);
-                    --accent: var(--vscode-button-background);
-                    --accent-hover: var(--vscode-button-hoverBackground);
-                    --success: #4caf50;
-                    --warning: #ff9800;
-                    --danger: #f44336;
-                    --info: #2196f3;
+
+                    /* Spacing */
+                    --space-xs: 8px;
+                    --space-sm: 12px;
+                    --space-md: 16px;
+                    --space-lg: 24px;
+                    --space-xl: 32px;
+
+                    /* Border Radius */
+                    --radius-sm: 8px;
+                    --radius-md: 12px;
+                    --radius-full: 9999px;
+
+                    /* Transitions */
+                    --transition-micro: 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+                    --transition-quick: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+                    --transition-bounce: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
                 }
 
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -393,8 +424,9 @@ export class InvoicePanel {
                     font-family: var(--vscode-font-family);
                     background: var(--bg-primary);
                     color: var(--text-primary);
-                    padding: 24px;
-                    line-height: 1.6;
+                    padding: var(--space-lg);
+                    line-height: 1.5;
+                    font-size: 13px;
                 }
 
                 .container {
@@ -406,66 +438,76 @@ export class InvoicePanel {
                     display: flex;
                     justify-content: space-between;
                     align-items: flex-start;
-                    margin-bottom: 32px;
-                    padding-bottom: 20px;
+                    margin-bottom: var(--space-xl);
+                    padding-bottom: var(--space-lg);
                     border-bottom: 1px solid var(--border);
                     flex-wrap: wrap;
-                    gap: 16px;
+                    gap: var(--space-md);
                 }
 
                 .header-info {
                     display: flex;
                     align-items: center;
-                    gap: 16px;
+                    gap: var(--space-md);
                 }
 
                 .invoice-icon {
                     width: 56px;
                     height: 56px;
-                    background: linear-gradient(135deg, var(--accent), var(--info));
-                    border-radius: 12px;
+                    background: linear-gradient(135deg, var(--ung-brand), var(--ung-brand-dark));
+                    border-radius: var(--radius-md);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     font-size: 24px;
                     color: white;
+                    transition: transform var(--transition-bounce);
+                }
+
+                .invoice-icon:hover {
+                    transform: scale(1.05) rotate(-3deg);
                 }
 
                 .header-text h1 {
-                    font-size: 28px;
+                    font-size: 26px;
                     font-weight: 700;
                     margin-bottom: 4px;
                 }
 
                 .header-text .subtitle {
                     color: var(--text-secondary);
-                    font-size: 14px;
+                    font-size: 13px;
                 }
 
                 .actions {
                     display: flex;
-                    gap: 10px;
+                    gap: var(--space-xs);
                     flex-wrap: wrap;
                 }
 
                 button {
-                    background: var(--accent);
-                    color: var(--vscode-button-foreground);
+                    background: var(--ung-brand);
+                    color: white;
                     border: none;
-                    padding: 10px 16px;
-                    border-radius: 6px;
+                    padding: var(--space-sm) var(--space-md);
+                    border-radius: var(--radius-sm);
                     cursor: pointer;
                     font-size: 13px;
                     font-weight: 500;
-                    transition: all 0.2s ease;
+                    transition: all var(--transition-quick);
                     display: flex;
                     align-items: center;
                     gap: 6px;
                 }
 
                 button:hover {
-                    background: var(--accent-hover);
+                    background: var(--ung-brand-dark);
                     transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(51, 115, 232, 0.25);
+                }
+
+                button:active {
+                    transform: translateY(0) scale(0.98);
                 }
 
                 button.secondary {
@@ -476,53 +518,76 @@ export class InvoicePanel {
 
                 button.secondary:hover {
                     background: var(--bg-tertiary);
+                    border-color: var(--ung-brand);
+                    box-shadow: none;
                 }
 
                 button.success {
-                    background: var(--success);
+                    background: var(--ung-success);
+                }
+
+                button.success:hover {
+                    background: #2A8F4A;
+                    box-shadow: 0 4px 12px rgba(51, 167, 86, 0.25);
                 }
 
                 button.danger {
-                    background: var(--danger);
+                    background: var(--ung-error);
+                }
+
+                button.danger:hover {
+                    background: #D14545;
+                    box-shadow: 0 4px 12px rgba(230, 90, 90, 0.25);
                 }
 
                 .card {
                     background: var(--bg-secondary);
                     border: 1px solid var(--border);
-                    border-radius: 12px;
-                    padding: 24px;
-                    margin-bottom: 20px;
+                    border-radius: var(--radius-md);
+                    padding: var(--space-lg);
+                    margin-bottom: var(--space-lg);
+                    transition: border-color var(--transition-quick);
+                }
+
+                .card:hover {
+                    border-color: rgba(51, 115, 232, 0.3);
                 }
 
                 .card-header {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 20px;
-                    padding-bottom: 12px;
+                    margin-bottom: var(--space-lg);
+                    padding-bottom: var(--space-sm);
                     border-bottom: 1px solid var(--border);
                 }
 
                 .card-header h2 {
-                    font-size: 16px;
+                    font-size: 15px;
                     font-weight: 600;
                     display: flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: var(--space-xs);
                 }
 
                 .detail-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 20px;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: var(--space-md);
                 }
 
                 .detail-item {
-                    padding: 16px;
+                    padding: var(--space-md);
                     background: var(--bg-tertiary);
-                    border-radius: 8px;
-                    transition: all 0.2s ease;
+                    border-radius: var(--radius-sm);
+                    transition: all var(--transition-quick);
                     position: relative;
+                    border: 1px solid transparent;
+                }
+
+                .detail-item:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
                 }
 
                 .detail-item.editable {
@@ -531,17 +596,17 @@ export class InvoicePanel {
 
                 .detail-item.editable:hover {
                     background: var(--bg-primary);
-                    border: 1px solid var(--accent);
+                    border-color: var(--ung-brand);
                 }
 
                 .detail-item.editable::after {
                     content: '✏️';
                     position: absolute;
-                    top: 8px;
-                    right: 8px;
+                    top: var(--space-xs);
+                    right: var(--space-xs);
                     font-size: 12px;
                     opacity: 0;
-                    transition: opacity 0.2s ease;
+                    transition: opacity var(--transition-quick);
                 }
 
                 .detail-item.editable:hover::after {
@@ -553,67 +618,94 @@ export class InvoicePanel {
                     color: var(--text-secondary);
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
-                    margin-bottom: 6px;
+                    margin-bottom: var(--space-xs);
+                    font-weight: 500;
                 }
 
                 .detail-value {
-                    font-size: 18px;
+                    font-size: 17px;
                     font-weight: 600;
+                    transition: color var(--transition-quick);
+                }
+
+                .detail-item:hover .detail-value {
+                    color: var(--ung-brand);
                 }
 
                 .badge {
                     display: inline-block;
-                    padding: 6px 12px;
-                    border-radius: 20px;
-                    font-size: 12px;
-                    font-weight: 500;
+                    padding: 6px 14px;
+                    border-radius: var(--radius-full);
+                    font-size: 11px;
+                    font-weight: 600;
                     text-transform: uppercase;
-                    letter-spacing: 0.5px;
+                    letter-spacing: 0.3px;
                 }
 
-                .badge.draft { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
-                .badge.pending { background: rgba(255, 152, 0, 0.2); color: var(--warning); }
-                .badge.sent { background: rgba(33, 150, 243, 0.2); color: var(--info); }
-                .badge.paid { background: rgba(76, 175, 80, 0.2); color: var(--success); }
-                .badge.overdue { background: rgba(244, 67, 54, 0.2); color: var(--danger); }
+                .badge.draft { background: rgba(128, 128, 128, 0.15); color: #808080; }
+                .badge.pending { background: var(--ung-warning-light); color: var(--ung-warning); }
+                .badge.sent { background: var(--ung-info-light); color: var(--ung-info); }
+                .badge.paid { background: var(--ung-success-light); color: var(--ung-success); }
+                .badge.overdue { background: var(--ung-error-light); color: var(--ung-error); }
 
                 .amount-highlight {
                     font-size: 28px;
                     font-weight: 700;
-                    color: var(--success);
+                    color: var(--ung-success);
+                    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
                 }
 
                 .quick-actions {
                     display: flex;
-                    gap: 10px;
+                    gap: var(--space-sm);
                     flex-wrap: wrap;
-                    margin-top: 20px;
-                    padding-top: 20px;
+                    margin-top: var(--space-lg);
+                    padding-top: var(--space-lg);
                     border-top: 1px solid var(--border);
+                    align-items: center;
                 }
 
                 .action-buttons {
                     display: flex;
-                    gap: 10px;
+                    gap: var(--space-xs);
                     flex-wrap: wrap;
                 }
 
                 .danger-zone {
-                    margin-top: 32px;
-                    padding: 20px;
-                    background: rgba(244, 67, 54, 0.1);
-                    border: 1px solid var(--danger);
-                    border-radius: 8px;
+                    margin-top: var(--space-xl);
+                    padding: var(--space-lg);
+                    background: var(--ung-error-light);
+                    border: 1px solid rgba(230, 90, 90, 0.3);
+                    border-radius: var(--radius-md);
+                    transition: border-color var(--transition-quick);
+                }
+
+                .danger-zone:hover {
+                    border-color: var(--ung-error);
                 }
 
                 .danger-zone h3 {
-                    color: var(--danger);
-                    margin-bottom: 12px;
+                    color: var(--ung-error);
+                    margin-bottom: var(--space-sm);
                     font-size: 14px;
                 }
 
+                /* Focus States */
+                button:focus-visible {
+                    outline: 2px solid var(--ung-brand);
+                    outline-offset: 2px;
+                }
+
+                /* Reduced Motion */
+                @media (prefers-reduced-motion: reduce) {
+                    *, *::before, *::after {
+                        animation-duration: 0.01ms !important;
+                        transition-duration: 0.01ms !important;
+                    }
+                }
+
                 @media (max-width: 600px) {
-                    body { padding: 16px; }
+                    body { padding: var(--space-md); }
                     .header { flex-direction: column; }
                     .actions { width: 100%; }
                     .actions button { flex: 1; justify-content: center; }

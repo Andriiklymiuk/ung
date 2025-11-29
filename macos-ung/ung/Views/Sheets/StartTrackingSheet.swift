@@ -46,7 +46,7 @@ struct StartTrackingSheet: View {
       footerSection
     }
     .frame(width: 320, height: 400)
-    .background(Color(nsColor: .windowBackgroundColor))
+    .background(Design.Colors.windowBackground)
     .onAppear {
       Task {
         await appState.refreshDashboard()
@@ -96,7 +96,7 @@ struct StartTrackingSheet: View {
       .padding(10)
       .background(
         RoundedRectangle(cornerRadius: 8)
-          .fill(Color(nsColor: .controlBackgroundColor))
+          .fill(Design.Colors.controlBackground)
           .overlay(
             RoundedRectangle(cornerRadius: 8)
               .stroke(Color.blue.opacity(0.3), lineWidth: 1)
@@ -119,7 +119,7 @@ struct StartTrackingSheet: View {
               .font(.system(size: 11))
               .padding(.horizontal, 10)
               .padding(.vertical, 6)
-              .background(Color(nsColor: .controlBackgroundColor))
+              .background(Design.Colors.controlBackground)
               .cornerRadius(6)
           }
           .buttonStyle(.plain)
@@ -149,7 +149,7 @@ struct StartTrackingSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
           RoundedRectangle(cornerRadius: 8)
-            .fill(Color(nsColor: .controlBackgroundColor))
+            .fill(Design.Colors.controlBackground)
         )
       } else {
         VStack(spacing: 4) {

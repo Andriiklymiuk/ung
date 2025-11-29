@@ -43,7 +43,7 @@ struct CreateInvoiceSheet: View {
             footerSection
         }
         .frame(width: 320, height: 380)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Design.Colors.windowBackground)
         .onAppear {
             Task {
                 await appState.refreshDashboard()
@@ -126,7 +126,7 @@ struct CreateInvoiceSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(Design.Colors.controlBackground)
                 )
             } else {
                 VStack(spacing: 4) {
@@ -159,7 +159,7 @@ struct CreateInvoiceSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Design.Colors.controlBackground)
         )
     }
 
@@ -205,10 +205,31 @@ struct CreateInvoiceSheet: View {
         guard let clientId = selectedClientId else { return }
         isCreating = true
         Task {
-            let success = await appState.cliService.createInvoice(clientId: clientId)
-            if success {
-                await appState.refreshDashboard()
+            // Get company for invoice
+            guard let company = try? await appState.database.getCompany(),
+                  let companyId = company?.id else {
+                isCreating = false
+                return
             }
+
+            // Generate invoice number
+            let year = Calendar.current.component(.year, from: Date())
+            let count = (try? await appState.database.getInvoiceCount()) ?? 0
+            let invoiceNum = "INV-\(year)-\(String(format: "%04d", count + 1))"
+
+            // Create invoice
+            var invoice = Invoice(
+                invoiceNum: invoiceNum,
+                companyId: companyId,
+                amount: 0,
+                currency: "USD",
+                status: "pending"
+            )
+            invoice.issuedDate = Date()
+            invoice.dueDate = Calendar.current.date(byAdding: .day, value: 30, to: Date())
+
+            _ = try? await appState.database.createInvoice(invoice)
+            await appState.refreshDashboard()
             isCreating = false
             dismiss()
         }
@@ -250,7 +271,7 @@ struct InvoiceClientRow: View {
             .padding(10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.blue.opacity(0.1) : Color(nsColor: .controlBackgroundColor))
+                    .fill(isSelected ? Color.blue.opacity(0.1) : Design.Colors.controlBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(isSelected ? Color.blue.opacity(0.5) : Color.clear, lineWidth: 1)

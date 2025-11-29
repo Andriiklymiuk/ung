@@ -118,7 +118,7 @@ struct PomodoroContent: View {
             .padding(.vertical, 12)
             .background(
               RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Design.Colors.controlBackground)
             )
           }
           .buttonStyle(.plain)
@@ -222,7 +222,7 @@ struct PomodoroContent: View {
     .padding(20)
     .background(
       RoundedRectangle(cornerRadius: 16)
-        .fill(Color(nsColor: .controlBackgroundColor))
+        .fill(Design.Colors.controlBackground)
     )
   }
 
@@ -266,7 +266,7 @@ struct PomodoroContent: View {
     .padding(20)
     .background(
       RoundedRectangle(cornerRadius: 16)
-        .fill(Color(nsColor: .controlBackgroundColor))
+        .fill(Design.Colors.controlBackground)
     )
   }
 }

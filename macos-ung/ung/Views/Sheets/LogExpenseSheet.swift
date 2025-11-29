@@ -89,7 +89,7 @@ struct LogExpenseSheet: View {
             footerSection
         }
         .frame(width: 320, height: 420)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Design.Colors.windowBackground)
     }
 
     // MARK: - Header
@@ -134,7 +134,7 @@ struct LogExpenseSheet: View {
             .padding(10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .fill(Design.Colors.controlBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.orange.opacity(0.3), lineWidth: 1)
@@ -162,7 +162,7 @@ struct LogExpenseSheet: View {
             .padding(10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .fill(Design.Colors.controlBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.green.opacity(0.3), lineWidth: 1)
@@ -234,14 +234,15 @@ struct LogExpenseSheet: View {
     private func logExpense() {
         isLogging = true
         Task {
-            let success = await appState.cliService.logExpense(
+            let newExpense = Expense(
                 description: description,
                 amount: amount,
-                category: selectedCategory.rawValue.lowercased()
+                currency: "USD",
+                category: selectedCategory.rawValue.lowercased(),
+                date: Date()
             )
-            if success {
-                await appState.refreshDashboard()
-            }
+            _ = try? await appState.database.createExpense(newExpense)
+            await appState.refreshDashboard()
             isLogging = false
             dismiss()
         }
@@ -271,7 +272,7 @@ struct CategoryButton: View {
             .padding(8)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? category.color.opacity(0.15) : Color(nsColor: .controlBackgroundColor))
+                    .fill(isSelected ? category.color.opacity(0.15) : Design.Colors.controlBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
                             .stroke(isSelected ? category.color.opacity(0.5) : Color.clear, lineWidth: 1)

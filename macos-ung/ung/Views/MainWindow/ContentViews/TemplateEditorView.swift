@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Template Models
 struct InvoiceTemplate: Codable, Identifiable {
@@ -154,7 +157,7 @@ struct TemplateEditorView: View {
                 Spacer()
             }
             .padding(16)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Design.Colors.windowBackground)
 
             Divider()
 
@@ -195,7 +198,7 @@ struct TemplateEditorView: View {
             }
             .padding(16)
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .background(Design.Colors.controlBackground.opacity(0.5))
     }
 
     // MARK: - Preview Panel
@@ -211,7 +214,7 @@ struct TemplateEditorView: View {
                 // Zoom controls would go here
             }
             .padding(16)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Design.Colors.windowBackground)
 
             Divider()
 
@@ -425,7 +428,7 @@ struct TemplateEditorView: View {
                 Spacer()
             }
             .padding(16)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Design.Colors.windowBackground)
 
             Divider()
 
@@ -521,7 +524,7 @@ struct TemplateEditorView: View {
                 .padding(16)
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .background(Design.Colors.controlBackground.opacity(0.5))
     }
 
     // MARK: - Actions
@@ -674,7 +677,11 @@ extension Color {
     }
 
     var hexString: String {
+        #if os(macOS)
         guard let components = NSColor(self).cgColor.components else { return "#000000" }
+        #else
+        guard let components = UIColor(self).cgColor.components else { return "#000000" }
+        #endif
         let r = Int(components[0] * 255)
         let g = Int(components[1] * 255)
         let b = Int(components[2] * 255)

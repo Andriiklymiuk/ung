@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 // MARK: - Database Document
 import UniformTypeIdentifiers
 
@@ -1146,6 +1149,10 @@ struct InvoiceRowView: View {
   let onMarkSent: () -> Void
   let onDelete: () -> Void
   @State private var isHovered = false
+  @State private var isExporting = false
+  @State private var showExportSuccess = false
+  @State private var showExportError = false
+  @State private var exportedURL: URL?
   @Environment(\.colorScheme) var colorScheme
 
   var statusColor: Color {
@@ -1187,6 +1194,16 @@ struct InvoiceRowView: View {
 
       if isHovered {
         HStack(spacing: Design.Spacing.xs) {
+          // Export PDF button
+          if isExporting {
+            ProgressView()
+              .scaleEffect(0.6)
+              .frame(width: 28, height: 28)
+          } else {
+            AnimatedIconButton(
+              icon: "arrow.down.doc", color: Design.Colors.primary, size: 28, action: exportPDF)
+          }
+
           if invoice.status.lowercased() != "paid" {
             AnimatedIconButton(
               icon: "checkmark.circle", color: Design.Colors.success, size: 28, action: onMarkPaid)
@@ -1212,6 +1229,94 @@ struct InvoiceRowView: View {
     )
     .animation(Design.Animation.smooth, value: isHovered)
     .onHover { hovering in isHovered = hovering }
+    .alert("PDF Exported", isPresented: $showExportSuccess) {
+      Button("Open") {
+        if let url = exportedURL {
+          #if os(macOS)
+          NSWorkspace.shared.open(url)
+          #else
+          // On iOS, we could use share sheet instead
+          #endif
+        }
+      }
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text("Invoice PDF saved successfully.")
+    }
+    .alert("Export Failed", isPresented: $showExportError) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text("Failed to generate PDF. Please try again.")
+    }
+  }
+
+  private func exportPDF() {
+    isExporting = true
+    Task {
+      do {
+        // Get the full invoice data
+        guard let invoiceData = try await appState.database.getInvoice(id: Int64(invoice.id)) else {
+          showExportError = true
+          isExporting = false
+          return
+        }
+
+        // Get company
+        guard let company = try await appState.database.getCompany() else {
+          showExportError = true
+          isExporting = false
+          return
+        }
+
+        // Get client for this invoice
+        guard let client = try await appState.database.getInvoiceClient(invoiceId: Int64(invoice.id)) else {
+          // Create a placeholder client from invoice data if no recipient linked
+          let placeholderClient = ClientModel(
+            name: invoice.client,
+            email: ""
+          )
+          let lineItems = try await appState.database.getInvoiceLineItems(invoiceId: Int64(invoice.id))
+
+          let pdfGenerator = PDFGenerator()
+          if let url = pdfGenerator.saveInvoicePDF(
+            invoice: invoiceData,
+            company: company,
+            client: placeholderClient,
+            lineItems: lineItems
+          ) {
+            exportedURL = url
+            try await appState.database.updateInvoicePDFPath(id: Int64(invoice.id), pdfPath: url.path)
+            showExportSuccess = true
+          } else {
+            showExportError = true
+          }
+          isExporting = false
+          return
+        }
+
+        // Get line items
+        let lineItems = try await appState.database.getInvoiceLineItems(invoiceId: Int64(invoice.id))
+
+        // Generate PDF
+        let pdfGenerator = PDFGenerator()
+        if let url = pdfGenerator.saveInvoicePDF(
+          invoice: invoiceData,
+          company: company,
+          client: client,
+          lineItems: lineItems
+        ) {
+          exportedURL = url
+          try await appState.database.updateInvoicePDFPath(id: Int64(invoice.id), pdfPath: url.path)
+          showExportSuccess = true
+        } else {
+          showExportError = true
+        }
+      } catch {
+        print("PDF export error: \(error)")
+        showExportError = true
+      }
+      isExporting = false
+    }
   }
 }
 

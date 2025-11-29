@@ -196,11 +196,48 @@ export class PomodoroPanel {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pomodoro Timer</title>
     <style>
+        /* ==============================================
+           UNG Design System - Pomodoro Timer
+           Aligned with macOS DesignTokens.swift
+           ============================================== */
+        :root {
+            /* Brand Colors */
+            --ung-brand: #3373E8;
+            --ung-brand-light: rgba(51, 115, 232, 0.15);
+            --ung-brand-dark: #2660CC;
+
+            /* Semantic Colors */
+            --ung-success: #33A756;
+            --ung-success-light: rgba(51, 167, 86, 0.12);
+            --ung-warning: #F29932;
+            --ung-warning-light: rgba(242, 153, 50, 0.12);
+            --ung-error: #E65A5A;
+            --ung-error-light: rgba(230, 90, 90, 0.12);
+
+            /* Spacing */
+            --space-xs: 8px;
+            --space-sm: 12px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+
+            /* Border Radius */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-full: 9999px;
+
+            /* Transitions */
+            --transition-micro: 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-quick: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-bounce: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
             font-family: var(--vscode-font-family);
             background: var(--vscode-editor-background);
@@ -209,108 +246,188 @@ export class PomodoroPanel {
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            padding: 20px;
+            padding: var(--space-lg);
         }
+
         .container {
             text-align: center;
             max-width: 400px;
             width: 100%;
         }
+
         .timer-display {
-            font-size: 72px;
-            font-weight: bold;
-            margin: 30px 0;
+            font-size: 64px;
+            font-weight: 700;
+            margin: var(--space-lg) 0;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
             font-variant-numeric: tabular-nums;
+            letter-spacing: -2px;
+            transition: color var(--transition-quick), transform var(--transition-bounce);
         }
+
         .timer-display.break {
-            color: var(--vscode-charts-green);
+            color: var(--ung-success);
         }
+
         .timer-display.work {
-            color: var(--vscode-charts-red);
+            color: var(--ung-warning);
         }
+
+        .timer-display:hover {
+            transform: scale(1.02);
+        }
+
         .status {
-            font-size: 24px;
-            margin-bottom: 20px;
-            opacity: 0.8;
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: var(--space-md);
+            opacity: 0.85;
+            transition: opacity var(--transition-quick);
         }
+
         .sessions {
-            font-size: 16px;
-            margin-bottom: 30px;
-            opacity: 0.7;
+            font-size: 14px;
+            margin-bottom: var(--space-xl);
+            color: var(--vscode-descriptionForeground);
+            padding: var(--space-xs) var(--space-md);
+            background: var(--vscode-input-background);
+            border-radius: var(--radius-full);
+            display: inline-block;
         }
+
         .controls {
             display: flex;
-            gap: 10px;
+            gap: var(--space-sm);
             justify-content: center;
             flex-wrap: wrap;
         }
+
         button {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+            background: var(--ung-brand);
+            color: white;
             border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 8px;
+            padding: var(--space-sm) var(--space-lg);
+            font-size: 14px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            transition: all 0.2s ease;
-            font-weight: 500;
+            transition: all var(--transition-quick);
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
         }
+
         button:hover {
+            background: var(--ung-brand-dark);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 6px 16px rgba(51, 115, 232, 0.3);
         }
+
         button:active {
-            transform: translateY(0);
+            transform: translateY(0) scale(0.98);
         }
+
         button.secondary {
-            background: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
+            background: var(--vscode-input-background);
+            color: var(--vscode-editor-foreground);
+            border: 1px solid var(--vscode-widget-border);
         }
+
+        button.secondary:hover {
+            background: var(--vscode-list-hoverBackground);
+            border-color: var(--ung-brand);
+            box-shadow: none;
+        }
+
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
         }
+
         .settings {
-            margin-top: 40px;
-            padding-top: 20px;
+            margin-top: var(--space-xl);
+            padding-top: var(--space-lg);
             border-top: 1px solid var(--vscode-widget-border);
         }
+
         .settings h3 {
-            margin-bottom: 15px;
-            font-size: 14px;
-            opacity: 0.7;
+            margin-bottom: var(--space-md);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--vscode-descriptionForeground);
         }
+
         .setting-row {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-sm);
         }
+
         .setting-row label {
-            min-width: 80px;
+            min-width: 60px;
             text-align: right;
+            font-size: 13px;
+            font-weight: 500;
         }
+
         .setting-row input {
-            width: 60px;
-            padding: 6px;
+            width: 64px;
+            padding: var(--space-xs);
             background: var(--vscode-input-background);
             color: var(--vscode-input-foreground);
             border: 1px solid var(--vscode-input-border);
-            border-radius: 4px;
+            border-radius: var(--radius-sm);
             text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            transition: border-color var(--transition-quick), box-shadow var(--transition-quick);
         }
+
+        .setting-row input:focus {
+            outline: none;
+            border-color: var(--ung-brand);
+            box-shadow: 0 0 0 3px var(--ung-brand-light);
+        }
+
         .progress-ring {
-            margin: 20px auto;
+            margin: var(--space-lg) auto;
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
         }
+
         .progress-ring circle {
-            transition: stroke-dashoffset 1s linear;
+            transition: stroke-dashoffset 1s linear, stroke var(--transition-quick);
         }
+
         .icon {
             font-size: 48px;
-            margin-bottom: 10px;
+            margin-bottom: var(--space-xs);
+            transition: transform var(--transition-bounce);
+            display: inline-block;
+        }
+
+        .icon:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        /* Focus States */
+        button:focus-visible,
+        input:focus-visible {
+            outline: 2px solid var(--ung-brand);
+            outline-offset: 2px;
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
         }
     </style>
 </head>

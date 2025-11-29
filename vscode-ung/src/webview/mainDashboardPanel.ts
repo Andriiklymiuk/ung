@@ -328,19 +328,59 @@ export class MainDashboardPanel {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UNG Dashboard</title>
     <style>
+        /* ==============================================
+           UNG Design System - Main Dashboard Panel
+           Aligned with macOS DesignTokens.swift
+           ============================================== */
+
         :root {
+            /* Brand Colors - Professional blue palette */
+            --ung-brand: #3373E8;
+            --ung-brand-light: rgba(51, 115, 232, 0.15);
+            --ung-brand-dark: #2660CC;
+
+            /* Semantic Colors - Matching macOS DesignTokens */
+            --ung-success: #33A756;
+            --ung-success-light: rgba(51, 167, 86, 0.12);
+            --ung-warning: #F29932;
+            --ung-warning-light: rgba(242, 153, 50, 0.12);
+            --ung-error: #E65A5A;
+            --ung-error-light: rgba(230, 90, 90, 0.12);
+            --ung-info: #3373E8;
+            --ung-info-light: rgba(51, 115, 232, 0.12);
+
+            /* Accent Colors */
+            --ung-purple: #8C59B2;
+            --ung-purple-light: rgba(140, 89, 178, 0.12);
+
+            /* VSCode Theme Integration */
             --bg-primary: var(--vscode-editor-background);
             --bg-secondary: var(--vscode-sideBar-background);
             --bg-tertiary: var(--vscode-input-background);
             --text-primary: var(--vscode-editor-foreground);
             --text-secondary: var(--vscode-descriptionForeground);
             --border: var(--vscode-panel-border);
-            --accent: var(--vscode-button-background);
-            --accent-hover: var(--vscode-button-hoverBackground);
-            --success: #4caf50;
-            --warning: #ff9800;
-            --danger: #f44336;
-            --info: #2196f3;
+
+            /* Spacing - 8pt grid system */
+            --space-xxs: 4px;
+            --space-xs: 8px;
+            --space-sm: 12px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+
+            /* Border Radius */
+            --radius-xs: 4px;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-full: 9999px;
+
+            /* Transitions - Snappy micro interactions */
+            --transition-micro: 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-quick: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-standard: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-bounce: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -349,40 +389,46 @@ export class MainDashboardPanel {
             font-family: var(--vscode-font-family);
             background: var(--bg-primary);
             color: var(--text-primary);
-            padding: 24px;
-            line-height: 1.6;
+            padding: var(--space-lg);
+            line-height: 1.5;
+            font-size: 13px;
         }
 
         .dashboard-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 32px;
-            padding-bottom: 16px;
+            margin-bottom: var(--space-xl);
+            padding-bottom: var(--space-md);
             border-bottom: 1px solid var(--border);
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: var(--space-sm);
         }
 
         .logo-icon {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, var(--accent), var(--info));
-            border-radius: 10px;
+            background: linear-gradient(135deg, var(--ung-brand), var(--ung-brand-dark));
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            font-weight: bold;
+            font-size: 18px;
+            font-weight: 700;
             color: white;
+            transition: transform var(--transition-bounce);
+        }
+
+        .logo-icon:hover {
+            transform: scale(1.05) rotate(-3deg);
         }
 
         .logo h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 600;
         }
 
@@ -394,27 +440,32 @@ export class MainDashboardPanel {
 
         .header-actions {
             display: flex;
-            gap: 8px;
+            gap: var(--space-xs);
         }
 
         button {
-            background: var(--accent);
-            color: var(--vscode-button-foreground);
+            background: var(--ung-brand);
+            color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-sm);
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
-            transition: all 0.2s;
+            transition: all var(--transition-quick);
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: var(--space-xs);
         }
 
         button:hover {
-            background: var(--accent-hover);
+            background: var(--ung-brand-dark);
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(51, 115, 232, 0.25);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.98);
         }
 
         button.secondary {
@@ -425,25 +476,47 @@ export class MainDashboardPanel {
 
         button.secondary:hover {
             background: var(--bg-tertiary);
+            border-color: var(--ung-brand);
+            box-shadow: none;
         }
 
         button.danger {
-            background: var(--danger);
+            background: var(--ung-error);
         }
 
         button.danger:hover {
-            background: #d32f2f;
+            background: #D14545;
+            box-shadow: 0 4px 12px rgba(230, 90, 90, 0.25);
         }
 
+        /* Active Tracking Banner */
         .tracking-banner {
-            background: linear-gradient(135deg, var(--success), #2e7d32);
-            border-radius: 12px;
-            padding: 20px 24px;
-            margin-bottom: 24px;
+            background: linear-gradient(135deg, var(--ung-success), #2A8F4A);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-lg);
             display: flex;
             justify-content: space-between;
             align-items: center;
             color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tracking-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
 
         .tracking-banner.inactive {
@@ -452,87 +525,135 @@ export class MainDashboardPanel {
             color: var(--text-primary);
         }
 
+        .tracking-banner.inactive::before {
+            display: none;
+        }
+
+        .tracking-info {
+            position: relative;
+            z-index: 1;
+        }
+
         .tracking-info h3 {
-            font-size: 14px;
+            font-size: 13px;
             opacity: 0.9;
-            margin-bottom: 4px;
+            margin-bottom: var(--space-xxs);
+            font-weight: 500;
         }
 
         .tracking-info .time {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 700;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+            letter-spacing: -1px;
         }
 
         .tracking-info .details {
             font-size: 13px;
-            opacity: 0.8;
-            margin-top: 4px;
+            opacity: 0.85;
+            margin-top: var(--space-xxs);
         }
 
+        /* Metrics Grid */
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--space-md);
+            margin-bottom: var(--space-xl);
         }
 
         .metric-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.2s;
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            transition: all var(--transition-quick);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--ung-brand);
+            opacity: 0;
+            transition: opacity var(--transition-micro);
         }
 
         .metric-card:hover {
-            border-color: var(--accent);
+            border-color: var(--ung-brand);
             transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        .metric-card:hover::after {
+            opacity: 1;
         }
 
         .metric-card.clickable {
             cursor: pointer;
         }
 
+        .metric-card:active {
+            transform: translateY(0) scale(0.99);
+        }
+
         .metric-icon {
             width: 40px;
             height: 40px;
-            border-radius: 10px;
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 18px;
-            margin-bottom: 12px;
+            margin-bottom: var(--space-sm);
+            transition: transform var(--transition-bounce);
         }
 
-        .metric-icon.green { background: rgba(76, 175, 80, 0.15); color: var(--success); }
-        .metric-icon.blue { background: rgba(33, 150, 243, 0.15); color: var(--info); }
-        .metric-icon.orange { background: rgba(255, 152, 0, 0.15); color: var(--warning); }
-        .metric-icon.red { background: rgba(244, 67, 54, 0.15); color: var(--danger); }
-        .metric-icon.purple { background: rgba(156, 39, 176, 0.15); color: #9c27b0; }
+        .metric-card:hover .metric-icon {
+            transform: scale(1.1);
+        }
+
+        .metric-icon.green { background: var(--ung-success-light); color: var(--ung-success); }
+        .metric-icon.blue { background: var(--ung-info-light); color: var(--ung-info); }
+        .metric-icon.orange { background: var(--ung-warning-light); color: var(--ung-warning); }
+        .metric-icon.red { background: var(--ung-error-light); color: var(--ung-error); }
+        .metric-icon.purple { background: var(--ung-purple-light); color: var(--ung-purple); }
 
         .metric-label {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 4px;
+            margin-bottom: var(--space-xxs);
+            font-weight: 500;
         }
 
         .metric-value {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 700;
+            transition: color var(--transition-micro);
+        }
+
+        .metric-card:hover .metric-value {
+            color: var(--ung-brand);
         }
 
         .metric-subtitle {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-top: 4px;
+            margin-top: var(--space-xxs);
         }
 
+        /* Content Grid */
         .content-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
-            gap: 24px;
+            gap: var(--space-lg);
         }
 
         @media (max-width: 900px) {
@@ -542,12 +663,17 @@ export class MainDashboardPanel {
         .card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             overflow: hidden;
+            transition: border-color var(--transition-quick);
+        }
+
+        .card:hover {
+            border-color: rgba(51, 115, 232, 0.3);
         }
 
         .card-header {
-            padding: 16px 20px;
+            padding: var(--space-md) var(--space-lg);
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
@@ -560,15 +686,24 @@ export class MainDashboardPanel {
         }
 
         .card-body {
-            padding: 16px 20px;
+            padding: var(--space-md) var(--space-lg);
         }
 
+        /* Invoice Items */
         .invoice-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
+            padding: var(--space-sm) 0;
             border-bottom: 1px solid var(--border);
+            transition: all var(--transition-quick);
+            margin: 0 calc(-1 * var(--space-lg));
+            padding-left: var(--space-lg);
+            padding-right: var(--space-lg);
+        }
+
+        .invoice-item:hover {
+            background: var(--bg-tertiary);
         }
 
         .invoice-item:last-child {
@@ -581,7 +716,12 @@ export class MainDashboardPanel {
 
         .invoice-client {
             font-weight: 500;
-            margin-bottom: 4px;
+            margin-bottom: var(--space-xxs);
+            transition: color var(--transition-micro);
+        }
+
+        .invoice-item:hover .invoice-client {
+            color: var(--ung-brand);
         }
 
         .invoice-date {
@@ -591,98 +731,171 @@ export class MainDashboardPanel {
 
         .invoice-amount {
             font-weight: 600;
-            margin-right: 12px;
+            margin-right: var(--space-sm);
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
         }
 
         .badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
+            padding: var(--space-xxs) var(--space-sm);
+            border-radius: var(--radius-xs);
+            font-size: 10px;
+            font-weight: 600;
             color: white;
             text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
+        /* Quick Actions */
         .quick-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: var(--space-sm);
         }
 
         .action-btn {
             background: var(--bg-tertiary);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
+            border-radius: var(--radius-sm);
+            padding: var(--space-md);
             text-align: center;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition-quick);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(51, 115, 232, 0.1);
+            border-radius: 50%;
+            transition: all var(--transition-standard);
+            transform: translate(-50%, -50%);
         }
 
         .action-btn:hover {
-            background: var(--accent);
-            border-color: var(--accent);
+            background: var(--ung-brand);
+            border-color: var(--ung-brand);
             color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(51, 115, 232, 0.25);
+        }
+
+        .action-btn:hover::before {
+            width: 200%;
+            height: 200%;
+        }
+
+        .action-btn:active {
+            transform: translateY(0) scale(0.98);
         }
 
         .action-btn:hover .action-icon {
             background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
         }
 
         .action-icon {
             width: 36px;
             height: 36px;
-            margin: 0 auto 8px;
+            margin: 0 auto var(--space-xs);
             background: var(--bg-secondary);
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 16px;
+            transition: all var(--transition-bounce);
+            position: relative;
+            z-index: 1;
         }
 
         .action-label {
             font-size: 12px;
             font-weight: 500;
+            position: relative;
+            z-index: 1;
         }
 
+        /* Empty State */
         .empty-state {
             text-align: center;
-            padding: 32px;
+            padding: var(--space-xl);
             color: var(--text-secondary);
         }
 
         .empty-state .icon {
             font-size: 48px;
-            margin-bottom: 12px;
+            margin-bottom: var(--space-sm);
             opacity: 0.5;
         }
 
+        /* Danger Zone */
         .danger-zone {
-            margin-top: 32px;
-            padding: 20px;
-            background: rgba(244, 67, 54, 0.1);
-            border: 1px solid rgba(244, 67, 54, 0.3);
-            border-radius: 12px;
+            margin-top: var(--space-xl);
+            padding: var(--space-lg);
+            background: var(--ung-error-light);
+            border: 1px solid rgba(230, 90, 90, 0.3);
+            border-radius: var(--radius-md);
+            transition: border-color var(--transition-quick);
+        }
+
+        .danger-zone:hover {
+            border-color: var(--ung-error);
         }
 
         .danger-zone h3 {
-            color: var(--danger);
+            color: var(--ung-error);
             font-size: 14px;
-            margin-bottom: 8px;
+            margin-bottom: var(--space-xs);
         }
 
         .danger-zone p {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 12px;
+            margin-bottom: var(--space-sm);
         }
 
+        /* Footer */
         .footer {
-            margin-top: 32px;
+            margin-top: var(--space-xl);
             text-align: center;
             color: var(--text-secondary);
             font-size: 12px;
+        }
+
+        .footer a {
+            color: var(--ung-brand);
+            text-decoration: none;
+            transition: color var(--transition-micro);
+        }
+
+        .footer a:hover {
+            color: var(--ung-brand-dark);
+            text-decoration: underline;
+        }
+
+        /* Focus States for Accessibility */
+        button:focus-visible,
+        .action-btn:focus-visible,
+        .metric-card:focus-visible {
+            outline: 2px solid var(--ung-brand);
+            outline-offset: 2px;
+        }
+
+        /* Reduced Motion Preference */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
         }
     </style>
 </head>

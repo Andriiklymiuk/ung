@@ -390,16 +390,45 @@ export class StatisticsPanel {
     <title>UNG Statistics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* ==============================================
+           UNG Design System - Statistics Panel
+           Aligned with macOS DesignTokens.swift
+           ============================================== */
         :root {
+            /* Brand Colors */
+            --ung-brand: #3373E8;
+            --ung-brand-light: rgba(51, 115, 232, 0.15);
+            --ung-brand-dark: #2660CC;
+
+            /* Semantic Colors */
+            --ung-success: #33A756;
+            --ung-success-light: rgba(51, 167, 86, 0.12);
+            --ung-warning: #F29932;
+            --ung-warning-light: rgba(242, 153, 50, 0.12);
+            --ung-error: #E65A5A;
+            --ung-error-light: rgba(230, 90, 90, 0.12);
+            --ung-purple: #8C59B2;
+
+            /* VSCode Integration */
             --bg-primary: var(--vscode-editor-background);
             --bg-secondary: var(--vscode-sideBar-background);
             --text-primary: var(--vscode-editor-foreground);
             --text-secondary: var(--vscode-descriptionForeground);
             --border: var(--vscode-panel-border);
-            --accent: var(--vscode-button-background);
-            --success: #4caf50;
-            --warning: #ff9800;
-            --danger: #f44336;
+
+            /* Spacing */
+            --space-xs: 8px;
+            --space-sm: 12px;
+            --space-md: 16px;
+            --space-lg: 24px;
+
+            /* Border Radius */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+
+            /* Transitions */
+            --transition-quick: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-bounce: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -408,42 +437,51 @@ export class StatisticsPanel {
             font-family: var(--vscode-font-family);
             background: var(--bg-primary);
             color: var(--text-primary);
-            padding: 20px;
+            padding: var(--space-lg);
             line-height: 1.5;
+            font-size: 13px;
         }
 
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: var(--space-lg);
             flex-wrap: wrap;
-            gap: 16px;
+            gap: var(--space-md);
         }
 
         h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 600;
         }
 
         .controls {
             display: flex;
-            gap: 8px;
+            gap: var(--space-xs);
             flex-wrap: wrap;
         }
 
         button, select {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+            background: var(--ung-brand);
+            color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: var(--space-xs) var(--space-md);
+            border-radius: var(--radius-sm);
             cursor: pointer;
             font-size: 13px;
+            font-weight: 500;
+            transition: all var(--transition-quick);
         }
 
-        button:hover, select:hover {
-            background: var(--vscode-button-hoverBackground);
+        button:hover {
+            background: var(--ung-brand-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(51, 115, 232, 0.25);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.98);
         }
 
         select {
@@ -452,39 +490,64 @@ export class StatisticsPanel {
             border: 1px solid var(--border);
         }
 
+        select:hover {
+            border-color: var(--ung-brand);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--ung-brand);
+            box-shadow: 0 0 0 3px var(--ung-brand-light);
+        }
+
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
         }
 
         .stat-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            transition: all var(--transition-quick);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            border-color: var(--ung-brand);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
         }
 
         .stat-card.highlight {
-            border-left: 4px solid var(--accent);
+            border-left: 4px solid var(--ung-brand);
         }
 
-        .stat-card.success { border-left-color: var(--success); }
-        .stat-card.warning { border-left-color: var(--warning); }
-        .stat-card.danger { border-left-color: var(--danger); }
+        .stat-card.success { border-left-color: var(--ung-success); }
+        .stat-card.warning { border-left-color: var(--ung-warning); }
+        .stat-card.danger { border-left-color: var(--ung-error); }
 
         .stat-label {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 4px;
+            margin-bottom: var(--space-xs);
+            font-weight: 500;
         }
 
         .stat-value {
-            font-size: 28px;
-            font-weight: 600;
+            font-size: 26px;
+            font-weight: 700;
+            transition: color var(--transition-quick);
+        }
+
+        .stat-card:hover .stat-value {
+            color: var(--ung-brand);
         }
 
         .stat-value.small { font-size: 20px; }
@@ -492,27 +555,32 @@ export class StatisticsPanel {
         .stat-subtitle {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-top: 4px;
+            margin-top: var(--space-xs);
         }
 
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 24px;
-            margin-bottom: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: var(--space-lg);
+            margin-bottom: var(--space-lg);
         }
 
         .chart-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            transition: border-color var(--transition-quick);
+        }
+
+        .chart-card:hover {
+            border-color: rgba(51, 115, 232, 0.3);
         }
 
         .chart-title {
             font-size: 14px;
             font-weight: 600;
-            margin-bottom: 16px;
+            margin-bottom: var(--space-md);
         }
 
         .chart-container {
@@ -523,18 +591,24 @@ export class StatisticsPanel {
         .export-section {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            transition: border-color var(--transition-quick);
+        }
+
+        .export-section:hover {
+            border-color: rgba(51, 115, 232, 0.3);
         }
 
         .export-section h3 {
             font-size: 14px;
-            margin-bottom: 12px;
+            font-weight: 600;
+            margin-bottom: var(--space-sm);
         }
 
         .export-buttons {
             display: flex;
-            gap: 8px;
+            gap: var(--space-xs);
             flex-wrap: wrap;
         }
 
@@ -545,7 +619,25 @@ export class StatisticsPanel {
         }
 
         .export-buttons button:hover {
-            background: var(--bg-primary);
+            background: var(--ung-brand-light);
+            border-color: var(--ung-brand);
+            color: var(--ung-brand);
+            box-shadow: none;
+        }
+
+        /* Focus States */
+        button:focus-visible,
+        select:focus-visible {
+            outline: 2px solid var(--ung-brand);
+            outline-offset: 2px;
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
         }
 
         @media (max-width: 600px) {
@@ -689,8 +781,8 @@ export class StatisticsPanel {
                 datasets: [{
                     label: 'Revenue',
                     data: revenueByDay.map(d => d.value),
-                    borderColor: '#4caf50',
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    borderColor: '#33A756',
+                    backgroundColor: 'rgba(51, 167, 86, 0.1)',
                     fill: true,
                     tension: 0.3
                 }]
@@ -713,7 +805,7 @@ export class StatisticsPanel {
                 datasets: [{
                     label: 'Hours',
                     data: hoursByDay.map(d => d.value),
-                    backgroundColor: '#2196f3'
+                    backgroundColor: '#3373E8'
                 }]
             },
             options: {
@@ -733,7 +825,7 @@ export class StatisticsPanel {
                 labels: revenueByClient.map(d => d.label),
                 datasets: [{
                     data: revenueByClient.map(d => d.value),
-                    backgroundColor: ['#4caf50', '#2196f3', '#ff9800', '#9c27b0', '#f44336']
+                    backgroundColor: ['#33A756', '#3373E8', '#F29932', '#8C59B2', '#E65A5A']
                 }]
             },
             options: {
@@ -761,7 +853,7 @@ export class StatisticsPanel {
                         invoicesByStatus.paid,
                         invoicesByStatus.overdue
                     ],
-                    backgroundColor: ['#9e9e9e', '#ff9800', '#2196f3', '#4caf50', '#f44336']
+                    backgroundColor: ['#808080', '#F29932', '#3373E8', '#33A756', '#E65A5A']
                 }]
             },
             options: {

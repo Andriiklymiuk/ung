@@ -57,6 +57,12 @@ func main() {
 	rateController := controllers.NewRateController()
 	goalController := controllers.NewGoalController()
 	subscriptionController := middleware.NewSubscriptionController(revenueCatConfig)
+	recurringController := controllers.NewRecurringController()
+	reportController := controllers.NewReportController()
+	pomodoroController := controllers.NewPomodoroController()
+	templateController := controllers.NewTemplateController()
+	searchController := controllers.NewSearchController()
+	exportController := controllers.NewExportController()
 
 	// Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(apiDB, cfg.JWTSecret)
@@ -77,6 +83,12 @@ func main() {
 		rateController,
 		goalController,
 		subscriptionController,
+		recurringController,
+		reportController,
+		pomodoroController,
+		templateController,
+		searchController,
+		exportController,
 		authMiddleware,
 		tenantMiddleware,
 		subscriptionMiddleware,

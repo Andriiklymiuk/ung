@@ -263,3 +263,68 @@ type SubscriptionInfo struct {
 	Entitlements map[string]RevenueCatEntitlement `json:"entitlements"`
 	ExpiresAt    *time.Time                       `json:"expires_at"`
 }
+
+// RecurringFrequency represents how often an invoice recurs
+type RecurringFrequency string
+
+const (
+	FrequencyWeekly    RecurringFrequency = "weekly"
+	FrequencyBiweekly  RecurringFrequency = "biweekly"
+	FrequencyMonthly   RecurringFrequency = "monthly"
+	FrequencyQuarterly RecurringFrequency = "quarterly"
+	FrequencyYearly    RecurringFrequency = "yearly"
+)
+
+// RecurringInvoice represents a recurring invoice template
+type RecurringInvoice struct {
+	ID            uint               `gorm:"primaryKey" json:"id"`
+	ClientID      uint               `gorm:"not null;index" json:"client_id"`
+	Client        Client             `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	CompanyID     uint               `gorm:"not null;index" json:"company_id"`
+	Company       Company            `gorm:"foreignKey:CompanyID" json:"company,omitempty"`
+	Amount        float64            `gorm:"not null" json:"amount"`
+	Currency      string             `gorm:"default:USD" json:"currency"`
+	Description   string             `json:"description"`
+	Frequency     RecurringFrequency `gorm:"not null" json:"frequency"`
+	DayOfMonth    int                `gorm:"default:1" json:"day_of_month"`
+	DayOfWeek     int                `json:"day_of_week"`
+	NextRunDate   time.Time          `json:"next_run_date"`
+	LastRunDate   *time.Time         `json:"last_run_date"`
+	Active        bool               `gorm:"default:true" json:"active"`
+	InvoicePrefix string             `gorm:"default:REC" json:"invoice_prefix"`
+	TotalGenerated int               `gorm:"default:0" json:"total_generated"`
+	CreatedAt     time.Time          `json:"created_at"`
+	UpdatedAt     time.Time          `json:"updated_at"`
+}
+
+// PomodoroSession represents a pomodoro timer session
+type PomodoroSession struct {
+	ID          uint           `gorm:"primaryKey" json:"id"`
+	ContractID  *uint          `gorm:"index" json:"contract_id"`
+	Contract    *Contract      `gorm:"foreignKey:ContractID" json:"contract,omitempty"`
+	ClientID    *uint          `gorm:"index" json:"client_id"`
+	Client      *Client        `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	ProjectName string         `json:"project_name"`
+	Duration    int            `gorm:"default:25" json:"duration"` // Duration in minutes
+	BreakTime   int            `gorm:"default:5" json:"break_time"`
+	StartTime   time.Time      `gorm:"not null" json:"start_time"`
+	EndTime     *time.Time     `json:"end_time"`
+	Completed   bool           `gorm:"default:false" json:"completed"`
+	Notes       string         `json:"notes"`
+	SessionType string         `gorm:"default:work" json:"session_type"` // work, short_break, long_break
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// InvoiceTemplate represents a reusable invoice template
+type InvoiceTemplate struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"not null" json:"name"`
+	Description string    `json:"description"`
+	Content     string    `gorm:"type:text" json:"content"` // HTML/Markdown template content
+	IsDefault   bool      `gorm:"default:false" json:"is_default"`
+	Variables   string    `gorm:"type:text" json:"variables"` // JSON list of template variables
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}

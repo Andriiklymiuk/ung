@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -41,6 +42,11 @@ func main() {
 	expenseHandler := handlers.NewExpenseHandler(bot, apiClient, sessionMgr)
 	trackingHandler := handlers.NewTrackingHandler(bot, apiClient, sessionMgr)
 	dashboardHandler := handlers.NewDashboardHandler(bot, apiClient, sessionMgr)
+	reportHandler := handlers.NewReportHandler(bot, apiClient, sessionMgr)
+	pomodoroHandler := handlers.NewPomodoroHandler(bot, apiClient, sessionMgr)
+	goalsHandler := handlers.NewGoalsHandler(bot, apiClient, sessionMgr)
+	settingsHandler := handlers.NewSettingsHandler(bot, apiClient, sessionMgr)
+	searchHandler := handlers.NewSearchHandler(bot, apiClient, sessionMgr)
 
 	// Start listening for updates
 	u := tgbotapi.NewUpdate(0)
@@ -53,14 +59,14 @@ func main() {
 	for update := range updates {
 		// Handle messages
 		if update.Message != nil {
-			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, sessionMgr); err != nil {
+			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, sessionMgr); err != nil {
 				log.Printf("Error handling message: %v", err)
 			}
 		}
 
 		// Handle callback queries
 		if update.CallbackQuery != nil {
-			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, sessionMgr); err != nil {
+			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, sessionMgr); err != nil {
 				log.Printf("Error handling callback: %v", err)
 			}
 		}
@@ -79,6 +85,11 @@ func handleMessage(
 	expenseHandler *handlers.ExpenseHandler,
 	trackingHandler *handlers.TrackingHandler,
 	dashboardHandler *handlers.DashboardHandler,
+	reportHandler *handlers.ReportHandler,
+	pomodoroHandler *handlers.PomodoroHandler,
+	goalsHandler *handlers.GoalsHandler,
+	settingsHandler *handlers.SettingsHandler,
+	searchHandler *handlers.SearchHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	// Handle commands
@@ -122,6 +133,29 @@ func handleMessage(
 			return trackingHandler.HandleLog(message)
 		case "dashboard":
 			return dashboardHandler.Handle(message)
+		// New commands
+		case "report", "weekly":
+			return reportHandler.HandleWeekly(message)
+		case "monthly":
+			return reportHandler.HandleMonthly(message)
+		case "overdue":
+			return reportHandler.HandleOverdue(message)
+		case "unpaid":
+			return reportHandler.HandleUnpaid(message)
+		case "pomodoro":
+			return pomodoroHandler.HandleStart(message)
+		case "pomo":
+			return pomodoroHandler.HandleActive(message)
+		case "pomostats":
+			return pomodoroHandler.HandleStats(message)
+		case "goal", "goals":
+			return goalsHandler.HandleStatus(message)
+		case "rate":
+			return goalsHandler.HandleRateAnalysis(message)
+		case "settings":
+			return settingsHandler.HandleShow(message)
+		case "search":
+			return searchHandler.HandleSearch(message)
 		default:
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Try /help")
 			bot.Send(msg)
@@ -179,6 +213,9 @@ func handleMessage(
 			return trackingHandler.HandleProjectInput(message)
 		case models.StateTrackLogNotes:
 			return trackingHandler.HandleNotesInput(message)
+		// Search states
+		case models.StateSearchQuery:
+			return searchHandler.HandleSearchQuery(message)
 		}
 	}
 
@@ -197,6 +234,11 @@ func handleCallback(
 	expenseHandler *handlers.ExpenseHandler,
 	trackingHandler *handlers.TrackingHandler,
 	dashboardHandler *handlers.DashboardHandler,
+	reportHandler *handlers.ReportHandler,
+	pomodoroHandler *handlers.PomodoroHandler,
+	goalsHandler *handlers.GoalsHandler,
+	settingsHandler *handlers.SettingsHandler,
+	searchHandler *handlers.SearchHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	data := callbackQuery.Data
@@ -226,7 +268,6 @@ func handleCallback(
 	}
 
 	if data == "action_invoice" {
-		// Convert callback to message for easier handling
 		msg := &tgbotapi.Message{
 			Chat: callbackQuery.Message.Chat,
 			From: callbackQuery.From,
@@ -235,7 +276,6 @@ func handleCallback(
 	}
 
 	if data == "invoice_new_client" {
-		// Start client creation flow
 		msg := &tgbotapi.Message{
 			Chat: callbackQuery.Message.Chat,
 			From: callbackQuery.From,
@@ -269,6 +309,108 @@ func handleCallback(
 	// Invoice PDF callbacks
 	if strings.HasPrefix(data, "invoice_pdf_") {
 		return invoiceHandler.HandlePDFCallback(callbackQuery)
+	}
+
+	// Report callbacks
+	if data == "report_weekly" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading weekly report...")
+		bot.Request(callback)
+		return reportHandler.HandleWeekly(msg)
+	}
+
+	if data == "report_monthly" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading monthly report...")
+		bot.Request(callback)
+		return reportHandler.HandleMonthly(msg)
+	}
+
+	if data == "report_overdue" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading overdue report...")
+		bot.Request(callback)
+		return reportHandler.HandleOverdue(msg)
+	}
+
+	if data == "report_unpaid" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading unpaid report...")
+		bot.Request(callback)
+		return reportHandler.HandleUnpaid(msg)
+	}
+
+	// Pomodoro callbacks
+	if strings.HasPrefix(data, "pomodoro_start_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 3 {
+			duration, _ := strconv.Atoi(parts[2])
+			return pomodoroHandler.HandleStartDuration(callbackQuery, duration)
+		}
+	}
+
+	if data == "pomodoro_active" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Checking pomodoro...")
+		bot.Request(callback)
+		return pomodoroHandler.HandleActive(msg)
+	}
+
+	if data == "action_pomodoro" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Starting pomodoro...")
+		bot.Request(callback)
+		return pomodoroHandler.HandleStart(msg)
+	}
+
+	// Goals callbacks
+	if data == "goal_status" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading goals...")
+		bot.Request(callback)
+		return goalsHandler.HandleStatus(msg)
+	}
+
+	if data == "action_rate" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading rate analysis...")
+		bot.Request(callback)
+		return goalsHandler.HandleRateAnalysis(msg)
+	}
+
+	// Search callbacks
+	if data == "action_search" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Search...")
+		bot.Request(callback)
+		return searchHandler.HandleSearch(msg)
 	}
 
 	// Auth callback
@@ -310,7 +452,6 @@ func handleCallback(
 	if data == "action_reports" {
 		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading dashboard...")
 		bot.Request(callback)
-		// Show dashboard directly
 		msg := &tgbotapi.Message{
 			Chat: callbackQuery.Message.Chat,
 			From: callbackQuery.From,
@@ -319,17 +460,13 @@ func handleCallback(
 	}
 
 	if data == "action_settings" {
-		chatID := callbackQuery.Message.Chat.ID
-		text := "⚙️ *Settings*\n\n" +
-			"Settings are managed via the web app or CLI.\n\n" +
-			"Visit https://ung.app/settings to configure your account."
-		settingsMsg := tgbotapi.NewMessage(chatID, text)
-		settingsMsg.ParseMode = "Markdown"
-		bot.Send(settingsMsg)
-
-		callback := tgbotapi.NewCallback(callbackQuery.ID, "Settings info shown")
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading settings...")
 		bot.Request(callback)
-		return nil
+		return settingsHandler.HandleShow(msg)
 	}
 
 	if data == "main_menu" {
@@ -343,12 +480,12 @@ func handleCallback(
 		}
 
 		text := fmt.Sprintf(
-			"━━━━━━━━━━━━━━━━━━━━━━\n"+
-				"      🏠 *Main Menu*\n"+
-				"━━━━━━━━━━━━━━━━━━━━━━\n\n"+
-				"Hey %s! 👋\n\n"+
+			"--------------------\n"+
+				"      *Main Menu*\n"+
+				"--------------------\n\n"+
+				"Hey %s!\n\n"+
 				"What would you like to do today?\n\n"+
-				"💡 _Tip: Use /help for all commands_",
+				"_Tip: Use /help for all commands_",
 			name,
 		)
 		msg := tgbotapi.NewMessage(chatID, text)
@@ -356,20 +493,28 @@ func handleCallback(
 
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("📄 New Invoice", "action_invoice"),
-				tgbotapi.NewInlineKeyboardButtonData("⏱️ Track Time", "action_track"),
+				tgbotapi.NewInlineKeyboardButtonData("New Invoice", "action_invoice"),
+				tgbotapi.NewInlineKeyboardButtonData("Track Time", "action_track"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("👥 Clients", "action_clients"),
-				tgbotapi.NewInlineKeyboardButtonData("📋 Contracts", "action_contracts"),
+				tgbotapi.NewInlineKeyboardButtonData("Clients", "action_clients"),
+				tgbotapi.NewInlineKeyboardButtonData("Contracts", "action_contracts"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("📊 Dashboard", "action_reports"),
-				tgbotapi.NewInlineKeyboardButtonData("💸 Expenses", "action_expenses"),
+				tgbotapi.NewInlineKeyboardButtonData("Dashboard", "action_reports"),
+				tgbotapi.NewInlineKeyboardButtonData("Expenses", "action_expenses"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("📑 All Invoices", "action_invoices_list"),
-				tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "action_settings"),
+				tgbotapi.NewInlineKeyboardButtonData("Pomodoro", "action_pomodoro"),
+				tgbotapi.NewInlineKeyboardButtonData("Reports", "report_weekly"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("Goals", "goal_status"),
+				tgbotapi.NewInlineKeyboardButtonData("Search", "action_search"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("All Invoices", "action_invoices_list"),
+				tgbotapi.NewInlineKeyboardButtonData("Settings", "action_settings"),
 			),
 		)
 		msg.ReplyMarkup = keyboard

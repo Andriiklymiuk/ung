@@ -437,6 +437,29 @@ struct MoreTabView: View {
                     }
                 }
 
+                Section("Tools") {
+                    NavigationLink {
+                        IncomeGoalsView()
+                            .navigationTitle("Income Goals")
+                    } label: {
+                        Label("Income Goals", systemImage: "target")
+                    }
+
+                    NavigationLink {
+                        RateCalculatorView()
+                            .navigationTitle("Rate Calculator")
+                    } label: {
+                        Label("Rate Calculator", systemImage: "dollarsign.circle")
+                    }
+
+                    NavigationLink {
+                        CSVExportView()
+                            .navigationTitle("Export Data")
+                    } label: {
+                        Label("Export Data", systemImage: "square.and.arrow.up")
+                    }
+                }
+
                 Section("Settings") {
                     NavigationLink {
                         SettingsContent()

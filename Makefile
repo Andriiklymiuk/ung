@@ -1,6 +1,7 @@
 .PHONY: build \
 	install \
 	test \
+	testMac \
 	clean \
 	run \
 	help \
@@ -53,6 +54,24 @@ install: build
 test:
 	@echo "Running tests..."
 	@go test -v ./...
+
+# Run macOS app tests
+testMac:
+	@echo "Running macOS app tests..."
+	@xcodebuild test \
+		-project $(MACOS_PROJECT) \
+		-scheme $(MACOS_SCHEME) \
+		-destination 'platform=macOS' \
+		-only-testing:ungTests \
+		-quiet \
+		| xcpretty --test --color || \
+		xcodebuild test \
+			-project $(MACOS_PROJECT) \
+			-scheme $(MACOS_SCHEME) \
+			-destination 'platform=macOS' \
+			-only-testing:ungTests \
+			2>&1 | grep -E '(Test Case|passed|failed|error:)'
+	@echo "✓ macOS tests complete"
 
 # Clean build artifacts
 clean:
@@ -210,7 +229,8 @@ help:
 	@echo "UNG Makefile targets:"
 	@echo "  build      - Build the binary"
 	@echo "  install    - Install to GOPATH/bin"
-	@echo "  test       - Run tests"
+	@echo "  test       - Run Go tests"
+	@echo "  testMac    - Run macOS app unit tests (fast)"
 	@echo "  clean      - Remove build artifacts"
 	@echo "  run        - Build and run the application"
 	@echo "  tidy       - Tidy Go modules"

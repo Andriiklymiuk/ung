@@ -6,10 +6,56 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct ungApp: App {
   @StateObject private var appState = AppState()
+
+  init() {
+    // Set up notification delegate
+    UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+
+    // Configure notification action handlers
+    NotificationDelegate.shared.onPomodoroAction = { action in
+      Task { @MainActor in
+        let appState = AppState()
+        switch action {
+        case "START_BREAK":
+          // Already handled by pomodoro completion
+          break
+        case "SKIP_BREAK":
+          appState.skipPomodoro()
+        case "START_WORK":
+          if !appState.pomodoroState.isActive {
+            appState.startPomodoro()
+          }
+        default:
+          break
+        }
+      }
+    }
+
+    NotificationDelegate.shared.onTrackingAction = { action in
+      Task { @MainActor in
+        let appState = AppState()
+        switch action {
+        case "STOP_TRACKING":
+          await appState.stopTracking()
+        case "CONTINUE_TRACKING":
+          // Just dismiss - reschedule reminder
+          NotificationService.shared.scheduleTrackingReminder()
+        default:
+          break
+        }
+      }
+    }
+
+    // Request notification authorization on first launch
+    Task {
+      _ = await NotificationService.shared.requestAuthorization()
+    }
+  }
 
   var body: some Scene {
     // Main Window (shows on launch like a regular macOS app)

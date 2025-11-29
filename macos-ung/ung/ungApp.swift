@@ -66,6 +66,141 @@ struct ungApp: App {
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentMinSize)
     .defaultSize(width: 1100, height: 750)
+    .commands {
+      // Replace default New command with our tracking
+      CommandGroup(replacing: .newItem) {
+        Button("Start Tracking") {
+          appState.selectedTab = .tracking
+        }
+        .keyboardShortcut("n", modifiers: [.command])
+        .disabled(appState.isTracking)
+
+        Button("Stop Tracking") {
+          Task { await appState.stopTracking() }
+        }
+        .keyboardShortcut(".", modifiers: [.command])
+        .disabled(!appState.isTracking)
+
+        Divider()
+
+        Button("New Client") {
+          appState.selectedTab = .clients
+        }
+        .keyboardShortcut("n", modifiers: [.command, .shift])
+
+        Button("New Invoice") {
+          appState.selectedTab = .invoices
+        }
+        .keyboardShortcut("i", modifiers: [.command, .shift])
+      }
+
+      // Navigation commands
+      CommandMenu("Navigate") {
+        Button("Dashboard") {
+          appState.selectedTab = .dashboard
+        }
+        .keyboardShortcut("1", modifiers: [.command])
+
+        Button("Time Tracking") {
+          appState.selectedTab = .tracking
+        }
+        .keyboardShortcut("2", modifiers: [.command])
+
+        Button("Clients") {
+          appState.selectedTab = .clients
+        }
+        .keyboardShortcut("3", modifiers: [.command])
+
+        Button("Contracts") {
+          appState.selectedTab = .contracts
+        }
+        .keyboardShortcut("4", modifiers: [.command])
+
+        Button("Invoices") {
+          appState.selectedTab = .invoices
+        }
+        .keyboardShortcut("5", modifiers: [.command])
+
+        Button("Expenses") {
+          appState.selectedTab = .expenses
+        }
+        .keyboardShortcut("6", modifiers: [.command])
+
+        Button("Focus Timer") {
+          appState.selectedTab = .pomodoro
+        }
+        .keyboardShortcut("7", modifiers: [.command])
+
+        Button("Reports") {
+          appState.selectedTab = .reports
+        }
+        .keyboardShortcut("8", modifiers: [.command])
+
+        Button("Settings") {
+          appState.selectedTab = .settings
+        }
+        .keyboardShortcut(",", modifiers: [.command])
+      }
+
+      // Focus Timer commands
+      CommandMenu("Focus") {
+        Button("Start Focus Session") {
+          appState.startPomodoro()
+        }
+        .keyboardShortcut("f", modifiers: [.command, .shift])
+        .disabled(appState.pomodoroState.isActive)
+
+        Button("Stop Focus Session") {
+          appState.stopPomodoro()
+        }
+        .keyboardShortcut("f", modifiers: [.command, .shift, .option])
+        .disabled(!appState.pomodoroState.isActive)
+
+        Button("Skip to Next") {
+          appState.skipPomodoro()
+        }
+        .keyboardShortcut("s", modifiers: [.command, .shift])
+        .disabled(!appState.pomodoroState.isActive)
+      }
+
+      // Data commands
+      CommandGroup(after: .importExport) {
+        Divider()
+
+        Button("Refresh Data") {
+          Task { await appState.refreshDashboard() }
+        }
+        .keyboardShortcut("r", modifiers: [.command])
+        .disabled(appState.isRefreshing)
+
+        Button("Sync with iCloud") {
+          appState.checkICloudSync()
+        }
+        .keyboardShortcut("s", modifiers: [.command, .option])
+        .disabled(!appState.iCloudEnabled)
+      }
+
+      // Security commands
+      CommandGroup(after: .windowArrangement) {
+        Divider()
+
+        Button(appState.secureMode ? "Disable Secure Mode" : "Enable Secure Mode") {
+          appState.secureMode.toggle()
+          let message = appState.secureMode
+            ? "Secure Mode Enabled - Sensitive data hidden"
+            : "Secure Mode Disabled - All data visible"
+          appState.showToastMessage(message, type: appState.secureMode ? .warning : .info)
+        }
+        .keyboardShortcut("h", modifiers: [.command, .shift])
+
+        if appState.appLockEnabled {
+          Button("Lock App") {
+            appState.lockApp()
+          }
+          .keyboardShortcut("l", modifiers: [.command, .control])
+        }
+      }
+    }
 
     // Menu Bar Extra (still accessible from menu bar)
     MenuBarExtra {

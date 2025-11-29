@@ -238,6 +238,108 @@ struct InvoiceRecipient: Codable, FetchableRecord, PersistableRecord, Identifiab
     static let client = belongsTo(ClientModel.self)
 }
 
+// MARK: - Recurring Invoice
+
+enum RecurringFrequency: String, Codable, CaseIterable {
+    case weekly = "weekly"
+    case biweekly = "biweekly"
+    case monthly = "monthly"
+    case quarterly = "quarterly"
+    case yearly = "yearly"
+
+    var displayName: String {
+        switch self {
+        case .weekly: return "Weekly"
+        case .biweekly: return "Bi-weekly"
+        case .monthly: return "Monthly"
+        case .quarterly: return "Quarterly"
+        case .yearly: return "Yearly"
+        }
+    }
+}
+
+struct RecurringInvoice: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: Int64?
+    var clientId: Int64
+    var contractId: Int64?
+    var amount: Double
+    var currency: String
+    var description: String?
+    var frequency: String  // RecurringFrequency raw value
+    var dayOfMonth: Int
+    var dayOfWeek: Int
+    var nextGenerationDate: Date
+    var lastGeneratedDate: Date?
+    var lastInvoiceId: Int64?
+    var active: Bool
+    var autoPdf: Bool
+    var autoSend: Bool
+    var emailApp: String?
+    var generatedCount: Int
+    var notes: String?
+    var createdAt: Date?
+    var updatedAt: Date?
+
+    static let databaseTableName = "recurring_invoices"
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case clientId = "client_id"
+        case contractId = "contract_id"
+        case amount
+        case currency
+        case description
+        case frequency
+        case dayOfMonth = "day_of_month"
+        case dayOfWeek = "day_of_week"
+        case nextGenerationDate = "next_generation_date"
+        case lastGeneratedDate = "last_generated_date"
+        case lastInvoiceId = "last_invoice_id"
+        case active
+        case autoPdf = "auto_pdf"
+        case autoSend = "auto_send"
+        case emailApp = "email_app"
+        case generatedCount = "generated_count"
+        case notes
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+
+    var frequencyType: RecurringFrequency {
+        RecurringFrequency(rawValue: frequency) ?? .monthly
+    }
+
+    // Calculate the next generation date based on frequency
+    func calculateNextGenerationDate(from date: Date = Date()) -> Date {
+        let calendar = Calendar.current
+
+        switch frequencyType {
+        case .weekly:
+            return calendar.date(byAdding: .weekOfYear, value: 1, to: date) ?? date
+        case .biweekly:
+            return calendar.date(byAdding: .weekOfYear, value: 2, to: date) ?? date
+        case .monthly:
+            guard var nextDate = calendar.date(byAdding: .month, value: 1, to: date) else { return date }
+            var components = calendar.dateComponents([.year, .month], from: nextDate)
+            components.day = min(dayOfMonth, 28) // Cap at 28 for safety
+            return calendar.date(from: components) ?? nextDate
+        case .quarterly:
+            guard var nextDate = calendar.date(byAdding: .month, value: 3, to: date) else { return date }
+            var components = calendar.dateComponents([.year, .month], from: nextDate)
+            components.day = min(dayOfMonth, 28)
+            return calendar.date(from: components) ?? nextDate
+        case .yearly:
+            return calendar.date(byAdding: .year, value: 1, to: date) ?? date
+        }
+    }
+
+    static let client = belongsTo(ClientModel.self)
+}
+
 // MARK: - Tracking Session
 
 struct TrackingSession: Codable, FetchableRecord, PersistableRecord, Identifiable {

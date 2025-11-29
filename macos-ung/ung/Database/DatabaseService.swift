@@ -1028,6 +1028,168 @@ actor DatabaseService {
         }
     }
 
+    // MARK: - Recurring Invoice Operations
+
+    func getRecurringInvoices() async throws -> [RecurringInvoice] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try RecurringInvoice.order(Column("next_generation_date").asc).fetchAll(db)
+        }
+    }
+
+    func getActiveRecurringInvoices() async throws -> [RecurringInvoice] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try RecurringInvoice
+                .filter(Column("active") == true)
+                .order(Column("next_generation_date").asc)
+                .fetchAll(db)
+        }
+    }
+
+    func getDueRecurringInvoices() async throws -> [RecurringInvoice] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try RecurringInvoice
+                .filter(Column("active") == true)
+                .filter(Column("next_generation_date") <= Date())
+                .order(Column("next_generation_date").asc)
+                .fetchAll(db)
+        }
+    }
+
+    func getRecurringInvoice(id: Int64) async throws -> RecurringInvoice? {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try RecurringInvoice.fetchOne(db, key: id)
+        }
+    }
+
+    func createRecurringInvoice(_ recurring: RecurringInvoice) async throws -> RecurringInvoice {
+        let db = try getDatabase()
+        var newRecurring = recurring
+        return try await db.write { db in
+            newRecurring.createdAt = Date()
+            newRecurring.updatedAt = Date()
+            try newRecurring.insert(db)
+            return newRecurring
+        }
+    }
+
+    func updateRecurringInvoice(_ recurring: RecurringInvoice) async throws {
+        let db = try getDatabase()
+        try await db.write { db in
+            var updated = recurring
+            updated.updatedAt = Date()
+            try updated.update(db)
+        }
+    }
+
+    func deleteRecurringInvoice(id: Int64) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try RecurringInvoice.deleteOne(db, key: id)
+        }
+    }
+
+    func pauseRecurringInvoice(id: Int64) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try db.execute(
+                sql: "UPDATE recurring_invoices SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                arguments: [id]
+            )
+        }
+    }
+
+    func resumeRecurringInvoice(id: Int64) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try db.execute(
+                sql: "UPDATE recurring_invoices SET active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                arguments: [id]
+            )
+        }
+    }
+
+    /// Generate invoice from a recurring invoice template
+    func generateInvoiceFromRecurring(_ recurring: RecurringInvoice) async throws -> Invoice? {
+        let db = try getDatabase()
+
+        // Get company
+        guard let company = try await getCompany() else { return nil }
+
+        // Generate invoice number
+        let year = Calendar.current.component(.year, from: Date())
+        let count = try await getInvoiceCount()
+        let invoiceNum = "INV-\(year)-\(String(format: "%04d", count + 1))"
+
+        // Create the invoice
+        var invoice = Invoice(
+            invoiceNum: invoiceNum,
+            companyId: company.id!,
+            amount: recurring.amount,
+            currency: recurring.currency,
+            description: recurring.description,
+            status: "pending"
+        )
+        invoice.issuedDate = Date()
+        invoice.dueDate = Calendar.current.date(byAdding: .day, value: 30, to: Date())
+        invoice.notes = recurring.notes
+
+        // Insert invoice
+        let createdInvoice = try await createInvoice(invoice)
+        guard let invoiceId = createdInvoice.id else { return nil }
+
+        // Create invoice recipient
+        var recipient = InvoiceRecipient(invoiceId: invoiceId, clientId: recurring.clientId)
+        _ = try await createInvoiceRecipient(recipient)
+
+        // Create line item
+        var lineItem = InvoiceLineItem(
+            invoiceId: invoiceId,
+            itemName: recurring.description ?? "Service",
+            description: nil,
+            quantity: 1,
+            rate: recurring.amount,
+            amount: recurring.amount
+        )
+        _ = try await createInvoiceLineItem(lineItem)
+
+        // Update recurring invoice
+        _ = try await db.write { db in
+            let nextDate = recurring.calculateNextGenerationDate(from: Date())
+            try db.execute(
+                sql: """
+                    UPDATE recurring_invoices
+                    SET last_generated_date = CURRENT_TIMESTAMP,
+                        last_invoice_id = ?,
+                        next_generation_date = ?,
+                        generated_count = generated_count + 1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """,
+                arguments: [invoiceId, nextDate, recurring.id]
+            )
+        }
+
+        return createdInvoice
+    }
+
+    /// Generate all due recurring invoices
+    func generateDueRecurringInvoices() async throws -> [Invoice] {
+        let dueRecurring = try await getDueRecurringInvoices()
+        var generatedInvoices: [Invoice] = []
+
+        for recurring in dueRecurring {
+            if let invoice = try await generateInvoiceFromRecurring(recurring) {
+                generatedInvoices.append(invoice)
+            }
+        }
+
+        return generatedInvoices
+    }
+
     // MARK: - Dashboard Metrics
 
     func getDashboardMetrics() async throws -> (

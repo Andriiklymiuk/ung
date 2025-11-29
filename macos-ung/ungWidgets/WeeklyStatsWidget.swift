@@ -2,7 +2,7 @@
 //  WeeklyStatsWidget.swift
 //  ungWidgets
 //
-//  Shows weekly progress and stats
+//  Premium weekly stats widget with Telegram-inspired design
 //
 
 import SwiftUI
@@ -29,7 +29,6 @@ struct WeeklyStatsProvider: TimelineProvider {
         let data = WidgetData.load()
         let entry = WeeklyStatsEntry(date: Date(), data: data)
 
-        // Refresh every 30 minutes
         let refreshDate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
         let timeline = Timeline(entries: [entry], policy: .after(refreshDate))
         completion(timeline)
@@ -39,6 +38,7 @@ struct WeeklyStatsProvider: TimelineProvider {
 // MARK: - Widget View
 struct WeeklyStatsWidgetView: View {
     @Environment(\.widgetFamily) var family
+    @Environment(\.colorScheme) var colorScheme
     var entry: WeeklyStatsEntry
 
     var body: some View {
@@ -54,247 +54,374 @@ struct WeeklyStatsWidgetView: View {
         }
     }
 
-    // MARK: - Small View (Progress Ring)
+    // MARK: - Small View (Elegant Progress Ring)
     private var smallView: some View {
-        VStack(spacing: 8) {
-            // Progress ring
-            ZStack {
-                Circle()
-                    .stroke(Color.blue.opacity(0.2), lineWidth: 8)
-                    .frame(width: 70, height: 70)
-
-                Circle()
-                    .trim(from: 0, to: entry.data.weeklyProgress)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.blue, .cyan],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                    )
-                    .frame(width: 70, height: 70)
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 0) {
-                    Text("\(Int(entry.data.weeklyProgress * 100))%")
-                        .font(.system(size: 16, weight: .bold))
-                    Text("goal")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Text(formatHours(entry.data.weeklyHours))
-                .font(.system(size: 14, weight: .semibold))
-
-            Text("of \(formatHours(entry.data.weeklyTarget))")
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .containerBackground(for: .widget) {
-            Color(.systemBackground)
-        }
-        .widgetURL(URL(string: "ung://reports"))
-    }
-
-    // MARK: - Medium View (Stats Row)
-    private var mediumView: some View {
-        HStack(spacing: 16) {
-            // Progress ring
-            ZStack {
-                Circle()
-                    .stroke(Color.blue.opacity(0.2), lineWidth: 10)
-                    .frame(width: 80, height: 80)
-
-                Circle()
-                    .trim(from: 0, to: entry.data.weeklyProgress)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.blue, .cyan],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                    )
-                    .frame(width: 80, height: 80)
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 2) {
-                    Text("\(Int(entry.data.weeklyProgress * 100))%")
-                        .font(.system(size: 18, weight: .bold))
-                    Text("Weekly")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            // Stats
-            VStack(alignment: .leading, spacing: 12) {
-                statRow(
-                    icon: "clock.fill",
-                    title: "This Week",
-                    value: formatHours(entry.data.weeklyHours),
-                    color: .blue
+        ZStack {
+            // Background
+            ContainerRelativeShape()
+                .fill(colorScheme == .dark
+                    ? Color(hex: "1C1C1E")
+                    : Color(hex: "F8F9FA")
                 )
 
-                statRow(
-                    icon: "sun.max.fill",
-                    title: "Today",
-                    value: formatHours(entry.data.todayHours),
-                    color: .orange
-                )
+            VStack(spacing: 8) {
+                // Premium progress ring
+                ZStack {
+                    // Background ring with gradient
+                    Circle()
+                        .stroke(
+                            WidgetColors.statsGradient.opacity(0.15),
+                            lineWidth: 8
+                        )
+                        .frame(width: 72, height: 72)
 
-                statRow(
-                    icon: "doc.plaintext.fill",
-                    title: "Pending",
-                    value: entry.data.formattedPendingAmount,
-                    color: .green
-                )
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding()
-        .containerBackground(for: .widget) {
-            Color(.systemBackground)
-        }
-        .widgetURL(URL(string: "ung://reports"))
-    }
+                    // Progress ring
+                    Circle()
+                        .trim(from: 0, to: entry.data.weeklyProgress)
+                        .stroke(
+                            WidgetColors.statsGradient,
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        )
+                        .frame(width: 72, height: 72)
+                        .rotationEffect(.degrees(-90))
 
-    // MARK: - Large View (Full Stats)
-    private var largeView: some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                Text("Weekly Progress")
-                    .font(.system(size: 16, weight: .semibold))
-                Spacer()
-                Image(systemName: "chart.bar.fill")
-                    .foregroundColor(.blue)
-            }
+                    // Subtle glow
+                    Circle()
+                        .trim(from: 0, to: entry.data.weeklyProgress)
+                        .stroke(
+                            WidgetColors.statsGradient,
+                            style: StrokeStyle(lineWidth: 16, lineCap: .round)
+                        )
+                        .frame(width: 72, height: 72)
+                        .rotationEffect(.degrees(-90))
+                        .blur(radius: 8)
+                        .opacity(0.4)
 
-            // Progress bar
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(formatHours(entry.data.weeklyHours))
-                        .font(.system(size: 28, weight: .bold))
-                    Text("of \(formatHours(entry.data.weeklyTarget))")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(Int(entry.data.weeklyProgress * 100))%")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.blue)
-                }
-
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.blue.opacity(0.2))
-                            .frame(height: 12)
-
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.blue, .cyan],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geometry.size.width * entry.data.weeklyProgress, height: 12)
+                    // Center content
+                    VStack(spacing: 0) {
+                        Text("\(Int(entry.data.weeklyProgress * 100))")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(WidgetColors.textPrimary)
+                        Text("%")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(WidgetColors.textTertiary)
                     }
                 }
-                .frame(height: 12)
+
+                // Hours label
+                VStack(spacing: 2) {
+                    Text(formatHoursCompact(entry.data.weeklyHours))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(WidgetColors.textPrimary)
+
+                    Text("of \(formatHoursCompact(entry.data.weeklyTarget))")
+                        .font(.system(size: 10))
+                        .foregroundColor(WidgetColors.textTertiary)
+                }
             }
-
-            Divider()
-
-            // Stats grid
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                largeStatCard(
-                    icon: "sun.max.fill",
-                    title: "Today",
-                    value: formatHours(entry.data.todayHours),
-                    color: .orange
-                )
-
-                largeStatCard(
-                    icon: "doc.plaintext.fill",
-                    title: "Pending Invoices",
-                    value: "\(entry.data.pendingInvoices)",
-                    color: .purple
-                )
-
-                largeStatCard(
-                    icon: "dollarsign.circle.fill",
-                    title: "Pending Amount",
-                    value: entry.data.formattedPendingAmount,
-                    color: .green
-                )
-
-                largeStatCard(
-                    icon: "target",
-                    title: "Weekly Target",
-                    value: formatHours(entry.data.weeklyTarget),
-                    color: .blue
-                )
-            }
-
-            Spacer()
+            .padding(14)
         }
-        .padding()
-        .containerBackground(for: .widget) {
-            Color(.systemBackground)
+        .widgetURL(URL(string: "ung://reports"))
+    }
+
+    // MARK: - Medium View (Stats Dashboard)
+    private var mediumView: some View {
+        ZStack {
+            // Background
+            ContainerRelativeShape()
+                .fill(colorScheme == .dark
+                    ? Color(hex: "1C1C1E")
+                    : Color(hex: "F8F9FA")
+                )
+
+            HStack(spacing: 16) {
+                // Left - Progress ring
+                ZStack {
+                    // Background ring
+                    Circle()
+                        .stroke(
+                            WidgetColors.statsGradient.opacity(0.15),
+                            lineWidth: 10
+                        )
+                        .frame(width: 90, height: 90)
+
+                    // Progress ring
+                    Circle()
+                        .trim(from: 0, to: entry.data.weeklyProgress)
+                        .stroke(
+                            WidgetColors.statsGradient,
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+                        .frame(width: 90, height: 90)
+                        .rotationEffect(.degrees(-90))
+
+                    // Glow
+                    Circle()
+                        .trim(from: 0, to: entry.data.weeklyProgress)
+                        .stroke(
+                            WidgetColors.statsGradient,
+                            style: StrokeStyle(lineWidth: 20, lineCap: .round)
+                        )
+                        .frame(width: 90, height: 90)
+                        .rotationEffect(.degrees(-90))
+                        .blur(radius: 10)
+                        .opacity(0.4)
+
+                    // Center
+                    VStack(spacing: 0) {
+                        Text("\(Int(entry.data.weeklyProgress * 100))")
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundColor(WidgetColors.textPrimary)
+                        Text("percent")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(WidgetColors.textTertiary)
+                    }
+                }
+
+                // Right - Stats grid
+                VStack(alignment: .leading, spacing: 10) {
+                    // Week hours
+                    statRow(
+                        icon: "calendar.badge.clock",
+                        title: "This Week",
+                        value: formatHours(entry.data.weeklyHours),
+                        gradient: WidgetColors.statsGradient
+                    )
+
+                    // Today hours
+                    statRow(
+                        icon: "sun.max.fill",
+                        title: "Today",
+                        value: formatHours(entry.data.todayHours),
+                        gradient: WidgetColors.focusGradient
+                    )
+
+                    // Pending amount
+                    statRow(
+                        icon: "banknote.fill",
+                        title: "Pending",
+                        value: entry.data.formattedPendingAmount,
+                        gradient: WidgetColors.invoiceGradient
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(16)
+        }
+        .widgetURL(URL(string: "ung://reports"))
+    }
+
+    // MARK: - Large View (Full Dashboard)
+    private var largeView: some View {
+        ZStack {
+            // Background
+            ContainerRelativeShape()
+                .fill(colorScheme == .dark
+                    ? Color(hex: "1C1C1E")
+                    : Color(hex: "F8F9FA")
+                )
+
+            VStack(spacing: 16) {
+                // Header
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Weekly Progress")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(WidgetColors.textPrimary)
+                        Text(weekDateRange())
+                            .font(.system(size: 12))
+                            .foregroundColor(WidgetColors.textTertiary)
+                    }
+
+                    Spacer()
+
+                    // Achievement badge
+                    if entry.data.weeklyProgress >= 1.0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12))
+                            Text("Goal Met!")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(WidgetColors.breakGradient)
+                        .clipShape(Capsule())
+                    }
+                }
+
+                // Progress section
+                VStack(spacing: 12) {
+                    // Hours row
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(formatHours(entry.data.weeklyHours))
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundColor(WidgetColors.textPrimary)
+
+                        Text("of \(formatHours(entry.data.weeklyTarget))")
+                            .font(.system(size: 14))
+                            .foregroundColor(WidgetColors.textTertiary)
+
+                        Spacer()
+
+                        Text("\(Int(entry.data.weeklyProgress * 100))%")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(WidgetColors.statsGradient)
+                    }
+
+                    // Progress bar
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(WidgetColors.statsGradient.opacity(0.15))
+                                .frame(height: 12)
+
+                            // Progress
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(WidgetColors.statsGradient)
+                                .frame(width: geometry.size.width * min(entry.data.weeklyProgress, 1.0), height: 12)
+
+                            // Glow
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(WidgetColors.statsGradient)
+                                .frame(width: geometry.size.width * min(entry.data.weeklyProgress, 1.0), height: 12)
+                                .blur(radius: 6)
+                                .opacity(0.5)
+                        }
+                    }
+                    .frame(height: 12)
+                }
+
+                Divider()
+                    .background(Color.gray.opacity(0.2))
+
+                // Stats grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    largeStatCard(
+                        icon: "sun.max.fill",
+                        title: "Today",
+                        value: formatHours(entry.data.todayHours),
+                        gradient: WidgetColors.focusGradient
+                    )
+
+                    largeStatCard(
+                        icon: "doc.text.fill",
+                        title: "Pending Invoices",
+                        value: "\(entry.data.pendingInvoices)",
+                        gradient: WidgetColors.trackingGradient
+                    )
+
+                    largeStatCard(
+                        icon: "banknote.fill",
+                        title: "Pending Amount",
+                        value: entry.data.formattedPendingAmount,
+                        gradient: WidgetColors.invoiceGradient
+                    )
+
+                    largeStatCard(
+                        icon: "target",
+                        title: "Weekly Target",
+                        value: formatHours(entry.data.weeklyTarget),
+                        gradient: WidgetColors.statsGradient
+                    )
+                }
+
+                Spacer()
+            }
+            .padding(16)
         }
         .widgetURL(URL(string: "ung://reports"))
     }
 
     // MARK: - Helper Views
-    private func statRow(icon: String, title: String, value: String, color: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .foregroundColor(color)
-                .frame(width: 20)
+    private func statRow(icon: String, title: String, value: String, gradient: LinearGradient) -> some View {
+        HStack(spacing: 10) {
+            // Icon badge
+            ZStack {
+                Circle()
+                    .fill(gradient.opacity(0.15))
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(gradient)
+            }
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(WidgetColors.textTertiary)
+
                 Text(value)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(WidgetColors.textPrimary)
             }
         }
     }
 
-    private func largeStatCard(icon: String, title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+    private func largeStatCard(icon: String, title: String, value: String, gradient: LinearGradient) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(gradient.opacity(0.15))
+                    .frame(width: 36, height: 36)
+
                 Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(color)
-                Spacer()
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(gradient)
             }
 
             Text(title)
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(WidgetColors.textTertiary)
+                .lineLimit(1)
 
             Text(value)
                 .font(.system(size: 18, weight: .bold))
+                .foregroundColor(WidgetColors.textPrimary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
+                .fill(colorScheme == .dark
+                    ? Color.white.opacity(0.05)
+                    : Color.black.opacity(0.03)
+                )
         )
     }
 
     private func formatHours(_ hours: Double) -> String {
         let h = Int(hours)
         let m = Int((hours - Double(h)) * 60)
-        return String(format: "%dh %02dm", h, m)
+        return String(format: "%dh %dm", h, m)
+    }
+
+    private func formatHoursCompact(_ hours: Double) -> String {
+        let h = Int(hours)
+        let m = Int((hours - Double(h)) * 60)
+        if h > 0 {
+            return String(format: "%dh", h)
+        }
+        return String(format: "%dm", m)
+    }
+
+    private func weekDateRange() -> String {
+        let calendar = Calendar.current
+        let now = Date()
+        let weekday = calendar.component(.weekday, from: now)
+        let daysToMonday = (weekday + 5) % 7
+
+        guard let monday = calendar.date(byAdding: .day, value: -daysToMonday, to: now),
+              let sunday = calendar.date(byAdding: .day, value: 6, to: monday) else {
+            return ""
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return "\(formatter.string(from: monday)) - \(formatter.string(from: sunday))"
     }
 }
 
@@ -307,19 +434,20 @@ struct WeeklyStatsWidget: Widget {
             WeeklyStatsWidgetView(entry: entry)
         }
         .configurationDisplayName("Weekly Stats")
-        .description("Track your weekly progress and goals at a glance.")
+        .description("Track your weekly progress with beautiful insights.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .contentMarginsDisabled()
     }
 }
 
-#Preview(as: .systemMedium) {
+#Preview(as: .systemLarge) {
     WeeklyStatsWidget()
 } timeline: {
     var data = WidgetData()
-    data.weeklyHours = 28.5
+    data.weeklyHours = 32.5
     data.weeklyTarget = 40
-    data.todayHours = 4.25
+    data.todayHours = 6.25
     data.pendingInvoices = 3
-    data.pendingAmount = 2450.00
+    data.pendingAmount = 4850.00
     return WeeklyStatsEntry(date: .now, data: data)
 }

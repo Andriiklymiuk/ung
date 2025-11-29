@@ -454,6 +454,75 @@ class AppState: ObservableObject {
         }
 
         isRefreshing = false
+
+        // Sync data to widgets
+        syncWidgetData()
+    }
+
+    // MARK: - Widget Data Sync
+    private func syncWidgetData() {
+        #if os(iOS)
+        // Update stats for widgets
+        WidgetDataManager.shared.updateStats(
+            todayHours: getTodayHours(),
+            weeklyHours: metrics.weeklyHours,
+            weeklyTarget: metrics.weeklyTarget,
+            pendingInvoices: invoiceCount,
+            pendingAmount: metrics.pendingAmount
+        )
+
+        // Update tracking status
+        if let session = activeSession {
+            WidgetDataManager.shared.updateTrackingStatus(
+                isTracking: true,
+                project: session.project,
+                client: session.client,
+                startTime: session.startTime
+            )
+        } else {
+            WidgetDataManager.shared.updateTrackingStatus(
+                isTracking: false,
+                project: "",
+                client: "",
+                startTime: nil
+            )
+        }
+
+        // Update pomodoro status
+        WidgetDataManager.shared.updatePomodoro(
+            active: pomodoroState.isActive,
+            isBreak: pomodoroState.isBreak,
+            secondsRemaining: pomodoroState.secondsRemaining,
+            sessionsCompleted: pomodoroState.sessionsCompleted
+        )
+        #endif
+    }
+
+    private func getTodayHours() -> Double {
+        // Calculate hours tracked today from recent sessions
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var todayHours: Double = 0
+
+        for session in recentSessions {
+            // Parse the duration string (format: "Xh Xm")
+            let components = session.duration.components(separatedBy: " ")
+            if components.count >= 1 {
+                if let hours = Int(components[0].replacingOccurrences(of: "h", with: "")) {
+                    todayHours += Double(hours)
+                }
+                if components.count >= 2, let minutes = Int(components[1].replacingOccurrences(of: "m", with: "")) {
+                    todayHours += Double(minutes) / 60.0
+                }
+            }
+        }
+
+        // Add current active session if any
+        if let session = activeSession {
+            todayHours += Double(session.elapsedSeconds) / 3600.0
+        }
+
+        return todayHours
     }
 
     // MARK: - Load Data (using native database)

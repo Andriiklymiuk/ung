@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -68,6 +69,30 @@ func (s *ScraperService) ScrapeJobs(skills []string) ([]models.Job, error) {
 		fmt.Printf("Arbeitnow scrape error: %v\n", err)
 	} else {
 		allJobs = append(allJobs, arbeitnowJobs...)
+	}
+
+	// Scrape Djinni (Ukraine)
+	djinniJobs, err := s.scrapeDjinni(skills)
+	if err != nil {
+		fmt.Printf("Djinni scrape error: %v\n", err)
+	} else {
+		allJobs = append(allJobs, djinniJobs...)
+	}
+
+	// Scrape DOU (Ukraine)
+	douJobs, err := s.scrapeDOU(skills)
+	if err != nil {
+		fmt.Printf("DOU scrape error: %v\n", err)
+	} else {
+		allJobs = append(allJobs, douJobs...)
+	}
+
+	// Scrape European jobs (Netherlands, Germany)
+	euroJobs, err := s.scrapeEuroJobs(skills)
+	if err != nil {
+		fmt.Printf("EuroJobs scrape error: %v\n", err)
+	} else {
+		allJobs = append(allJobs, euroJobs...)
 	}
 
 	return allJobs, nil
@@ -570,6 +595,571 @@ func (s *ScraperService) scrapeRemoteOK(skills []string) ([]models.Job, error) {
 	}
 
 	return jobs, nil
+}
+
+// DjinniJob represents a job from Djinni.co (Ukrainian IT jobs)
+type DjinniJob struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Company     string   `json:"company"`
+	Description string   `json:"description"`
+	URL         string   `json:"url"`
+	Location    string   `json:"location"`
+	Experience  string   `json:"experience"`
+	SalaryFrom  int      `json:"salary_from"`
+	SalaryTo    int      `json:"salary_to"`
+	Remote      bool     `json:"remote"`
+	Tags        []string `json:"tags"`
+	PublishedAt string   `json:"published_at"`
+}
+
+// scrapeDjinni scrapes IT jobs from Djinni.co (Ukraine)
+func (s *ScraperService) scrapeDjinni(skills []string) ([]models.Job, error) {
+	// Djinni has a public jobs listing - we'll scrape their JSON API
+	// Categories: all, python, javascript, java, php, ruby, go, rust, etc.
+	categories := []string{"all"}
+	if len(skills) > 0 {
+		// Map skills to Djinni categories
+		skillMap := map[string]string{
+			"go": "go", "golang": "go", "python": "python", "javascript": "javascript",
+			"typescript": "javascript", "java": "java", "php": "php", "ruby": "ruby",
+			"rust": "rust", "swift": "ios", "ios": "ios", "android": "android",
+			"react": "javascript", "vue": "javascript", "angular": "javascript",
+			"node": "javascript", "nodejs": "javascript",
+		}
+		for _, skill := range skills {
+			if cat, ok := skillMap[strings.ToLower(skill)]; ok {
+				categories = append(categories, cat)
+			}
+		}
+	}
+
+	var allJobs []models.Job
+	seenIDs := make(map[string]bool)
+
+	for _, category := range categories {
+		url := fmt.Sprintf("https://djinni.co/jobs/?primary_keyword=%s", category)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "UNG Job Hunter/1.0")
+		req.Header.Set("Accept", "text/html,application/xhtml+xml")
+
+		resp, err := s.client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+
+		// Parse jobs from HTML (simplified extraction)
+		jobs := s.parseDjinniHTML(string(body), skills)
+		for _, job := range jobs {
+			if !seenIDs[job.SourceID] {
+				seenIDs[job.SourceID] = true
+				allJobs = append(allJobs, job)
+			}
+		}
+
+		// Rate limiting
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return allJobs, nil
+}
+
+// parseDjinniHTML parses job listings from Djinni HTML
+func (s *ScraperService) parseDjinniHTML(html string, skills []string) []models.Job {
+	var jobs []models.Job
+
+	// Simple regex-based extraction for job cards
+	// Looking for patterns like: <a class="profile" href="/jobs/..."
+	// and job titles, companies, etc.
+
+	// Extract job URLs and basic info using string parsing
+	lines := strings.Split(html, "\n")
+	var currentJob *models.Job
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Look for job links
+		if strings.Contains(line, `href="/jobs/`) && strings.Contains(line, `class="`) {
+			// Extract job ID from URL
+			start := strings.Index(line, `href="/jobs/`)
+			if start != -1 {
+				end := strings.Index(line[start+12:], `"`)
+				if end != -1 {
+					jobID := line[start+12 : start+12+end]
+					if currentJob != nil && currentJob.Title != "" {
+						jobs = append(jobs, *currentJob)
+					}
+					currentJob = &models.Job{
+						Source:    models.JobSourceDjinni,
+						SourceID:  jobID,
+						SourceURL: "https://djinni.co/jobs/" + jobID,
+						Remote:    true,
+						Location:  "Ukraine",
+						Currency:  "USD",
+						PostedAt:  time.Now(),
+					}
+				}
+			}
+		}
+
+		// Look for job title
+		if currentJob != nil && currentJob.Title == "" {
+			if strings.Contains(line, `class="job-list-item__title"`) || strings.Contains(line, `<h3`) {
+				// Try to extract title text
+				titleStart := strings.Index(line, ">")
+				titleEnd := strings.LastIndex(line, "<")
+				if titleStart != -1 && titleEnd > titleStart {
+					title := strings.TrimSpace(line[titleStart+1 : titleEnd])
+					title = strings.ReplaceAll(title, "&amp;", "&")
+					if len(title) > 0 && len(title) < 200 {
+						currentJob.Title = title
+					}
+				}
+			}
+		}
+
+		// Look for company name
+		if currentJob != nil && currentJob.Company == "" && strings.Contains(line, `class="company"`) {
+			compStart := strings.Index(line, ">")
+			compEnd := strings.LastIndex(line, "<")
+			if compStart != -1 && compEnd > compStart {
+				company := strings.TrimSpace(line[compStart+1 : compEnd])
+				if len(company) > 0 && len(company) < 100 {
+					currentJob.Company = company
+				}
+			}
+		}
+
+		// Look for salary info
+		if currentJob != nil && strings.Contains(line, "$") {
+			// Try to extract salary range like "$3000-5000"
+			if matches := extractSalaryRange(line); matches != nil {
+				currentJob.RateMin = matches[0]
+				currentJob.RateMax = matches[1]
+				currentJob.RateType = "monthly"
+			}
+		}
+	}
+
+	// Add last job if exists
+	if currentJob != nil && currentJob.Title != "" {
+		jobs = append(jobs, *currentJob)
+	}
+
+	// Calculate match scores
+	for i := range jobs {
+		jobs[i].MatchScore = s.calculateMatchScore(jobs[i].Title+" "+jobs[i].Description, skills)
+	}
+
+	return jobs
+}
+
+// extractSalaryRange extracts salary numbers from text like "$3000-5000" or "$3000 - $5000"
+func extractSalaryRange(text string) []float64 {
+	// Simple extraction - look for patterns like $XXXX
+	var numbers []float64
+	parts := strings.Fields(text)
+	for _, part := range parts {
+		part = strings.ReplaceAll(part, "$", "")
+		part = strings.ReplaceAll(part, ",", "")
+		part = strings.ReplaceAll(part, "-", " ")
+		for _, num := range strings.Fields(part) {
+			if n, err := strconv.ParseFloat(num, 64); err == nil && n > 100 && n < 1000000 {
+				numbers = append(numbers, n)
+			}
+		}
+	}
+	if len(numbers) >= 2 {
+		return []float64{numbers[0], numbers[1]}
+	} else if len(numbers) == 1 {
+		return []float64{numbers[0], numbers[0]}
+	}
+	return nil
+}
+
+// DOUJob represents a job from DOU.ua (Ukrainian IT community)
+type DOUJob struct {
+	Title       string
+	Company     string
+	Description string
+	URL         string
+	Location    string
+	Salary      string
+	PostedAt    time.Time
+}
+
+// scrapeDOU scrapes IT jobs from DOU.ua (Ukraine)
+func (s *ScraperService) scrapeDOU(skills []string) ([]models.Job, error) {
+	// DOU.ua is a popular Ukrainian IT community with job listings
+	url := "https://jobs.dou.ua/vacancies/?category=Programming"
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	req.Header.Set("Accept-Language", "uk-UA,uk;q=0.9,en;q=0.8")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch DOU: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return s.parseDOUHTML(string(body), skills), nil
+}
+
+// parseDOUHTML parses job listings from DOU.ua HTML
+func (s *ScraperService) parseDOUHTML(html string, skills []string) []models.Job {
+	var jobs []models.Job
+
+	// DOU uses specific CSS classes for job listings
+	// Looking for vacancy items with title, company, and details
+
+	lines := strings.Split(html, "\n")
+	var currentJob *models.Job
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Look for vacancy links
+		if strings.Contains(line, `class="vt"`) || strings.Contains(line, `class="vacancy"`) {
+			if strings.Contains(line, `href="`) {
+				start := strings.Index(line, `href="`)
+				if start != -1 {
+					end := strings.Index(line[start+6:], `"`)
+					if end != -1 {
+						jobURL := line[start+6 : start+6+end]
+						if strings.Contains(jobURL, "jobs.dou.ua") || strings.HasPrefix(jobURL, "/") {
+							if !strings.HasPrefix(jobURL, "http") {
+								jobURL = "https://jobs.dou.ua" + jobURL
+							}
+							if currentJob != nil && currentJob.Title != "" {
+								jobs = append(jobs, *currentJob)
+							}
+							currentJob = &models.Job{
+								Source:    models.JobSourceDOU,
+								SourceID:  jobURL,
+								SourceURL: jobURL,
+								Remote:    false,
+								Location:  "Ukraine",
+								Currency:  "USD",
+								PostedAt:  time.Now(),
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Extract title
+		if currentJob != nil && currentJob.Title == "" {
+			if strings.Contains(line, `class="vt"`) {
+				titleStart := strings.LastIndex(line, ">")
+				titleEnd := strings.Index(line[titleStart:], "<")
+				if titleStart != -1 && titleEnd > 0 {
+					title := strings.TrimSpace(line[titleStart+1 : titleStart+titleEnd])
+					if len(title) > 3 && len(title) < 200 {
+						currentJob.Title = title
+					}
+				}
+			}
+		}
+
+		// Extract company
+		if currentJob != nil && currentJob.Company == "" {
+			if strings.Contains(line, `class="company"`) {
+				compStart := strings.LastIndex(line, ">")
+				compEnd := strings.Index(line[compStart:], "<")
+				if compStart != -1 && compEnd > 0 {
+					company := strings.TrimSpace(line[compStart+1 : compStart+compEnd])
+					if len(company) > 1 && len(company) < 100 {
+						currentJob.Company = company
+					}
+				}
+			}
+		}
+
+		// Extract location
+		if currentJob != nil && strings.Contains(line, `class="cities"`) {
+			locStart := strings.LastIndex(line, ">")
+			locEnd := strings.Index(line[locStart:], "<")
+			if locStart != -1 && locEnd > 0 {
+				location := strings.TrimSpace(line[locStart+1 : locStart+locEnd])
+				if len(location) > 0 {
+					currentJob.Location = location + ", Ukraine"
+				}
+			}
+		}
+
+		// Check for remote indicator
+		if currentJob != nil && (strings.Contains(strings.ToLower(line), "remote") || strings.Contains(strings.ToLower(line), "віддалено")) {
+			currentJob.Remote = true
+		}
+
+		// Extract salary
+		if currentJob != nil && strings.Contains(line, "$") {
+			if matches := extractSalaryRange(line); matches != nil {
+				currentJob.RateMin = matches[0]
+				currentJob.RateMax = matches[1]
+				currentJob.RateType = "monthly"
+			}
+		}
+	}
+
+	// Add last job
+	if currentJob != nil && currentJob.Title != "" {
+		jobs = append(jobs, *currentJob)
+	}
+
+	// Calculate match scores
+	for i := range jobs {
+		jobs[i].MatchScore = s.calculateMatchScore(jobs[i].Title+" "+jobs[i].Description, skills)
+	}
+
+	return jobs
+}
+
+// EuroJobsJob represents a job from European job boards
+type EuroJobsJob struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Company     string   `json:"company"`
+	Description string   `json:"description"`
+	URL         string   `json:"url"`
+	Location    string   `json:"location"`
+	Country     string   `json:"country"`
+	Remote      bool     `json:"remote"`
+	Tags        []string `json:"tags"`
+}
+
+// scrapeEuroJobs scrapes jobs from European job boards (Netherlands focus)
+func (s *ScraperService) scrapeEuroJobs(skills []string) ([]models.Job, error) {
+	// Use multiple European sources
+	var allJobs []models.Job
+
+	// 1. ICTergezocht.nl - Dutch IT jobs (has RSS)
+	ictJobs, _ := s.scrapeICTergezocht(skills)
+	allJobs = append(allJobs, ictJobs...)
+
+	// 2. Honeypot.io - European tech jobs
+	honeypotJobs, _ := s.scrapeHoneypot(skills)
+	allJobs = append(allJobs, honeypotJobs...)
+
+	return allJobs, nil
+}
+
+// scrapeICTergezocht scrapes IT jobs from ICTergezocht.nl (Netherlands)
+func (s *ScraperService) scrapeICTergezocht(skills []string) ([]models.Job, error) {
+	url := "https://www.ictergezocht.nl/vacatures"
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "UNG Job Hunter/1.0")
+	req.Header.Set("Accept-Language", "nl-NL,nl;q=0.9,en;q=0.8")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.parseICTergezochtHTML(string(body), skills), nil
+}
+
+// parseICTergezochtHTML parses jobs from ICTergezocht.nl
+func (s *ScraperService) parseICTergezochtHTML(html string, skills []string) []models.Job {
+	var jobs []models.Job
+
+	lines := strings.Split(html, "\n")
+	var currentJob *models.Job
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Look for job links
+		if strings.Contains(line, `href="/vacature/`) {
+			start := strings.Index(line, `href="/vacature/`)
+			if start != -1 {
+				end := strings.Index(line[start+16:], `"`)
+				if end != -1 {
+					jobID := line[start+16 : start+16+end]
+					if currentJob != nil && currentJob.Title != "" {
+						jobs = append(jobs, *currentJob)
+					}
+					currentJob = &models.Job{
+						Source:    models.JobSourceNetherlands,
+						SourceID:  jobID,
+						SourceURL: "https://www.ictergezocht.nl/vacature/" + jobID,
+						Location:  "Netherlands",
+						Currency:  "EUR",
+						PostedAt:  time.Now(),
+					}
+				}
+			}
+		}
+
+		// Extract title and other fields
+		if currentJob != nil {
+			if currentJob.Title == "" && (strings.Contains(line, `<h2`) || strings.Contains(line, `<h3`) || strings.Contains(line, `class="title"`)) {
+				titleStart := strings.LastIndex(line, ">")
+				titleEnd := strings.Index(line[titleStart:], "<")
+				if titleStart != -1 && titleEnd > 0 {
+					title := strings.TrimSpace(line[titleStart+1 : titleStart+titleEnd])
+					if len(title) > 3 && len(title) < 200 {
+						currentJob.Title = title
+					}
+				}
+			}
+
+			if strings.Contains(strings.ToLower(line), "remote") || strings.Contains(strings.ToLower(line), "thuiswerken") {
+				currentJob.Remote = true
+			}
+		}
+	}
+
+	if currentJob != nil && currentJob.Title != "" {
+		jobs = append(jobs, *currentJob)
+	}
+
+	for i := range jobs {
+		jobs[i].MatchScore = s.calculateMatchScore(jobs[i].Title, skills)
+	}
+
+	return jobs
+}
+
+// scrapeHoneypot scrapes tech jobs from Honeypot (European tech jobs)
+func (s *ScraperService) scrapeHoneypot(skills []string) ([]models.Job, error) {
+	// Honeypot focuses on Netherlands and Germany
+	locations := []string{"netherlands", "germany"}
+	var allJobs []models.Job
+
+	for _, location := range locations {
+		url := fmt.Sprintf("https://www.honeypot.io/pages/jobs/%s", location)
+
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "UNG Job Hunter/1.0")
+
+		resp, err := s.client.Do(req)
+		if err != nil {
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+
+		jobs := s.parseHoneypotHTML(string(body), location, skills)
+		allJobs = append(allJobs, jobs...)
+
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	return allJobs, nil
+}
+
+// parseHoneypotHTML parses jobs from Honeypot
+func (s *ScraperService) parseHoneypotHTML(html string, country string, skills []string) []models.Job {
+	var jobs []models.Job
+
+	lines := strings.Split(html, "\n")
+	var currentJob *models.Job
+
+	countryName := "Netherlands"
+	source := models.JobSourceNetherlands
+	if country == "germany" {
+		countryName = "Germany"
+		source = models.JobSourceEuroJobs
+	}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Look for job links
+		if strings.Contains(line, `href="`) && strings.Contains(line, "job") {
+			start := strings.Index(line, `href="`)
+			if start != -1 {
+				end := strings.Index(line[start+6:], `"`)
+				if end != -1 {
+					jobURL := line[start+6 : start+6+end]
+					if strings.Contains(jobURL, "honeypot") || strings.HasPrefix(jobURL, "/") {
+						if !strings.HasPrefix(jobURL, "http") {
+							jobURL = "https://www.honeypot.io" + jobURL
+						}
+						if currentJob != nil && currentJob.Title != "" {
+							jobs = append(jobs, *currentJob)
+						}
+						currentJob = &models.Job{
+							Source:    source,
+							SourceID:  jobURL,
+							SourceURL: jobURL,
+							Location:  countryName,
+							Currency:  "EUR",
+							Remote:    false,
+							PostedAt:  time.Now(),
+						}
+					}
+				}
+			}
+		}
+
+		if currentJob != nil {
+			// Extract title
+			if currentJob.Title == "" && (strings.Contains(line, `<h2`) || strings.Contains(line, `<h3`)) {
+				titleStart := strings.LastIndex(line, ">")
+				titleEnd := strings.Index(line[titleStart:], "<")
+				if titleStart != -1 && titleEnd > 0 {
+					title := strings.TrimSpace(line[titleStart+1 : titleStart+titleEnd])
+					if len(title) > 3 && len(title) < 200 {
+						currentJob.Title = title
+					}
+				}
+			}
+
+			// Check for remote
+			if strings.Contains(strings.ToLower(line), "remote") {
+				currentJob.Remote = true
+			}
+		}
+	}
+
+	if currentJob != nil && currentJob.Title != "" {
+		jobs = append(jobs, *currentJob)
+	}
+
+	for i := range jobs {
+		jobs[i].MatchScore = s.calculateMatchScore(jobs[i].Title, skills)
+	}
+
+	return jobs
 }
 
 // calculateMatchScore calculates how well a job matches the user's skills

@@ -510,6 +510,53 @@
         "title": "Toggle Secure Mode",
         "category": "UNG",
         "icon": "$(eye)"
+      },
+      {
+        "command": "ung.createGig",
+        "title": "Create Gig",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.viewGig",
+        "title": "View Gig",
+        "category": "UNG"
+      },
+      {
+        "command": "ung.moveGig",
+        "title": "Move Gig",
+        "category": "UNG",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "ung.deleteGig",
+        "title": "Delete Gig",
+        "category": "UNG",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "ung.addGigTask",
+        "title": "Add Task to Gig",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.filterGigs",
+        "title": "Filter Gigs",
+        "category": "UNG",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "ung.refreshGigs",
+        "title": "Refresh Gigs",
+        "category": "UNG",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ung.openGigBoard",
+        "title": "Open Gig Kanban Board",
+        "category": "UNG",
+        "icon": "$(layout)"
       }
     ],
     "viewsContainers": {
@@ -649,6 +696,12 @@
         "command": "ung.quickActions",
         "key": "ctrl+alt+u",
         "mac": "cmd+alt+u",
+        "when": "editorTextFocus || !editorFocus"
+      },
+      {
+        "command": "ung.openGigBoard",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
         "when": "editorTextFocus || !editorFocus"
       }
     ]

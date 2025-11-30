@@ -7,6 +7,7 @@ import { CommandCenter } from './commands/commandCenter';
 import { CompanyCommands } from './commands/company';
 import { ContractCommands } from './commands/contract';
 import { ExpenseCommands } from './commands/expense';
+import { GigCommands } from './commands/gig';
 import { InvoiceCommands } from './commands/invoice';
 import { SearchCommands } from './commands/search';
 import { SecurityCommands } from './commands/security';
@@ -16,11 +17,13 @@ import { StatusBarManager } from './utils/statusBar';
 import { ClientProvider } from './views/clientProvider';
 import { ContractProvider } from './views/contractProvider';
 import { ExpenseProvider } from './views/expenseProvider';
+import { GigProvider } from './views/gigProvider';
 import { InvoiceProvider } from './views/invoiceProvider';
 import { TrackingProvider } from './views/trackingProvider';
 import { DashboardWebviewProvider } from './webview/dashboardWebviewProvider';
 import { ExpensePanel } from './webview/expensePanel';
 import { ExportPanel } from './webview/exportPanel';
+import { GigPanel } from './webview/gigPanel';
 import { MainDashboardPanel } from './webview/mainDashboardPanel';
 import { OnboardingWebviewProvider } from './webview/onboardingWebviewProvider';
 import { PomodoroPanel } from './webview/pomodoroPanel';
@@ -494,6 +497,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const clientProvider = new ClientProvider(cli);
   const expenseProvider = new ExpenseProvider(cli);
   const trackingProvider = new TrackingProvider(cli);
+  const gigProvider = new GigProvider(cli);
 
   // Initialize command handlers
   const companyCommands = new CompanyCommands(cli);
@@ -516,7 +520,17 @@ export async function activate(context: vscode.ExtensionContext) {
     trackingProvider.refresh();
     dashboardWebviewProvider.refresh();
   });
+  const gigCommands = new GigCommands(cli, () => {
+    gigProvider.refresh();
+    dashboardWebviewProvider.refresh();
+  });
   const securityCommands = new SecurityCommands(cli, outputChannel);
+
+  // Set callback for GigPanel to refresh when gigs change
+  GigPanel.setOnChangeCallback(() => {
+    gigProvider.refresh();
+    dashboardWebviewProvider.refresh();
+  });
 
   // Register all commands
 
@@ -667,6 +681,34 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  // Gig commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.createGig', () =>
+      gigCommands.createGig()
+    ),
+    vscode.commands.registerCommand('ung.viewGig', (item) =>
+      gigCommands.viewGig(item?.itemId)
+    ),
+    vscode.commands.registerCommand('ung.moveGig', (item) =>
+      gigCommands.moveGig(item?.itemId)
+    ),
+    vscode.commands.registerCommand('ung.deleteGig', (item) =>
+      gigCommands.deleteGig(item?.itemId)
+    ),
+    vscode.commands.registerCommand('ung.addGigTask', (item) =>
+      gigCommands.addTask(item?.itemId)
+    ),
+    vscode.commands.registerCommand('ung.filterGigs', () =>
+      gigCommands.filterGigs()
+    ),
+    vscode.commands.registerCommand('ung.refreshGigs', () =>
+      gigProvider.refresh()
+    ),
+    vscode.commands.registerCommand('ung.openGigBoard', () =>
+      GigPanel.createOrShow(cli)
+    )
+  );
+
   // Dashboard commands
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.refreshDashboard', () =>
@@ -778,6 +820,7 @@ export async function activate(context: vscode.ExtensionContext) {
       clientProvider.refresh();
       expenseProvider.refresh();
       trackingProvider.refresh();
+      gigProvider.refresh();
       dashboardWebviewProvider.refresh();
       statusBar.forceUpdate();
       vscode.window.showInformationMessage('All views refreshed!');

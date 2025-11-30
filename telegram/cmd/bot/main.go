@@ -47,6 +47,7 @@ func main() {
 	goalsHandler := handlers.NewGoalsHandler(bot, apiClient, sessionMgr)
 	settingsHandler := handlers.NewSettingsHandler(bot, apiClient, sessionMgr)
 	searchHandler := handlers.NewSearchHandler(bot, apiClient, sessionMgr)
+	hunterHandler := handlers.NewHunterHandler(bot, apiClient, sessionMgr)
 
 	// Start listening for updates
 	u := tgbotapi.NewUpdate(0)
@@ -59,14 +60,14 @@ func main() {
 	for update := range updates {
 		// Handle messages
 		if update.Message != nil {
-			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, sessionMgr); err != nil {
+			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, hunterHandler, sessionMgr); err != nil {
 				log.Printf("Error handling message: %v", err)
 			}
 		}
 
 		// Handle callback queries
 		if update.CallbackQuery != nil {
-			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, sessionMgr); err != nil {
+			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, hunterHandler, sessionMgr); err != nil {
 				log.Printf("Error handling callback: %v", err)
 			}
 		}
@@ -90,6 +91,7 @@ func handleMessage(
 	goalsHandler *handlers.GoalsHandler,
 	settingsHandler *handlers.SettingsHandler,
 	searchHandler *handlers.SearchHandler,
+	hunterHandler *handlers.HunterHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	// Handle commands
@@ -156,6 +158,17 @@ func handleMessage(
 			return settingsHandler.HandleShow(message)
 		case "search":
 			return searchHandler.HandleSearch(message)
+		// Hunter commands
+		case "hunter":
+			return hunterHandler.HandleMenu(message)
+		case "hunt":
+			return hunterHandler.HandleHunt(message)
+		case "jobs":
+			return hunterHandler.HandleJobs(message)
+		case "profile":
+			return hunterHandler.HandleProfile(message)
+		case "applications":
+			return hunterHandler.HandleApplications(message)
 		default:
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Try /help")
 			bot.Send(msg)
@@ -216,6 +229,15 @@ func handleMessage(
 		// Search states
 		case models.StateSearchQuery:
 			return searchHandler.HandleSearchQuery(message)
+		// Hunter states
+		case models.StateHunterProfileName:
+			return hunterHandler.HandleNameInput(message)
+		case models.StateHunterProfileTitle:
+			return hunterHandler.HandleTitleInput(message)
+		case models.StateHunterProfileSkills:
+			return hunterHandler.HandleSkillsInput(message)
+		case models.StateHunterProfileRate:
+			return hunterHandler.HandleRateInput(message)
 		}
 	}
 
@@ -239,6 +261,7 @@ func handleCallback(
 	goalsHandler *handlers.GoalsHandler,
 	settingsHandler *handlers.SettingsHandler,
 	searchHandler *handlers.SearchHandler,
+	hunterHandler *handlers.HunterHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	data := callbackQuery.Data
@@ -510,10 +533,10 @@ func handleCallback(
 			),
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("Goals", "goal_status"),
-				tgbotapi.NewInlineKeyboardButtonData("Search", "action_search"),
+				tgbotapi.NewInlineKeyboardButtonData("🎯 Hunter", "action_hunter"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("All Invoices", "action_invoices_list"),
+				tgbotapi.NewInlineKeyboardButtonData("Search", "action_search"),
 				tgbotapi.NewInlineKeyboardButtonData("Settings", "action_settings"),
 			),
 		)
@@ -574,6 +597,93 @@ func handleCallback(
 		callback := tgbotapi.NewCallback(callbackQuery.ID, "Checking session...")
 		bot.Request(callback)
 		return trackingHandler.HandleActive(msg)
+	}
+
+	// Hunter callbacks
+	if data == "action_hunter" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "")
+		bot.Request(callback)
+		return hunterHandler.HandleMenu(msg)
+	}
+
+	if data == "hunter_hunt" {
+		return hunterHandler.HandleHuntCallback(callbackQuery)
+	}
+
+	if data == "hunter_jobs" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading jobs...")
+		bot.Request(callback)
+		return hunterHandler.HandleJobs(msg)
+	}
+
+	if data == "hunter_profile" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading profile...")
+		bot.Request(callback)
+		return hunterHandler.HandleProfile(msg)
+	}
+
+	if data == "hunter_profile_create" {
+		return hunterHandler.HandleProfileCreate(callbackQuery)
+	}
+
+	if data == "hunter_profile_edit" {
+		return hunterHandler.HandleProfileCreate(callbackQuery) // Same flow for edit
+	}
+
+	if data == "hunter_stats" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading stats...")
+		bot.Request(callback)
+		return hunterHandler.HandleStats(msg)
+	}
+
+	if data == "hunter_applications" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "Loading applications...")
+		bot.Request(callback)
+		return hunterHandler.HandleApplications(msg)
+	}
+
+	if strings.HasPrefix(data, "hunter_job_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 3 {
+			jobID, _ := strconv.Atoi(parts[2])
+			return hunterHandler.HandleJobDetail(callbackQuery, uint(jobID))
+		}
+	}
+
+	if strings.HasPrefix(data, "hunter_proposal_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 3 {
+			jobID, _ := strconv.Atoi(parts[2])
+			return hunterHandler.HandleGenerateProposal(callbackQuery, uint(jobID))
+		}
+	}
+
+	if strings.HasPrefix(data, "hunter_apply_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 3 {
+			jobID, _ := strconv.Atoi(parts[2])
+			return hunterHandler.HandleApply(callbackQuery, uint(jobID))
+		}
 	}
 
 	// Answer callback with default response

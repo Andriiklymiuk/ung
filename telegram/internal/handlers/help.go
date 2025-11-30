@@ -49,6 +49,13 @@ func (h *HelpHandler) Handle(message *tgbotapi.Message) error {
 *📊 REPORTS*
 └ /dashboard — Revenue overview
 
+*🎯 JOB HUNTER*
+├ /hunter — Hunter menu
+├ /hunt — Search for jobs
+├ /jobs — View matched jobs
+├ /profile — Your profile
+└ /applications — Your applications
+
 *🔧 GENERAL*
 ├ /start — Main menu
 └ /help — This help message

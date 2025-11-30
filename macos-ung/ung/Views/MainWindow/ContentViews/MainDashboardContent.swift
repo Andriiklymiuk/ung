@@ -194,11 +194,42 @@ struct MainDashboardContent: View {
     DashboardCard(title: "Recent Activity", icon: "clock.arrow.circlepath") {
       VStack(spacing: 8) {
         if appState.recentSessions.isEmpty && appState.recentInvoices.isEmpty {
-          Text("No recent activity")
-            .font(Design.Typography.bodyMedium)
-            .foregroundColor(Design.Colors.textSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Design.Spacing.lg)
+          // Empty state with CTA
+          VStack(spacing: 12) {
+            Image(systemName: "clock.badge.questionmark")
+              .font(.system(size: 32))
+              .foregroundColor(Design.Colors.textSecondary.opacity(0.5))
+
+            Text("No activity yet")
+              .font(Design.Typography.bodyMedium)
+              .foregroundColor(Design.Colors.textSecondary)
+
+            Text("Start tracking time to see your work here")
+              .font(Design.Typography.bodySmall)
+              .foregroundColor(Design.Colors.textSecondary.opacity(0.8))
+              .multilineTextAlignment(.center)
+
+            Button(action: {
+              appState.selectedTab = .tracking
+            }) {
+              HStack(spacing: 6) {
+                Image(systemName: "play.fill")
+                Text("Start Tracking")
+              }
+              .font(Design.Typography.labelMedium)
+              .foregroundColor(.white)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 8)
+              .background(
+                RoundedRectangle(cornerRadius: 8)
+                  .fill(Color.green)
+              )
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+          }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, Design.Spacing.md)
         } else {
           ForEach(appState.recentSessions.prefix(3)) { session in
             ActivityRow(

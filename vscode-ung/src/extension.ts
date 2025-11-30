@@ -1218,6 +1218,109 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Import database command (dedicated for encrypted database import)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.importDatabase', async () => {
+      const files = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        filters: {
+          'UNG Database': ['db', 'encrypted', 'sqlite', 'sqlite3'],
+          'All Files': ['*'],
+        },
+        title: 'Select UNG database file to import (data will be merged)',
+      });
+
+      if (!files || files.length === 0) return;
+
+      const filePath = files[0].fsPath;
+      const isEncryptedFile =
+        filePath.endsWith('.encrypted') || filePath.endsWith('.db.encrypted');
+
+      let password: string | undefined;
+
+      // Check if the file is encrypted
+      if (isEncryptedFile) {
+        // Prompt for password
+        const secureStorage = getSecureStorage();
+        password = await secureStorage.getOrPromptPassword({
+          title: 'Import Database Password',
+          prompt:
+            'Enter the password for the encrypted database (AES-256-GCM)',
+          offerToSave: false,
+        });
+        if (!password) return;
+      } else {
+        // For non-encrypted files, still ask if they want to provide a password (SQLCipher)
+        const needsPassword = await vscode.window.showQuickPick(
+          [
+            { label: '$(unlock) Not encrypted', value: false },
+            { label: '$(lock) Password protected', value: true },
+          ],
+          { placeHolder: 'Is the database encrypted?' }
+        );
+
+        if (!needsPassword) return;
+
+        if (needsPassword.value) {
+          password = await vscode.window.showInputBox({
+            prompt: 'Enter database password',
+            password: true,
+            title: 'Database Password',
+          });
+          if (!password) return;
+        }
+      }
+
+      // Confirm merge import
+      const confirmMessage = isEncryptedFile
+        ? 'Import and merge data from this encrypted database? Existing records will be kept, new records will be added.'
+        : 'Import and merge data from this database? Existing records will be kept, new records will be added.';
+
+      const confirmed = await vscode.window.showInformationMessage(
+        confirmMessage,
+        { modal: true },
+        'Import & Merge'
+      );
+
+      if (confirmed !== 'Import & Merge') return;
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Importing and merging database...',
+        },
+        async () => {
+          const result = await cli.importDatabase(filePath, password);
+          outputChannel.clear();
+          outputChannel.appendLine('=== Database Import Results ===\n');
+          outputChannel.appendLine(result.stdout || 'No output');
+          if (result.stderr) {
+            outputChannel.appendLine(`\nErrors:\n${result.stderr}`);
+          }
+          outputChannel.show();
+
+          if (result.success) {
+            vscode.window.showInformationMessage(
+              'Database import completed! Data has been merged with your existing records.'
+            );
+            // Refresh all views
+            clientProvider.refresh();
+            expenseProvider.refresh();
+            trackingProvider.refresh();
+            invoiceProvider.refresh();
+            contractProvider.refresh();
+            gigProvider.refresh();
+            dashboardWebviewProvider.refresh();
+          } else {
+            vscode.window.showErrorMessage(
+              `Import failed: ${result.error || 'Unknown error'}`
+            );
+          }
+        }
+      );
+    })
+  );
+
   // Income goal commands
   context.subscriptions.push(
     vscode.commands.registerCommand('ung.setIncomeGoal', async () => {

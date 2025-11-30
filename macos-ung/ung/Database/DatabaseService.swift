@@ -1631,6 +1631,274 @@ actor DatabaseService {
         try fileManager.copyItem(atPath: encPath, toPath: url.path)
     }
 
+    // MARK: - Merge Import
+
+    /// Import result statistics
+    struct ImportResult {
+        var companiesImported: Int = 0
+        var companiesSkipped: Int = 0
+        var clientsImported: Int = 0
+        var clientsSkipped: Int = 0
+        var contractsImported: Int = 0
+        var contractsSkipped: Int = 0
+        var invoicesImported: Int = 0
+        var invoicesSkipped: Int = 0
+        var expensesImported: Int = 0
+        var sessionsImported: Int = 0
+        var recurringImported: Int = 0
+        var recurringSkipped: Int = 0
+        var gigsImported: Int = 0
+        var gigsSkipped: Int = 0
+
+        var summary: String {
+            var parts: [String] = []
+            if companiesImported > 0 { parts.append("\(companiesImported) companies") }
+            if clientsImported > 0 { parts.append("\(clientsImported) clients") }
+            if contractsImported > 0 { parts.append("\(contractsImported) contracts") }
+            if invoicesImported > 0 { parts.append("\(invoicesImported) invoices") }
+            if expensesImported > 0 { parts.append("\(expensesImported) expenses") }
+            if sessionsImported > 0 { parts.append("\(sessionsImported) time entries") }
+            if recurringImported > 0 { parts.append("\(recurringImported) recurring invoices") }
+            if gigsImported > 0 { parts.append("\(gigsImported) gigs") }
+
+            if parts.isEmpty {
+                return "No new data imported (all records already exist)"
+            }
+            return "Imported: " + parts.joined(separator: ", ")
+        }
+
+        var skippedSummary: String {
+            var parts: [String] = []
+            if companiesSkipped > 0 { parts.append("\(companiesSkipped) companies") }
+            if clientsSkipped > 0 { parts.append("\(clientsSkipped) clients") }
+            if contractsSkipped > 0 { parts.append("\(contractsSkipped) contracts") }
+            if invoicesSkipped > 0 { parts.append("\(invoicesSkipped) invoices") }
+            if recurringSkipped > 0 { parts.append("\(recurringSkipped) recurring invoices") }
+            if gigsSkipped > 0 { parts.append("\(gigsSkipped) gigs") }
+
+            if parts.isEmpty {
+                return ""
+            }
+            return "Skipped (already exist): " + parts.joined(separator: ", ")
+        }
+    }
+
+    /// Import and merge data from another UNG database
+    /// Data is merged - existing records are skipped, new records are added
+    func mergeImportDatabase(from url: URL, password: String? = nil) async throws -> ImportResult {
+        let db = try getDatabase()
+
+        // Determine the source database path
+        var sourcePath = url.path
+        var tempDecryptedPath: String? = nil
+
+        // Check if it's an encrypted file
+        if url.pathExtension == "encrypted" || url.path.hasSuffix(".db.encrypted") {
+            guard let pwd = password else {
+                throw DatabaseError.invalidData("Password required for encrypted database")
+            }
+
+            // Decrypt to temp file
+            tempDecryptedPath = fileManager.temporaryDirectory
+                .appendingPathComponent("import_\(UUID().uuidString).db")
+                .path
+
+            try await encryption.decryptDatabase(
+                inputPath: url.path,
+                outputPath: tempDecryptedPath!,
+                password: pwd
+            )
+
+            sourcePath = tempDecryptedPath!
+        }
+
+        defer {
+            // Clean up temp file
+            if let tempPath = tempDecryptedPath {
+                try? fileManager.removeItem(atPath: tempPath)
+            }
+        }
+
+        // Open source database
+        let sourceDbQueue = try DatabaseQueue(path: sourcePath)
+
+        var result = ImportResult()
+
+        // Import companies
+        let sourceCompanies = try await sourceDbQueue.read { db in
+            try Company.fetchAll(db)
+        }
+        for var company in sourceCompanies {
+            // Check if company with same email exists
+            let exists = try await db.read { db in
+                try Company.filter(Column("email") == company.email).fetchOne(db) != nil
+            }
+            if !exists {
+                company.id = nil // Reset ID for new insert
+                company.createdAt = Date()
+                company.updatedAt = Date()
+                try await db.write { db in
+                    try company.insert(db)
+                }
+                result.companiesImported += 1
+            } else {
+                result.companiesSkipped += 1
+            }
+        }
+
+        // Import clients
+        let sourceClients = try await sourceDbQueue.read { db in
+            try ClientModel.fetchAll(db)
+        }
+        for var client in sourceClients {
+            // Check if client with same email exists
+            let exists = try await db.read { db in
+                try ClientModel.filter(Column("email") == client.email).fetchOne(db) != nil
+            }
+            if !exists {
+                client.id = nil
+                client.createdAt = Date()
+                client.updatedAt = Date()
+                try await db.write { db in
+                    try client.insert(db)
+                }
+                result.clientsImported += 1
+            } else {
+                result.clientsSkipped += 1
+            }
+        }
+
+        // Import contracts
+        let sourceContracts = try await sourceDbQueue.read { db in
+            try ContractModel.fetchAll(db)
+        }
+        for var contract in sourceContracts {
+            // Check if contract with same contract_num exists
+            let exists = try await db.read { db in
+                try ContractModel.filter(Column("contract_num") == contract.contractNum).fetchOne(db) != nil
+            }
+            if !exists {
+                contract.id = nil
+                contract.createdAt = Date()
+                contract.updatedAt = Date()
+                try await db.write { db in
+                    try contract.insert(db)
+                }
+                result.contractsImported += 1
+            } else {
+                result.contractsSkipped += 1
+            }
+        }
+
+        // Import invoices
+        let sourceInvoices = try await sourceDbQueue.read { db in
+            try Invoice.fetchAll(db)
+        }
+        for var invoice in sourceInvoices {
+            // Check if invoice with same invoice_num exists
+            let exists = try await db.read { db in
+                try Invoice.filter(Column("invoice_num") == invoice.invoiceNum).fetchOne(db) != nil
+            }
+            if !exists {
+                invoice.id = nil
+                invoice.createdAt = Date()
+                invoice.updatedAt = Date()
+                try await db.write { db in
+                    try invoice.insert(db)
+                }
+                result.invoicesImported += 1
+            } else {
+                result.invoicesSkipped += 1
+            }
+        }
+
+        // Import expenses (always import - no unique key)
+        let sourceExpenses = try await sourceDbQueue.read { db in
+            try Expense.fetchAll(db)
+        }
+        for var expense in sourceExpenses {
+            expense.id = nil
+            expense.createdAt = Date()
+            expense.updatedAt = Date()
+            try await db.write { db in
+                try expense.insert(db)
+            }
+            result.expensesImported += 1
+        }
+
+        // Import tracking sessions (always import - time entries are typically unique)
+        let sourceSessions = try await sourceDbQueue.read { db in
+            try TrackingSession.filter(Column("deleted_at") == nil).fetchAll(db)
+        }
+        for var session in sourceSessions {
+            session.id = nil
+            session.createdAt = Date()
+            session.updatedAt = Date()
+            try await db.write { db in
+                try session.insert(db)
+            }
+            result.sessionsImported += 1
+        }
+
+        // Import recurring invoices
+        let sourceRecurring = try await sourceDbQueue.read { db in
+            try RecurringInvoice.fetchAll(db)
+        }
+        for var recurring in sourceRecurring {
+            // Check for similar recurring invoice
+            let exists = try await db.read { db in
+                try RecurringInvoice
+                    .filter(Column("client_id") == recurring.clientId)
+                    .filter(Column("amount") == recurring.amount)
+                    .filter(Column("frequency") == recurring.frequency)
+                    .fetchOne(db) != nil
+            }
+            if !exists {
+                recurring.id = nil
+                recurring.createdAt = Date()
+                recurring.updatedAt = Date()
+                try await db.write { db in
+                    try recurring.insert(db)
+                }
+                result.recurringImported += 1
+            } else {
+                result.recurringSkipped += 1
+            }
+        }
+
+        // Import gigs
+        let sourceGigs = try await sourceDbQueue.read { db in
+            try Gig.fetchAll(db)
+        }
+        for var gig in sourceGigs {
+            // Check if gig with same name and client exists
+            let exists = try await db.read { db in
+                try Gig
+                    .filter(Column("name") == gig.name)
+                    .filter(Column("client_id") == gig.clientId)
+                    .fetchOne(db) != nil
+            }
+            if !exists {
+                gig.id = nil
+                gig.createdAt = Date()
+                gig.updatedAt = Date()
+                try await db.write { db in
+                    try gig.insert(db)
+                }
+                result.gigsImported += 1
+            } else {
+                result.gigsSkipped += 1
+            }
+        }
+
+        return result
+    }
+
+    /// Import and merge from an encrypted database
+    func mergeImportEncryptedDatabase(from url: URL, password: String) async throws -> ImportResult {
+        return try await mergeImportDatabase(from: url, password: password)
+    }
+
     // MARK: - Gig Operations
 
     func getGigs() async throws -> [Gig] {

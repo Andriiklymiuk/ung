@@ -99,18 +99,18 @@ struct DatabaseImportPasswordView: View {
             }
             .toggleStyle(.checkbox)
 
-            // Warning
+            // Info about merge
             HStack(spacing: Design.Spacing.xs) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-                Text("Importing will replace your current database")
+                Image(systemName: "arrow.triangle.merge")
+                    .foregroundColor(.green)
+                Text("Data will be merged with your existing records")
                     .font(Design.Typography.bodySmall)
-                    .foregroundColor(.orange)
+                    .foregroundColor(.green)
             }
             .padding(Design.Spacing.sm)
             .background(
                 RoundedRectangle(cornerRadius: Design.Radius.sm)
-                    .fill(Color.orange.opacity(0.1))
+                    .fill(Color.green.opacity(0.1))
             )
 
             Spacer()
@@ -128,7 +128,7 @@ struct DatabaseImportPasswordView: View {
                         ProgressView()
                             .scaleEffect(0.8)
                     } else {
-                        Text("Import Database")
+                        Text("Import & Merge")
                     }
                 }
                 .buttonStyle(.borderedProminent)

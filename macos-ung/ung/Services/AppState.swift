@@ -267,6 +267,7 @@ class AppState: ObservableObject {
     @Published var metrics: DashboardMetrics = DashboardMetrics()
     @Published var setupStatus: SetupStatus = SetupStatus()
     @Published var onboardingSkipped: Bool = false
+    @Published var hasSeenWelcome: Bool = false
     @Published var recentInvoices: [RecentInvoice] = []
     @Published var recentSessions: [RecentSession] = []
     @Published var recentExpenses: [RecentExpense] = []
@@ -670,15 +671,28 @@ class AppState: ObservableObject {
         UserDefaults.standard.set(true, forKey: "onboardingSkipped")
     }
 
-    /// Check if user has previously skipped onboarding
+    /// Load all onboarding-related status from UserDefaults
     func loadOnboardingStatus() {
         onboardingSkipped = UserDefaults.standard.bool(forKey: "onboardingSkipped")
+        hasSeenWelcome = UserDefaults.standard.bool(forKey: "hasSeenWelcome")
     }
 
     /// Reset onboarding skip (useful if user wants to see onboarding again)
     func resetOnboardingSkip() {
         onboardingSkipped = false
         UserDefaults.standard.set(false, forKey: "onboardingSkipped")
+    }
+
+    /// Complete the welcome walkthrough and proceed to main app
+    func completeWelcomeWalkthrough() {
+        hasSeenWelcome = true
+        UserDefaults.standard.set(true, forKey: "hasSeenWelcome")
+    }
+
+    /// Reset welcome walkthrough (useful for testing or re-showing)
+    func resetWelcomeWalkthrough() {
+        hasSeenWelcome = false
+        UserDefaults.standard.set(false, forKey: "hasSeenWelcome")
     }
 
     // MARK: - Dashboard Refresh

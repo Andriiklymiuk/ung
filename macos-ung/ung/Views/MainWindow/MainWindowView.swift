@@ -31,7 +31,12 @@ struct MainWindowView: View {
                         .frame(width: 340, height: 300)
                         .background(backgroundColor)
                 case .ready:
-                    mainContent
+                    // Show walkthrough for first-time users
+                    if !appState.hasSeenWelcome {
+                        WelcomeWalkthroughView()
+                    } else {
+                        mainContent
+                    }
                     #if os(macOS)
                         .frame(minWidth: 600, minHeight: 400)
                     #endif

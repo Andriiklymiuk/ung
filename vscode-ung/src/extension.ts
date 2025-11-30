@@ -731,7 +731,7 @@ export async function activate(context: vscode.ExtensionContext) {
         placeHolder: 'e.g., 5000',
         validateInput: (value) => {
           const num = parseFloat(value);
-          if (isNaN(num) || num <= 0) {
+          if (Number.isNaN(num) || num <= 0) {
             return 'Please enter a valid positive number';
           }
           return null;
@@ -741,14 +741,16 @@ export async function activate(context: vscode.ExtensionContext) {
       if (amount) {
         const result = await cli.runCommand(['goal', 'set', amount]);
         if (result.success) {
-          vscode.window.showInformationMessage(
-            `Monthly goal set to $${amount}`,
-            'View Progress'
-          ).then((choice) => {
-            if (choice === 'View Progress') {
-              vscode.commands.executeCommand('ung.openStatistics');
-            }
-          });
+          vscode.window
+            .showInformationMessage(
+              `Monthly goal set to $${amount}`,
+              'View Progress'
+            )
+            .then((choice) => {
+              if (choice === 'View Progress') {
+                vscode.commands.executeCommand('ung.openStatistics');
+              }
+            });
         } else {
           vscode.window.showErrorMessage(
             `Failed to set goal: ${result.stderr || 'Unknown error'}`

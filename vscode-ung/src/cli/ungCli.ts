@@ -1075,4 +1075,13 @@ export class UngCli {
   async deleteGigTask(taskId: number): Promise<CliResult> {
     return this.exec(['gig', 'task', 'delete', taskId.toString()]);
   }
+
+  /**
+   * Run a command with string array args (convenience wrapper for exec)
+   * @param args Command arguments as string array
+   * @returns Promise with result containing stdout, stderr, and success status
+   */
+  async runCommand(args: string[]): Promise<CliResult> {
+    return this.exec(args);
+  }
 }

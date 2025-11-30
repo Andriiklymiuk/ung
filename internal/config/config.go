@@ -11,15 +11,15 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	DatabasePath string           `yaml:"database_path"`
-	InvoicesDir  string           `yaml:"invoices_dir"`
-	ContractsDir string           `yaml:"contracts_dir,omitempty"` // Path to contracts directory
-	Language     string           `yaml:"language"`                // e.g., "en", "uk", "de"
-	Invoice      InvoiceConfig    `yaml:"invoice"`
-	PDF          PDFConfig        `yaml:"pdf"`
-	Templates    TemplateConfig   `yaml:"templates"`
-	Email        EmailConfig      `yaml:"email"`
-	Security     SecurityConfig   `yaml:"security"`
+	DatabasePath string         `yaml:"database_path"`
+	InvoicesDir  string         `yaml:"invoices_dir"`
+	ContractsDir string         `yaml:"contracts_dir,omitempty"` // Path to contracts directory
+	Language     string         `yaml:"language"`                // e.g., "en", "uk", "de"
+	Invoice      InvoiceConfig  `yaml:"invoice"`
+	PDF          PDFConfig      `yaml:"pdf"`
+	Templates    TemplateConfig `yaml:"templates"`
+	Email        EmailConfig    `yaml:"email"`
+	Security     SecurityConfig `yaml:"security"`
 }
 
 // ConfigSource indicates where the config was loaded from
@@ -49,15 +49,15 @@ type PDFConfig struct {
 	WatermarkText string `yaml:"watermark_text"` // Custom watermark text (overrides status)
 
 	// Layout options
-	ShowLogo       bool `yaml:"show_logo"`        // Show company logo
-	ShowQRCode     bool `yaml:"show_qr_code"`     // Show payment QR code
-	ShowPageNumber bool `yaml:"show_page_number"` // Show page numbers on multi-page documents
+	ShowLogo         bool `yaml:"show_logo"`          // Show company logo
+	ShowQRCode       bool `yaml:"show_qr_code"`       // Show payment QR code
+	ShowPageNumber   bool `yaml:"show_page_number"`   // Show page numbers on multi-page documents
 	ShowTaxBreakdown bool `yaml:"show_tax_breakdown"` // Show VAT/tax breakdown
 
 	// Tax settings
-	TaxRate     float64 `yaml:"tax_rate"`      // Tax/VAT rate (e.g., 0.20 for 20%)
-	TaxLabel    string  `yaml:"tax_label"`     // e.g., "VAT", "GST", "Tax"
-	TaxInclusive bool   `yaml:"tax_inclusive"` // Whether prices include tax
+	TaxRate      float64 `yaml:"tax_rate"`      // Tax/VAT rate (e.g., 0.20 for 20%)
+	TaxLabel     string  `yaml:"tax_label"`     // e.g., "VAT", "GST", "Tax"
+	TaxInclusive bool    `yaml:"tax_inclusive"` // Whether prices include tax
 
 	// Additional labels
 	SubtotalLabel   string `yaml:"subtotal_label"`
@@ -302,24 +302,24 @@ func getDefaultConfig(useGlobal bool) *Config {
 // GetDefaultPDFConfig returns the default PDF configuration
 func GetDefaultPDFConfig() PDFConfig {
 	return PDFConfig{
-		PrimaryColor:   ColorRGB{R: 232, G: 119, B: 34},
-		SecondaryColor: ColorRGB{R: 80, G: 80, B: 80},
-		TextColor:      ColorRGB{R: 60, G: 60, B: 60},
-		ShowWatermark:  true,
-		ShowLogo:       true,
-		ShowQRCode:     false,
-		ShowPageNumber: true,
+		PrimaryColor:     ColorRGB{R: 232, G: 119, B: 34},
+		SecondaryColor:   ColorRGB{R: 80, G: 80, B: 80},
+		TextColor:        ColorRGB{R: 60, G: 60, B: 60},
+		ShowWatermark:    true,
+		ShowLogo:         true,
+		ShowQRCode:       false,
+		ShowPageNumber:   true,
 		ShowTaxBreakdown: false,
-		TaxRate:        0.0,
-		TaxLabel:       "VAT",
-		TaxInclusive:   false,
-		SubtotalLabel:   "Subtotal",
-		DiscountLabel:   "Discount",
-		TaxAmountLabel:  "VAT",
-		BalanceDueLabel: "Balance Due",
-		PaidLabel:       "PAID",
-		DraftLabel:      "DRAFT",
-		OverdueLabel:    "OVERDUE",
+		TaxRate:          0.0,
+		TaxLabel:         "VAT",
+		TaxInclusive:     false,
+		SubtotalLabel:    "Subtotal",
+		DiscountLabel:    "Discount",
+		TaxAmountLabel:   "VAT",
+		BalanceDueLabel:  "Balance Due",
+		PaidLabel:        "PAID",
+		DraftLabel:       "DRAFT",
+		OverdueLabel:     "OVERDUE",
 	}
 }
 
@@ -617,4 +617,56 @@ func GetInitializedDir() string {
 	}
 
 	return ""
+}
+
+// Initialize creates the .ung directory structure and saves default config
+// Parameters:
+//   - global: if true, creates ~/.ung/, otherwise creates local .ung/
+//   - overwrite: if true, will overwrite existing config
+//   - dbPath: optional custom database path (empty uses default)
+func Initialize(global bool, overwrite bool, dbPath string) error {
+	var targetDir string
+
+	if global {
+		targetDir = GetGlobalUngDir()
+		if targetDir == "" {
+			return fmt.Errorf("could not determine home directory")
+		}
+	} else {
+		var err error
+		targetDir, err = filepath.Abs(LocalUngDir)
+		if err != nil {
+			return fmt.Errorf("could not resolve local directory: %w", err)
+		}
+	}
+
+	// Check if already initialized
+	configPath := filepath.Join(targetDir, "config.yaml")
+	if !overwrite {
+		if _, err := os.Stat(configPath); err == nil {
+			return nil // Already initialized
+		}
+	}
+
+	// Create directory structure
+	if global {
+		if err := InitGlobalDirectory(); err != nil {
+			return err
+		}
+	} else {
+		if err := InitLocalDirectory(); err != nil {
+			return err
+		}
+	}
+
+	// Create default config
+	cfg := getDefaultConfig(global)
+
+	// Override database path if provided
+	if dbPath != "" {
+		cfg.DatabasePath = expandPath(dbPath)
+	}
+
+	// Save config
+	return Save(cfg, global)
 }

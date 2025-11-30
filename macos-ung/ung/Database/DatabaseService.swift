@@ -1378,6 +1378,86 @@ actor DatabaseService {
         }
     }
 
+    // MARK: - Gig Task Operations
+
+    func getGigTasks(gigId: Int64) async throws -> [GigTask] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try GigTask
+                .filter(Column("gig_id") == gigId)
+                .order(Column("sort_order").asc, Column("created_at").asc)
+                .fetchAll(db)
+        }
+    }
+
+    func createGigTask(_ task: GigTask) async throws -> GigTask {
+        let db = try getDatabase()
+        return try await db.write { db in
+            var newTask = task
+            try newTask.insert(db)
+            return newTask
+        }
+    }
+
+    func updateGigTask(_ task: GigTask) async throws {
+        let db = try getDatabase()
+        try await db.write { db in
+            try task.update(db)
+        }
+    }
+
+    func toggleGigTaskCompleted(id: Int64) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            guard var task = try GigTask.fetchOne(db, key: id) else {
+                throw DatabaseError.notFound
+            }
+            task.completed = !task.completed
+            task.completedAt = task.completed ? Date() : nil
+            try task.update(db)
+        }
+    }
+
+    func deleteGigTask(id: Int64) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try GigTask.deleteOne(db, key: id)
+        }
+    }
+
+    func reorderGigTasks(gigId: Int64, taskIds: [Int64]) async throws {
+        let db = try getDatabase()
+        try await db.write { db in
+            for (index, taskId) in taskIds.enumerated() {
+                try db.execute(
+                    sql: "UPDATE gig_tasks SET sort_order = ? WHERE id = ? AND gig_id = ?",
+                    arguments: [index, taskId, gigId]
+                )
+            }
+        }
+    }
+
+    // MARK: - Gig with Tasks (aggregated query)
+
+    func getGigsWithTasks() async throws -> [(gig: Gig, tasks: [GigTask], client: ClientModel?)] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            let gigs = try Gig.order(Column("priority").desc, Column("updated_at").desc).fetchAll(db)
+            var results: [(gig: Gig, tasks: [GigTask], client: ClientModel?)] = []
+
+            for gig in gigs {
+                guard let gigId = gig.id else { continue }
+                let tasks = try GigTask
+                    .filter(Column("gig_id") == gigId)
+                    .order(Column("sort_order").asc)
+                    .fetchAll(db)
+                let client: ClientModel? = gig.clientId != nil ? try ClientModel.fetchOne(db, key: gig.clientId!) : nil
+                results.append((gig: gig, tasks: tasks, client: client))
+            }
+            return results
+        }
+    }
+
     // MARK: - Next View Helpers
 
     func getUnbilledHours() async throws -> Double {

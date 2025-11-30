@@ -418,6 +418,22 @@ type WorkLog struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// GigTask represents an actionable task within a gig
+type GigTask struct {
+	ID          uint       `gorm:"primaryKey" json:"id"`
+	GigID       uint       `gorm:"not null;index" json:"gig_id"`
+	Gig         *Gig       `gorm:"foreignKey:GigID" json:"-"`
+	Title       string     `gorm:"not null" json:"title"`
+	Description string     `json:"description"`
+	Completed   bool       `gorm:"default:false" json:"completed"`
+	CompletedAt *time.Time `json:"completed_at"`
+	DueDate     *time.Time `json:"due_date"`
+	SortOrder   int        `gorm:"default:0" json:"sort_order"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // =====================================
 // Enhanced Goals
 // =====================================

@@ -81,11 +81,29 @@ CREATE TABLE IF NOT EXISTS income_goals (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tasks within gigs - actionable items to complete
+CREATE TABLE IF NOT EXISTS gig_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gig_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    completed BOOLEAN DEFAULT 0,
+    completed_at TIMESTAMP,
+    due_date TIMESTAMP,
+    sort_order INTEGER DEFAULT 0,           -- For drag-and-drop reordering
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (gig_id) REFERENCES gigs(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_gigs_status ON gigs(status);
 CREATE INDEX IF NOT EXISTS idx_gigs_client ON gigs(client_id);
 CREATE INDEX IF NOT EXISTS idx_gigs_priority ON gigs(priority);
 CREATE INDEX IF NOT EXISTS idx_gigs_due_date ON gigs(due_date);
+CREATE INDEX IF NOT EXISTS idx_gig_tasks_gig ON gig_tasks(gig_id);
+CREATE INDEX IF NOT EXISTS idx_gig_tasks_completed ON gig_tasks(completed);
 CREATE INDEX IF NOT EXISTS idx_work_logs_gig ON work_logs(gig_id);
 CREATE INDEX IF NOT EXISTS idx_work_logs_client ON work_logs(client_id);
 CREATE INDEX IF NOT EXISTS idx_work_logs_created ON work_logs(created_at);

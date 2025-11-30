@@ -6,8 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/andriiklymiuk/ung/api/internal/models"
-	"github.com/andriiklymiuk/ung/api/internal/services"
+	"ung/api/internal/middleware"
+	"ung/api/internal/models"
+	"ung/api/internal/services"
+
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
@@ -26,16 +28,16 @@ func NewDigController(digService *services.DigService) *DigController {
 
 // StartSession starts a new idea analysis session
 func (c *DigController) StartSession(w http.ResponseWriter, r *http.Request) {
-	db := r.Context().Value("db").(*gorm.DB)
+	db := middleware.GetTenantDB(r)
 
 	var req models.DigStartRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		RespondError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.Idea == "" {
-		respondWithError(w, http.StatusBadRequest, "Idea is required")
+		RespondError(w, "Idea is required", http.StatusBadRequest)
 		return
 	}
 
@@ -50,18 +52,14 @@ func (c *DigController) StartSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := db.Create(&session).Error; err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to create session")
+		RespondError(w, "Failed to create session", http.StatusInternalServerError)
 		return
 	}
 
 	// Start async analysis
 	go c.runAnalysis(db, &session)
 
-	respondWithJSON(w, http.StatusCreated, models.StandardResponse{
-		Success: true,
-		Message: "Analysis started",
-		Data:    session,
-	})
+	RespondJSON(w, session, http.StatusCreated)
 }
 
 // runAnalysis performs the multi-step analysis asynchronously with agentic early-exit logic
@@ -278,11 +276,11 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 
 // GetSession retrieves a specific session with all data
 func (c *DigController) GetSession(w http.ResponseWriter, r *http.Request) {
-	db := r.Context().Value("db").(*gorm.DB)
+	db := middleware.GetTenantDB(r)
 
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID")
+		RespondError(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
@@ -293,29 +291,26 @@ func (c *DigController) GetSession(w http.ResponseWriter, r *http.Request) {
 		Preload("RevenueProjection").
 		Preload("Alternatives").
 		First(&session, id).Error; err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found")
+		RespondError(w, "Session not found", http.StatusNotFound)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, models.StandardResponse{
-		Success: true,
-		Data:    session,
-	})
+	RespondJSON(w, session, http.StatusOK)
 }
 
 // GetProgress returns the progress of an ongoing analysis
 func (c *DigController) GetProgress(w http.ResponseWriter, r *http.Request) {
-	db := r.Context().Value("db").(*gorm.DB)
+	db := middleware.GetTenantDB(r)
 
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID")
+		RespondError(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
 	var session models.DigSession
 	if err := db.First(&session, id).Error; err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found")
+		RespondError(w, "Session not found", http.StatusNotFound)
 		return
 	}
 
@@ -360,35 +355,29 @@ func (c *DigController) GetProgress(w http.ResponseWriter, r *http.Request) {
 		Message:         message,
 	}
 
-	respondWithJSON(w, http.StatusOK, models.StandardResponse{
-		Success: true,
-		Data:    response,
-	})
+	RespondJSON(w, response, http.StatusOK)
 }
 
 // ListSessions returns all sessions for the user
 func (c *DigController) ListSessions(w http.ResponseWriter, r *http.Request) {
-	db := r.Context().Value("db").(*gorm.DB)
+	db := middleware.GetTenantDB(r)
 
 	var sessions []models.DigSession
 	if err := db.Order("created_at DESC").Find(&sessions).Error; err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to fetch sessions")
+		RespondError(w, "Failed to fetch sessions", http.StatusInternalServerError)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, models.StandardResponse{
-		Success: true,
-		Data:    sessions,
-	})
+	RespondJSON(w, sessions, http.StatusOK)
 }
 
 // DeleteSession deletes a session
 func (c *DigController) DeleteSession(w http.ResponseWriter, r *http.Request) {
-	db := r.Context().Value("db").(*gorm.DB)
+	db := middleware.GetTenantDB(r)
 
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID")
+		RespondError(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
@@ -400,36 +389,33 @@ func (c *DigController) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	db.Where("session_id = ?", id).Delete(&models.DigAlternative{})
 
 	if err := db.Delete(&models.DigSession{}, id).Error; err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to delete session")
+		RespondError(w, "Failed to delete session", http.StatusInternalServerError)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, models.StandardResponse{
-		Success: true,
-		Message: "Session deleted",
-	})
+	RespondJSON(w, map[string]string{"message": "Session deleted"}, http.StatusOK)
 }
 
 // GenerateImages generates images for a session's marketing prompts
 func (c *DigController) GenerateImages(w http.ResponseWriter, r *http.Request) {
-	db := r.Context().Value("db").(*gorm.DB)
+	db := middleware.GetTenantDB(r)
 
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID")
+		RespondError(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
 	var marketing models.DigMarketing
 	if err := db.Where("session_id = ?", id).First(&marketing).Error; err != nil {
-		respondWithError(w, http.StatusNotFound, "Marketing data not found")
+		RespondError(w, "Marketing data not found", http.StatusNotFound)
 		return
 	}
 
 	// Parse imagery prompts
 	var prompts []string
 	if err := json.Unmarshal([]byte(marketing.ImageryPrompts), &prompts); err != nil || len(prompts) == 0 {
-		respondWithError(w, http.StatusBadRequest, "No image prompts available")
+		RespondError(w, "No image prompts available", http.StatusBadRequest)
 		return
 	}
 
@@ -452,20 +438,16 @@ func (c *DigController) GenerateImages(w http.ResponseWriter, r *http.Request) {
 	marketing.GeneratedImages = string(imagesJSON)
 	db.Save(&marketing)
 
-	respondWithJSON(w, http.StatusOK, models.StandardResponse{
-		Success: true,
-		Message: "Images generated",
-		Data:    generatedImages,
-	})
+	RespondJSON(w, generatedImages, http.StatusOK)
 }
 
 // ExportSession exports a session in various formats
 func (c *DigController) ExportSession(w http.ResponseWriter, r *http.Request) {
-	db := r.Context().Value("db").(*gorm.DB)
+	db := middleware.GetTenantDB(r)
 
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID")
+		RespondError(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
@@ -481,7 +463,7 @@ func (c *DigController) ExportSession(w http.ResponseWriter, r *http.Request) {
 		Preload("RevenueProjection").
 		Preload("Alternatives").
 		First(&session, id).Error; err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found")
+		RespondError(w, "Session not found", http.StatusNotFound)
 		return
 	}
 
@@ -497,7 +479,7 @@ func (c *DigController) ExportSession(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(generateMarkdownExport(session)))
 
 	default:
-		respondWithError(w, http.StatusBadRequest, "Unsupported format. Use 'json' or 'markdown'")
+		RespondError(w, "Unsupported format. Use 'json' or 'markdown'", http.StatusBadRequest)
 	}
 }
 

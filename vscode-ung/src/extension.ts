@@ -1244,8 +1244,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const secureStorage = getSecureStorage();
         password = await secureStorage.getOrPromptPassword({
           title: 'Import Database Password',
-          prompt:
-            'Enter the password for the encrypted database (AES-256-GCM)',
+          prompt: 'Enter the password for the encrypted database (AES-256-GCM)',
           offerToSave: false,
         });
         if (!password) return;

@@ -967,10 +967,24 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
                     opacity: 0;
                 }
             }
+            /* Respect user's motion preferences for accessibility */
+            @media (prefers-reduced-motion: reduce) {
+                .confetti-piece {
+                    animation: none;
+                    opacity: 0;
+                }
+                .confetti {
+                    display: none;
+                }
+            }
         </style>
-        <div class="confetti" id="confetti"></div>
+        <div class="confetti" id="confetti" aria-hidden="true"></div>
         <script>
             (function() {
+                // Only show confetti if user doesn't prefer reduced motion
+                if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                    return;
+                }
                 const confetti = document.getElementById('confetti');
                 const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
                 for (let i = 0; i < 50; i++) {

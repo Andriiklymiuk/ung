@@ -23,61 +23,61 @@ struct WelcomeWalkthroughView: View {
   @State private var isAnimating = false
   @Namespace private var animation
 
-  // Testimonials - funky, feature-specific
+  // Testimonials - real outcomes, specific help
   private let testimonials: [Testimonial] = [
     Testimonial(
-      quote: "Tracked myself for a week. Turns out I spend 11 hours on 'quick emails.' I'm basically an unpaid mailman with a design degree.",
-      name: "Jake Rivera",
-      role: "Freelance Designer",
-      feature: "Tracking",
-      color: .blue
-    ),
-    Testimonial(
-      quote: "Sent an invoice at 2am in my underwear. Got paid by breakfast. This is the future our ancestors dreamed of.",
-      name: "Priya K.",
-      role: "Developer",
-      feature: "Invoicing",
-      color: .teal
-    ),
-    Testimonial(
-      quote: "Dig told me my 'revolutionary' idea was just Uber for laundry. Again. Fourth time. I might have a problem.",
+      quote: "Look, I don't wanna write a testimonial. I'm too busy actually building my app now. Dig killed 6 of my ideas in one afternoon. The 7th scored 73. That's the one I'm shipping. Leave me alone.",
       name: "Marcus Chen",
-      role: "Serial Idea-Haver",
+      role: "Finally Building Something",
       feature: "Dig",
       color: .yellow
     ),
     Testimonial(
-      quote: "Hunt found me 3 gigs while I was doom-scrolling. It's hunting while I'm procrastinating. Terrifying. Also: rent paid.",
+      quote: "Tracking showed me I was billing 4 hours but working 9. Did the math: I was earning $11/hour. Raised my rates 3x. Same clients stayed. I was just scared of nothing.",
+      name: "Jake Rivera",
+      role: "Designer, now $95/hr",
+      feature: "Tracking",
+      color: .blue
+    ),
+    Testimonial(
+      quote: "Client ghosted for 47 days. I sent the invoice link with 'overdue' status visible. They paid in 6 hours with an apology. The red badge did more than my 5 follow-up emails.",
+      name: "Emma Lindqvist",
+      role: "Photographer",
+      feature: "Invoicing",
+      color: .teal
+    ),
+    Testimonial(
+      quote: "Hunt matched me with a gig I never would've found - small startup, weird niche, perfect fit. $8k contract. They found ME because I had alerts on while sleeping.",
       name: "Nina Volkov",
-      role: "Freelance Writer",
+      role: "Writer, now with retainer",
       feature: "Hunt",
       color: .orange
     ),
     Testimonial(
-      quote: "Moved a card to 'Done' and felt more dopamine than my entire childhood. Is this addiction? Don't care. Shipping.",
+      quote: "I had 23 'in progress' projects. Kanban showed me 19 were actually dead. Archived them. Finished the other 4 in two weeks. The board doesn't lie.",
       name: "David Morrison",
-      role: "Solo Developer",
+      role: "Solo Dev, 4 shipped apps",
       feature: "Kanban",
       color: .purple
     ),
     Testimonial(
-      quote: "Set a $10k monthly goal as a joke. Hit it by accident because the red progress bar made me feel broke every morning.",
+      quote: "Goal was $8k/month. The progress bar turned red at $2k by day 20. Panic mode. Sent 12 proposals that week. Hit $11k. The bar bullied me into success.",
       name: "Sarah Okonkwo",
       role: "Consultant",
       feature: "Goals",
       color: .green
     ),
     Testimonial(
-      quote: "25 minutes of Focus mode and I wrote more code than the entire previous week. My phone might be the actual enemy.",
+      quote: "4.5 hours free time per week. Focus mode + tracking = I know exactly where every minute goes. Built my MVP in 6 weeks. Previously took 6 months and failed.",
       name: "Raj Patel",
-      role: "Engineer",
+      role: "Eng Manager, side project shipped",
       feature: "Focus",
       color: .red
     ),
     Testimonial(
-      quote: "Client said 'we'll pay eventually.' I showed them my Invoices dashboard. They paid in 4 hours. Fear is a motivator.",
-      name: "Emma Lindqvist",
-      role: "Photographer",
+      quote: "Recurring invoices. Set it once in January. It's November. I've collected $34k on autopilot. Literally forgot some clients existed. They just... pay.",
+      name: "Priya K.",
+      role: "Developer",
       feature: "Invoicing",
       color: .pink
     ),
@@ -96,7 +96,7 @@ struct WelcomeWalkthroughView: View {
         FeatureItem(icon: "chart.bar.fill", text: "See where your time actually goes", color: .blue),
         FeatureItem(icon: "target", text: "Set income goals, watch the bar fill", color: .orange),
       ],
-      testimonial: "\"Found 11 hours/week I was giving away for free.\" - Designer"
+      testimonial: "\"Billing 4hrs, working 9. Did the math: $11/hr. Raised rates 3x.\" - Jake, Designer"
     ),
     // 2. Gigs & Kanban
     WalkthroughPage(
@@ -109,7 +109,7 @@ struct WelcomeWalkthroughView: View {
         FeatureItem(icon: "person.2.fill", text: "Client management in one place", color: .blue),
         FeatureItem(icon: "doc.badge.clock", text: "Contracts & deadlines auto-tracked", color: .orange),
       ],
-      testimonial: "\"Moved a card to Done. Felt dopamine. Shipping.\" - Solo Dev"
+      testimonial: "\"23 projects 'in progress.' 19 were dead. Shipped the other 4 in 2 weeks.\" - David"
     ),
     // 3. Invoicing
     WalkthroughPage(
@@ -122,7 +122,7 @@ struct WelcomeWalkthroughView: View {
         FeatureItem(icon: "checkmark.circle.fill", text: "Know who paid, who owes", color: .green),
         FeatureItem(icon: "arrow.clockwise", text: "Recurring invoices on autopilot", color: .teal),
       ],
-      testimonial: "\"2am invoice. Paid by breakfast.\" - Developer"
+      testimonial: "\"Client ghosted 47 days. Sent 'overdue' link. Paid in 6 hours.\" - Emma"
     ),
     // 4. Hunt - Job Finder
     WalkthroughPage(
@@ -135,7 +135,7 @@ struct WelcomeWalkthroughView: View {
         FeatureItem(icon: "bell.badge.fill", text: "Alerts when perfect matches appear", color: .red),
         FeatureItem(icon: "doc.richtext", text: "One-click proposals with AI", color: .purple),
       ],
-      testimonial: "\"Found 3 gigs while I was procrastinating.\" - Writer"
+      testimonial: "\"$8k contract from a gig I never would've found. Alert hit while I slept.\" - Nina"
     ),
     // 5. Focus Mode / Pomodoro
     WalkthroughPage(
@@ -148,7 +148,7 @@ struct WelcomeWalkthroughView: View {
         FeatureItem(icon: "clock.badge.checkmark", text: "Pomodoro timer built-in", color: .orange),
         FeatureItem(icon: "chart.xyaxis.line", text: "Track focus streaks over time", color: .green),
       ],
-      testimonial: "\"25 mins Focus > my entire previous week.\" - Engineer"
+      testimonial: "\"4.5 hrs/week free time. MVP in 6 weeks. Before: 6 months, failed.\" - Raj"
     ),
     // 6. Dig - Idea Validation
     WalkthroughPage(
@@ -161,7 +161,7 @@ struct WelcomeWalkthroughView: View {
         FeatureItem(icon: "chart.line.uptrend.xyaxis", text: "Revenue projections before code", color: .green),
         FeatureItem(icon: "exclamationmark.triangle.fill", text: "Devil's Advocate finds blind spots", color: .red),
       ],
-      testimonial: "\"Told me it was Uber for laundry. Again.\" - Idea-Haver"
+      testimonial: "\"Killed 6 ideas in one afternoon. The 7th scored 73. Shipping that one.\" - Marcus"
     ),
     // 7. Final page - Everything together
     WalkthroughPage(

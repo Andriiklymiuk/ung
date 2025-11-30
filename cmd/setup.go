@@ -138,6 +138,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			huh.NewGroup(
 				huh.NewInput().
 					Title("What's your business name?").
+					Description("Appears on all your invoices").
 					Placeholder("e.g., Jane Smith Consulting").
 					Value(&companyName).
 					Validate(func(s string) error {
@@ -148,6 +149,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 					}),
 				huh.NewInput().
 					Title("Business email").
+					Description("Where clients reply to invoices").
 					Placeholder("e.g., hello@example.com").
 					Value(&companyEmail).
 					Validate(func(s string) error {
@@ -157,7 +159,8 @@ func runSetup(cmd *cobra.Command, args []string) error {
 						return nil
 					}),
 				huh.NewInput().
-					Title("Address (optional - for invoices)").
+					Title("Address (optional)").
+					Description("Shows on invoices if your business requires it").
 					Placeholder("e.g., 123 Main St, City, Country").
 					Value(&companyAddress),
 			),
@@ -222,6 +225,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 				huh.NewGroup(
 					huh.NewInput().
 						Title("Client/Company name").
+						Description("Who you're billing - appears on invoices").
 						Placeholder("e.g., Acme Corp").
 						Value(&clientName).
 						Validate(func(s string) error {
@@ -232,6 +236,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 						}),
 					huh.NewInput().
 						Title("Client email").
+						Description("Where to send invoices").
 						Placeholder("e.g., billing@acme.com").
 						Value(&clientEmail).
 						Validate(func(s string) error {
@@ -287,7 +292,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 				huh.NewGroup(
 					huh.NewConfirm().
 						Title("Set a monthly income goal?").
-						Description("Track progress toward your earnings target").
+						Description("See progress on your dashboard - motivates you to hit targets").
 						Affirmative("Yes, set a goal").
 						Negative("Skip for now").
 						Value(&setGoal),
@@ -304,6 +309,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 					huh.NewGroup(
 						huh.NewInput().
 							Title(fmt.Sprintf("Monthly target for %s %d ($)", time.Now().Month().String(), year)).
+							Description("Enter amount in dollars (e.g., 5000). You can change this anytime.").
 							Placeholder("e.g., 5000").
 							Value(&goalAmount).
 							Validate(func(s string) error {
@@ -312,7 +318,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 								}
 								var amount float64
 								if _, err := fmt.Sscanf(s, "%f", &amount); err != nil || amount <= 0 {
-									return fmt.Errorf("enter a valid positive amount")
+									return fmt.Errorf("enter a positive number like 5000")
 								}
 								return nil
 							}),

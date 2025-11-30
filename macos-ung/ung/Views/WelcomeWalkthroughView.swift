@@ -2,7 +2,8 @@
 //  WelcomeWalkthroughView.swift
 //  ung
 //
-//  Classic multi-page walkthrough for first-time users
+//  Premium animated multi-page walkthrough for first-time users
+//  Inspired by Uber, Headspace, and top-tier app onboarding experiences
 //
 
 import SwiftUI
@@ -16,11 +17,40 @@ struct Testimonial {
     let color: Color
 }
 
+// MARK: - Floating Orb Model
+struct FloatingOrb: Identifiable {
+    let id = UUID()
+    var x: CGFloat
+    var y: CGFloat
+    var size: CGFloat
+    var color: Color
+    var opacity: Double
+    var speed: Double
+    var phase: Double
+}
+
+// MARK: - Confetti Particle
+struct ConfettiParticle: Identifiable {
+    let id = UUID()
+    var x: CGFloat
+    var y: CGFloat
+    var rotation: Double
+    var scale: CGFloat
+    var color: Color
+    var speed: Double
+}
+
 // MARK: - Welcome Walkthrough View
 struct WelcomeWalkthroughView: View {
   @EnvironmentObject var appState: AppState
   @State private var currentPage = 0
   @State private var isAnimating = false
+  @State private var floatingOrbs: [FloatingOrb] = []
+  @State private var confettiParticles: [ConfettiParticle] = []
+  @State private var showConfetti = false
+  @State private var animationTimer: Timer?
+  @State private var dragOffset: CGFloat = 0
+  @State private var progressAnimation: CGFloat = 0
   @Namespace private var animation
 
   // Testimonials - real outcomes, specific help
@@ -84,59 +114,85 @@ struct WelcomeWalkthroughView: View {
   ]
 
   // Journey-based onboarding: Idea → Find Work → Manage → Do Work → Get Paid
-  // iOS: Simplified 4-page version (mobile-focused)
+  // iOS: Optimized 6-page version (mobile-first design, different visuals)
   // macOS: Full 6-page version (power user features)
   #if os(iOS)
   private let pages: [WalkthroughPage] = [
-    // 1. QUICK START: Track & Invoice
+    // 1. START: Your freelance companion
     WalkthroughPage(
-      icon: "clock.badge.checkmark.fill",
-      iconColors: [.blue, .purple],
-      title: "Track. Invoice. Done.",
-      subtitle: "Your time. Your money. One tap away.",
+      icon: "sparkles",
+      iconColors: [.purple, .pink],
+      title: "Your Gig, Your Way",
+      subtitle: "From spark to paycheck. All in your pocket.",
       features: [
-        FeatureItem(icon: "play.circle.fill", text: "One-tap tracking - start anywhere", color: .green),
-        FeatureItem(icon: "doc.text.fill", text: "Invoices auto-generated from hours", color: .teal),
-        FeatureItem(icon: "bell.badge.fill", text: "Get paid alerts on your wrist", color: .orange),
+        FeatureItem(icon: "lightbulb.max.fill", text: "Validate ideas before you build", color: .yellow),
+        FeatureItem(icon: "clock.fill", text: "Track every hour, effortlessly", color: .blue),
+        FeatureItem(icon: "dollarsign.circle.fill", text: "Get paid, on time, every time", color: .green),
       ],
-      testimonial: "\"Sent invoice from my phone at 2am. Paid by breakfast.\" - Priya"
+      testimonial: "\"This app is my entire business.\" - Priya"
     ),
-    // 2. FIND: Gigs on the go
+    // 2. FIND: Gigs find you
     WalkthroughPage(
       icon: "binoculars.fill",
       iconColors: [.orange, .red],
       title: "Gigs Find You",
-      subtitle: "Hunt alerts. Even when you're offline.",
+      subtitle: "Push alerts. Perfect matches. Zero effort.",
       features: [
-        FeatureItem(icon: "bell.badge.fill", text: "Push alerts when perfect gigs drop", color: .red),
+        FeatureItem(icon: "bell.badge.fill", text: "Alerts when your gig drops", color: .red),
         FeatureItem(icon: "hand.tap.fill", text: "Quick apply from notification", color: .orange),
-        FeatureItem(icon: "icloud.fill", text: "Syncs with your Mac instantly", color: .blue),
+        FeatureItem(icon: "sparkle.magnifyingglass", text: "AI matches you to opportunities", color: .purple),
       ],
-      testimonial: "\"$8k contract. Alert hit while I was at the gym.\" - Nina"
+      testimonial: "\"$8k contract. Alert hit at the gym.\" - Nina"
     ),
-    // 3. FOCUS: Stay in flow
+    // 3. TRACK: Every minute counts
+    WalkthroughPage(
+      icon: "clock.badge.checkmark.fill",
+      iconColors: [.blue, .cyan],
+      title: "Track Everything",
+      subtitle: "One tap. Zero friction. Pure accountability.",
+      features: [
+        FeatureItem(icon: "play.circle.fill", text: "Start tracking in one tap", color: .green),
+        FeatureItem(icon: "chart.bar.fill", text: "See where your time actually goes", color: .blue),
+        FeatureItem(icon: "applewatch", text: "Track from your Apple Watch", color: .purple),
+      ],
+      testimonial: "\"Found out I worked 9hrs, billed 4.\" - Jake"
+    ),
+    // 4. FOCUS: Deep work mode
     WalkthroughPage(
       icon: "timer",
       iconColors: [.red, .orange],
       title: "Stay Focused",
-      subtitle: "Pomodoro timer. Focus mode. Deep work.",
+      subtitle: "Pomodoro. Focus mode. No distractions.",
       features: [
-        FeatureItem(icon: "timer", text: "25-minute focus sessions", color: .red),
-        FeatureItem(icon: "bell.slash.fill", text: "Silence notifications automatically", color: .orange),
-        FeatureItem(icon: "applewatch", text: "Timer on your Apple Watch", color: .green),
+        FeatureItem(icon: "moon.fill", text: "Focus mode silences everything", color: .indigo),
+        FeatureItem(icon: "flame.fill", text: "Build focus streaks", color: .orange),
+        FeatureItem(icon: "bell.slash.fill", text: "DND syncs automatically", color: .red),
       ],
-      testimonial: "\"Focus mode from my watch. No excuses anymore.\" - Raj"
+      testimonial: "\"Built my MVP in 6 weeks. Focus mode.\" - Raj"
     ),
-    // 4. FINAL: Everything synced
+    // 5. GET PAID: Invoice instantly
     WalkthroughPage(
-      icon: "sparkles",
-      iconColors: [.purple, .pink],
-      title: "Your Pocket Office",
-      subtitle: "Track. Invoice. Focus. All synced.",
+      icon: "dollarsign.circle.fill",
+      iconColors: [.green, .teal],
+      title: "Get Paid Fast",
+      subtitle: "Track hours → Generate invoice → Collect money.",
       features: [
-        FeatureItem(icon: "icloud.fill", text: "Changes sync to Mac instantly", color: .blue),
+        FeatureItem(icon: "wand.and.stars", text: "Auto-invoices from tracked time", color: .purple),
+        FeatureItem(icon: "arrow.clockwise", text: "Recurring invoices on autopilot", color: .teal),
+        FeatureItem(icon: "bell.badge.fill", text: "Payment alerts on your phone", color: .orange),
+      ],
+      testimonial: "\"Sent invoice at 2am. Paid by breakfast.\" - Priya"
+    ),
+    // 6. FINAL: Everything synced
+    WalkthroughPage(
+      icon: "icloud.fill",
+      iconColors: [.purple, .blue],
+      title: "Always In Sync",
+      subtitle: "iPhone. iPad. Mac. Watch. All connected.",
+      features: [
         FeatureItem(icon: "lock.shield.fill", text: "Your data stays on your devices", color: .green),
-        FeatureItem(icon: "applewatch", text: "Works on iPhone, iPad, Watch", color: .purple),
+        FeatureItem(icon: "arrow.triangle.2.circlepath", text: "Real-time sync across everything", color: .blue),
+        FeatureItem(icon: "hand.raised.fill", text: "No account required", color: .purple),
       ],
       isLastPage: true,
       showTestimonials: true
@@ -229,26 +285,56 @@ struct WelcomeWalkthroughView: View {
   var body: some View {
     GeometryReader { geometry in
       ZStack {
-        // Background gradient
-        LinearGradient(
-          colors: [
-            Color(pages[currentPage].iconColors[0]).opacity(0.1),
-            Color(pages[currentPage].iconColors[1]).opacity(0.05),
-          ],
-          startPoint: .topLeading,
-          endPoint: .bottomTrailing
+        // MARK: - Animated Background
+        AnimatedGradientBackground(
+          colors: pages[currentPage].iconColors,
+          geometry: geometry
         )
-        .animation(.easeInOut(duration: 0.5), value: currentPage)
         .ignoresSafeArea()
 
+        // MARK: - Floating Orbs (Parallax Background)
+        ForEach(floatingOrbs) { orb in
+          Circle()
+            .fill(
+              RadialGradient(
+                colors: [orb.color.opacity(orb.opacity), orb.color.opacity(0)],
+                center: .center,
+                startRadius: 0,
+                endRadius: orb.size / 2
+              )
+            )
+            .frame(width: orb.size, height: orb.size)
+            .position(x: orb.x, y: orb.y)
+            .blur(radius: orb.size * 0.1)
+        }
+
+        // MARK: - Confetti (Final Page)
+        if showConfetti {
+          ForEach(confettiParticles) { particle in
+            ConfettiView(particle: particle)
+          }
+        }
+
         VStack(spacing: 0) {
-          // Page content
+          // MARK: - Progress Bar
+          ProgressBarView(
+            currentPage: currentPage,
+            totalPages: pages.count,
+            colors: pages[currentPage].iconColors,
+            progress: progressAnimation
+          )
+          .padding(.top, 20)
+          .padding(.horizontal, 40)
+
+          // MARK: - Page Content
           TabView(selection: $currentPage) {
             ForEach(0..<pages.count, id: \.self) { index in
               WalkthroughPageView(
                 page: pages[index],
                 isAnimating: currentPage == index,
-                testimonials: testimonials
+                testimonials: testimonials,
+                geometry: geometry,
+                pageIndex: index
               )
               .tag(index)
             }
@@ -258,119 +344,310 @@ struct WelcomeWalkthroughView: View {
           #else
           .tabViewStyle(.page(indexDisplayMode: .never))
           #endif
+          .onChange(of: currentPage) { oldValue, newValue in
+            // Haptic feedback on iOS
+            #if os(iOS)
+            let impact = UIImpactFeedbackGenerator(style: .light)
+            impact.impactOccurred()
+            #endif
 
-          // Bottom controls
-          VStack(spacing: 20) {
-            // Page indicator with counter
-            VStack(spacing: 8) {
-              HStack(spacing: 8) {
-                ForEach(0..<pages.count, id: \.self) { index in
-                  Circle()
-                    .fill(currentPage == index ? pages[currentPage].iconColors[0] : Color.secondary.opacity(0.3))
-                    .frame(width: currentPage == index ? 10 : 8, height: currentPage == index ? 10 : 8)
-                    .animation(.spring(response: 0.3), value: currentPage)
-                    .onTapGesture {
-                      withAnimation { currentPage = index }
-                    }
-                    .accessibilityLabel("Page \(index + 1) of \(pages.count)")
-                }
-              }
-              Text("\(currentPage + 1) of \(pages.count)")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            // Animate progress bar
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+              progressAnimation = CGFloat(newValue) / CGFloat(pages.count - 1)
             }
-            .padding(.bottom, 8)
 
-            // Buttons
-            HStack(spacing: 16) {
-              if currentPage > 0 {
-                Button(action: {
-                  withAnimation(.spring(response: 0.4)) {
-                    currentPage -= 1
-                  }
-                }) {
-                  HStack {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                  }
-                  .frame(width: 100)
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-              } else {
-                Spacer().frame(width: 100)
-              }
-
-              Spacer()
-
-              if pages[currentPage].isLastPage {
-                Button(action: {
-                  appState.completeWelcomeWalkthrough()
-                }) {
-                  HStack {
-                    Text("Get Started")
-                    Image(systemName: "arrow.right")
-                  }
-                  .font(.headline)
-                  .foregroundColor(.white)
-                  .frame(width: 160, height: 44)
-                  .background(
-                    LinearGradient(
-                      colors: pages[currentPage].iconColors,
-                      startPoint: .leading,
-                      endPoint: .trailing
-                    )
-                  )
-                  .cornerRadius(22)
-                  .shadow(color: pages[currentPage].iconColors[0].opacity(0.4), radius: 8, y: 4)
-                }
-                .buttonStyle(.plain)
-              } else {
-                Button(action: {
-                  withAnimation(.spring(response: 0.4)) {
-                    currentPage += 1
-                  }
-                }) {
-                  HStack {
-                    Text("Next")
-                    Image(systemName: "chevron.right")
-                  }
-                  .font(.headline)
-                  .foregroundColor(.white)
-                  .frame(width: 120, height: 44)
-                  .background(
-                    LinearGradient(
-                      colors: pages[currentPage].iconColors,
-                      startPoint: .leading,
-                      endPoint: .trailing
-                    )
-                  )
-                  .cornerRadius(22)
-                  .shadow(color: pages[currentPage].iconColors[0].opacity(0.4), radius: 8, y: 4)
-                }
-                .buttonStyle(.plain)
-              }
-            }
-            .padding(.horizontal, 40)
-
-            // Skip button (except on last page)
-            if !pages[currentPage].isLastPage {
-              Button(action: {
-                appState.completeWelcomeWalkthrough()
-              }) {
-                Text("Skip")
-                  .font(.subheadline)
-                  .foregroundColor(.secondary)
-              }
-              .buttonStyle(.plain)
-              .padding(.top, 8)
+            // Show confetti on last page
+            if pages[newValue].isLastPage && !showConfetti {
+              triggerConfetti(geometry: geometry)
             }
           }
-          .padding(.bottom, 40)
+
+          // MARK: - Bottom Navigation
+          BottomNavigationView(
+            currentPage: $currentPage,
+            pages: pages,
+            onComplete: { appState.completeWelcomeWalkthrough() }
+          )
+          .padding(.bottom, 30)
         }
       }
     }
     .frame(minWidth: 500, minHeight: 600)
+    .onAppear {
+      setupFloatingOrbs()
+      startAnimations()
+    }
+    .onDisappear {
+      animationTimer?.invalidate()
+    }
+  }
+
+  // MARK: - Setup Floating Orbs
+  private func setupFloatingOrbs() {
+    floatingOrbs = (0..<8).map { i in
+      FloatingOrb(
+        x: CGFloat.random(in: 50...450),
+        y: CGFloat.random(in: 50...550),
+        size: CGFloat.random(in: 60...200),
+        color: [Color.purple, .blue, .pink, .orange, .teal, .yellow].randomElement()!,
+        opacity: Double.random(in: 0.1...0.25),
+        speed: Double.random(in: 0.3...0.8),
+        phase: Double.random(in: 0...2 * .pi)
+      )
+    }
+  }
+
+  // MARK: - Start Animations
+  private func startAnimations() {
+    var time: Double = 0
+    animationTimer = Timer.scheduledTimer(withTimeInterval: 1/30, repeats: true) { _ in
+      time += 0.02
+      withAnimation(.linear(duration: 0.03)) {
+        for i in floatingOrbs.indices {
+          let orb = floatingOrbs[i]
+          floatingOrbs[i].x = orb.x + CGFloat(sin(time * orb.speed + orb.phase)) * 0.5
+          floatingOrbs[i].y = orb.y + CGFloat(cos(time * orb.speed * 0.7 + orb.phase)) * 0.3
+        }
+      }
+    }
+  }
+
+  // MARK: - Trigger Confetti
+  private func triggerConfetti(geometry: GeometryProxy) {
+    showConfetti = true
+    confettiParticles = (0..<50).map { _ in
+      ConfettiParticle(
+        x: geometry.size.width / 2,
+        y: -20,
+        rotation: Double.random(in: 0...360),
+        scale: CGFloat.random(in: 0.5...1.2),
+        color: [.purple, .pink, .orange, .yellow, .green, .blue, .red].randomElement()!,
+        speed: Double.random(in: 2...5)
+      )
+    }
+
+    // Animate confetti falling
+    withAnimation(.easeOut(duration: 3)) {
+      for i in confettiParticles.indices {
+        confettiParticles[i].y = geometry.size.height + 50
+        confettiParticles[i].x += CGFloat.random(in: -200...200)
+        confettiParticles[i].rotation += Double.random(in: 360...1080)
+      }
+    }
+
+    // Haptic feedback
+    #if os(iOS)
+    let generator = UINotificationFeedbackGenerator()
+    generator.notificationOccurred(.success)
+    #endif
+  }
+}
+
+// MARK: - Animated Gradient Background
+struct AnimatedGradientBackground: View {
+  let colors: [Color]
+  let geometry: GeometryProxy
+  @State private var animateGradient = false
+
+  var body: some View {
+    ZStack {
+      // Base gradient
+      LinearGradient(
+        colors: [
+          colors[0].opacity(0.15),
+          colors[1].opacity(0.08),
+          Color.clear
+        ],
+        startPoint: animateGradient ? .topLeading : .topTrailing,
+        endPoint: animateGradient ? .bottomTrailing : .bottomLeading
+      )
+
+      // Animated mesh-like overlay
+      EllipticalGradient(
+        colors: [colors[0].opacity(0.1), Color.clear],
+        center: animateGradient ? .topLeading : .bottomTrailing,
+        startRadiusFraction: 0,
+        endRadiusFraction: 0.8
+      )
+
+      // Second animated overlay
+      EllipticalGradient(
+        colors: [colors[1].opacity(0.08), Color.clear],
+        center: animateGradient ? .bottomTrailing : .topLeading,
+        startRadiusFraction: 0,
+        endRadiusFraction: 0.6
+      )
+    }
+    .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateGradient)
+    .onAppear { animateGradient = true }
+    .animation(.easeInOut(duration: 0.8), value: colors)
+  }
+}
+
+// MARK: - Progress Bar View
+struct ProgressBarView: View {
+  let currentPage: Int
+  let totalPages: Int
+  let colors: [Color]
+  let progress: CGFloat
+
+  var body: some View {
+    VStack(spacing: 8) {
+      // Step indicators
+      HStack(spacing: 4) {
+        ForEach(0..<totalPages, id: \.self) { index in
+          Capsule()
+            .fill(index <= currentPage ?
+              LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing) :
+              LinearGradient(colors: [Color.secondary.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
+            )
+            .frame(height: 4)
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentPage)
+        }
+      }
+
+      // Page label
+      HStack {
+        Text("Step \(currentPage + 1) of \(totalPages)")
+          .font(.caption)
+          .fontWeight(.medium)
+          .foregroundColor(.secondary)
+
+        Spacer()
+
+        // Percentage complete
+        Text("\(Int(progress * 100))% complete")
+          .font(.caption)
+          .fontWeight(.medium)
+          .foregroundColor(colors[0])
+      }
+    }
+  }
+}
+
+// MARK: - Confetti View
+struct ConfettiView: View {
+  let particle: ConfettiParticle
+  @State private var appear = false
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: 2)
+      .fill(particle.color)
+      .frame(width: 8 * particle.scale, height: 12 * particle.scale)
+      .rotationEffect(.degrees(particle.rotation))
+      .position(x: particle.x, y: particle.y)
+      .opacity(appear ? 0.8 : 0)
+      .onAppear {
+        withAnimation(.easeOut(duration: 0.2)) {
+          appear = true
+        }
+      }
+  }
+}
+
+// MARK: - Bottom Navigation View
+struct BottomNavigationView: View {
+  @Binding var currentPage: Int
+  let pages: [WalkthroughPage]
+  let onComplete: () -> Void
+
+  var body: some View {
+    VStack(spacing: 16) {
+      // Main action button
+      HStack(spacing: 20) {
+        // Back button
+        if currentPage > 0 {
+          Button(action: {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+              currentPage -= 1
+            }
+          }) {
+            HStack(spacing: 6) {
+              Image(systemName: "chevron.left")
+                .font(.system(size: 14, weight: .semibold))
+              Text("Back")
+                .font(.system(size: 15, weight: .medium))
+            }
+            .foregroundColor(.secondary)
+            .frame(width: 90, height: 44)
+            .background(
+              RoundedRectangle(cornerRadius: 22)
+                .fill(Color.primary.opacity(0.05))
+            )
+          }
+          .buttonStyle(.plain)
+          .transition(.opacity.combined(with: .move(edge: .leading)))
+        }
+
+        Spacer()
+
+        // Next / Get Started button
+        Button(action: {
+          if pages[currentPage].isLastPage {
+            onComplete()
+          } else {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+              currentPage += 1
+            }
+          }
+        }) {
+          HStack(spacing: 8) {
+            Text(pages[currentPage].isLastPage ? "Get Started" : "Continue")
+              .font(.system(size: 16, weight: .semibold))
+
+            Image(systemName: pages[currentPage].isLastPage ? "arrow.right" : "chevron.right")
+              .font(.system(size: 14, weight: .semibold))
+              .offset(x: pages[currentPage].isLastPage ? 0 : 0)
+          }
+          .foregroundColor(.white)
+          .frame(width: pages[currentPage].isLastPage ? 160 : 140, height: 50)
+          .background(
+            ZStack {
+              // Gradient background
+              LinearGradient(
+                colors: pages[currentPage].iconColors,
+                startPoint: .leading,
+                endPoint: .trailing
+              )
+
+              // Shine effect
+              LinearGradient(
+                colors: [.white.opacity(0.3), .clear, .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            }
+          )
+          .clipShape(Capsule())
+          .shadow(color: pages[currentPage].iconColors[0].opacity(0.4), radius: 12, y: 6)
+          .scaleEffect(pages[currentPage].isLastPage ? 1.05 : 1.0)
+          .animation(.spring(response: 0.3), value: pages[currentPage].isLastPage)
+        }
+        .buttonStyle(BounceButtonStyle())
+      }
+      .padding(.horizontal, 30)
+
+      // Skip button
+      if !pages[currentPage].isLastPage {
+        Button(action: onComplete) {
+          Text("Skip for now")
+            .font(.system(size: 14))
+            .foregroundColor(.secondary.opacity(0.7))
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity)
+      }
+    }
+    .animation(.easeInOut(duration: 0.3), value: currentPage)
+  }
+}
+
+// MARK: - Bounce Button Style
+struct BounceButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+      .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
   }
 }
 
@@ -382,8 +659,8 @@ struct WalkthroughPage {
   let subtitle: String
   let features: [FeatureItem]
   var isLastPage: Bool = false
-  var testimonial: String? = nil  // Mini testimonial for feature pages
-  var showTestimonials: Bool = false  // Show full testimonials carousel
+  var testimonial: String? = nil
+  var showTestimonials: Bool = false
 }
 
 struct FeatureItem {
@@ -397,188 +674,360 @@ struct WalkthroughPageView: View {
   let page: WalkthroughPage
   let isAnimating: Bool
   var testimonials: [Testimonial] = []
+  let geometry: GeometryProxy
+  let pageIndex: Int
+
+  @State private var showIcon = false
+  @State private var showTitle = false
   @State private var showFeatures = false
   @State private var currentTestimonialIndex = 0
+  @State private var iconRotation: Double = 0
+  @State private var iconScale: CGFloat = 0.3
+  @State private var testimonialTimer: Timer?
 
   var body: some View {
-    VStack(spacing: 20) {
+    VStack(spacing: 24) {
       Spacer()
 
-      // Animated icon
+      // MARK: - Animated Icon
       ZStack {
+        // Outer pulsing ring
+        ForEach(0..<3) { i in
+          Circle()
+            .stroke(
+              LinearGradient(
+                colors: [page.iconColors[0].opacity(0.4), page.iconColors[1].opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              ),
+              lineWidth: 2
+            )
+            .frame(width: 100 + CGFloat(i * 30), height: 100 + CGFloat(i * 30))
+            .scaleEffect(showIcon ? 1.0 + CGFloat(i) * 0.1 : 0.5)
+            .opacity(showIcon ? 0.6 - Double(i) * 0.2 : 0)
+            .animation(
+              .easeOut(duration: 1.2).delay(Double(i) * 0.15),
+              value: showIcon
+            )
+        }
+
         // Outer glow
         Circle()
           .fill(
             RadialGradient(
-              colors: [page.iconColors[0].opacity(0.3), .clear],
+              colors: [page.iconColors[0].opacity(0.4), .clear],
               center: .center,
               startRadius: 0,
-              endRadius: 80
+              endRadius: 70
             )
           )
           .frame(width: 140, height: 140)
-          .scaleEffect(isAnimating ? 1.2 : 1.0)
-          .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: isAnimating)
+          .scaleEffect(isAnimating ? 1.15 : 1.0)
+          .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: isAnimating)
 
-        // Icon background
-        Circle()
-          .fill(
-            LinearGradient(
-              colors: page.iconColors,
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
+        // Icon background with 3D effect
+        ZStack {
+          // Shadow layer
+          Circle()
+            .fill(
+              LinearGradient(
+                colors: [page.iconColors[0].opacity(0.8), page.iconColors[1]],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
             )
-          )
-          .frame(width: 90, height: 90)
-          .shadow(color: page.iconColors[0].opacity(0.5), radius: 20, y: 10)
+            .frame(width: 88, height: 88)
+            .offset(y: 4)
+            .blur(radius: 8)
+            .opacity(0.5)
+
+          // Main circle
+          Circle()
+            .fill(
+              LinearGradient(
+                colors: page.iconColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            )
+            .frame(width: 88, height: 88)
+            .overlay(
+              // Highlight
+              Circle()
+                .fill(
+                  LinearGradient(
+                    colors: [.white.opacity(0.4), .clear],
+                    startPoint: .topLeading,
+                    endPoint: .center
+                  )
+                )
+                .frame(width: 88, height: 88)
+            )
+            .shadow(color: page.iconColors[0].opacity(0.5), radius: 20, y: 10)
+        }
+        .scaleEffect(iconScale)
+        .rotationEffect(.degrees(iconRotation))
 
         // Icon
         Image(systemName: page.icon)
-          .font(.system(size: 40, weight: .medium))
+          .font(.system(size: 38, weight: .medium))
           .foregroundColor(.white)
-          .symbolEffect(.pulse, options: .repeating, value: isAnimating)
+          .scaleEffect(iconScale)
+          .symbolEffect(.bounce, options: .repeating.speed(0.3), value: isAnimating)
       }
-      .padding(.bottom, 12)
+      .frame(height: 180)
 
-      // Title
-      Text(page.title)
-        .font(.system(size: 28, weight: .bold, design: .rounded))
-        .foregroundColor(.primary)
-        .multilineTextAlignment(.center)
+      // MARK: - Title with stagger animation
+      VStack(spacing: 8) {
+        Text(page.title)
+          .font(.system(size: 32, weight: .bold, design: .rounded))
+          .foregroundColor(.primary)
+          .multilineTextAlignment(.center)
+          .opacity(showTitle ? 1 : 0)
+          .offset(y: showTitle ? 0 : 20)
 
-      // Subtitle
-      Text(page.subtitle)
-        .font(.system(size: 16))
-        .foregroundColor(.secondary)
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, 40)
-
-      // Feature list
-      VStack(spacing: 12) {
-        ForEach(Array(page.features.enumerated()), id: \.offset) { index, feature in
-          HStack(spacing: 14) {
-            ZStack {
-              Circle()
-                .fill(feature.color.opacity(0.15))
-                .frame(width: 36, height: 36)
-
-              Image(systemName: feature.icon)
-                .font(.system(size: 16))
-                .foregroundColor(feature.color)
-            }
-
-            Text(feature.text)
-              .font(.system(size: 14))
-              .foregroundColor(.primary)
-
-            Spacer()
-          }
-          .padding(.horizontal, 16)
-          .padding(.vertical, 6)
-          .background(
-            RoundedRectangle(cornerRadius: 10)
-              .fill(Color.primary.opacity(0.03))
-          )
-          .offset(x: showFeatures ? 0 : 50)
-          .opacity(showFeatures ? 1 : 0)
-          .animation(
-            .spring(response: 0.5, dampingFraction: 0.8).delay(Double(index) * 0.1),
-            value: showFeatures
-          )
-        }
-      }
-      .frame(maxWidth: 380)
-      .padding(.top, 16)
-
-      // Mini testimonial (for feature pages like Dig)
-      if let testimonial = page.testimonial {
-        Text(testimonial)
-          .font(.system(size: 13, weight: .medium, design: .serif))
-          .italic()
+        Text(page.subtitle)
+          .font(.system(size: 17, weight: .medium))
           .foregroundColor(.secondary)
           .multilineTextAlignment(.center)
           .padding(.horizontal, 40)
+          .opacity(showTitle ? 1 : 0)
+          .offset(y: showTitle ? 0 : 15)
+          .animation(.spring(response: 0.6).delay(0.1), value: showTitle)
+      }
+      .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showTitle)
+
+      // MARK: - Feature List with stagger
+      VStack(spacing: 14) {
+        ForEach(Array(page.features.enumerated()), id: \.offset) { index, feature in
+          FeatureRow(feature: feature, index: index, isVisible: showFeatures)
+        }
+      }
+      .frame(maxWidth: 400)
+      .padding(.top, 8)
+
+      // MARK: - Mini Testimonial
+      if let testimonial = page.testimonial {
+        Text(testimonial)
+          .font(.system(size: 14, weight: .medium, design: .serif))
+          .italic()
+          .foregroundColor(.secondary)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 50)
           .padding(.top, 8)
-          .offset(y: showFeatures ? 0 : 20)
           .opacity(showFeatures ? 1 : 0)
-          .animation(.spring(response: 0.5).delay(0.4), value: showFeatures)
+          .offset(y: showFeatures ? 0 : 10)
+          .animation(.spring(response: 0.6).delay(0.5), value: showFeatures)
       }
 
-      // Full testimonials carousel (for final page)
+      // MARK: - Full Testimonials Carousel (Final Page)
       if page.showTestimonials && !testimonials.isEmpty {
-        TestimonialCard(testimonial: testimonials[currentTestimonialIndex])
-          .frame(maxWidth: 400)
-          .padding(.top, 8)
-          .offset(y: showFeatures ? 0 : 20)
-          .opacity(showFeatures ? 1 : 0)
-          .animation(.spring(response: 0.5).delay(0.3), value: showFeatures)
-          .onAppear {
-            // Auto-rotate testimonials
-            Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
-              withAnimation(.easeInOut(duration: 0.5)) {
-                currentTestimonialIndex = (currentTestimonialIndex + 1) % testimonials.count
-              }
+        VStack(spacing: 12) {
+          TestimonialCard(testimonial: testimonials[currentTestimonialIndex])
+            .frame(maxWidth: 420)
+            .transition(.asymmetric(
+              insertion: .move(edge: .trailing).combined(with: .opacity),
+              removal: .move(edge: .leading).combined(with: .opacity)
+            ))
+            .id(currentTestimonialIndex)
+
+          // Testimonial indicators
+          HStack(spacing: 8) {
+            ForEach(0..<min(testimonials.count, 5), id: \.self) { index in
+              Capsule()
+                .fill(currentTestimonialIndex == index ?
+                  testimonials[index].color :
+                  Color.secondary.opacity(0.3)
+                )
+                .frame(width: currentTestimonialIndex == index ? 20 : 8, height: 8)
+                .animation(.spring(response: 0.3), value: currentTestimonialIndex)
+                .onTapGesture {
+                  withAnimation(.spring(response: 0.4)) {
+                    currentTestimonialIndex = index
+                  }
+                }
             }
           }
-
-        // Testimonial indicators
-        HStack(spacing: 6) {
-          ForEach(0..<testimonials.count, id: \.self) { index in
-            Circle()
-              .fill(currentTestimonialIndex == index ? testimonials[index].color : Color.secondary.opacity(0.3))
-              .frame(width: 6, height: 6)
-              .onTapGesture {
-                withAnimation { currentTestimonialIndex = index }
-              }
-          }
         }
-        .padding(.top, 4)
+        .padding(.top, 8)
+        .opacity(showFeatures ? 1 : 0)
+        .offset(y: showFeatures ? 0 : 20)
+        .animation(.spring(response: 0.6).delay(0.4), value: showFeatures)
+        .onAppear {
+          startTestimonialRotation()
+        }
+        .onDisappear {
+          testimonialTimer?.invalidate()
+        }
       }
 
       Spacer()
     }
     .padding()
     .onAppear {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-        showFeatures = true
-      }
+      triggerEntranceAnimation()
     }
     .onChange(of: isAnimating) { _, newValue in
       if newValue {
-        showFeatures = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-          showFeatures = true
-        }
+        resetAndTriggerAnimation()
       }
     }
+  }
+
+  // MARK: - Animation Triggers
+  private func triggerEntranceAnimation() {
+    // Icon entrance
+    withAnimation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.1)) {
+      showIcon = true
+      iconScale = 1.0
+    }
+
+    // Small rotation for playfulness
+    withAnimation(.spring(response: 0.8, dampingFraction: 0.5).delay(0.1)) {
+      iconRotation = 360
+    }
+
+    // Title entrance
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+      withAnimation {
+        showTitle = true
+      }
+    }
+
+    // Features entrance
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+      withAnimation {
+        showFeatures = true
+      }
+    }
+  }
+
+  private func resetAndTriggerAnimation() {
+    showIcon = false
+    showTitle = false
+    showFeatures = false
+    iconScale = 0.3
+    iconRotation = 0
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+      triggerEntranceAnimation()
+    }
+  }
+
+  private func startTestimonialRotation() {
+    testimonialTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+      withAnimation(.spring(response: 0.5)) {
+        currentTestimonialIndex = (currentTestimonialIndex + 1) % min(testimonials.count, 5)
+      }
+    }
+  }
+}
+
+// MARK: - Feature Row
+struct FeatureRow: View {
+  let feature: FeatureItem
+  let index: Int
+  let isVisible: Bool
+
+  var body: some View {
+    HStack(spacing: 16) {
+      // Icon with animated background
+      ZStack {
+        Circle()
+          .fill(feature.color.opacity(0.15))
+          .frame(width: 42, height: 42)
+
+        Circle()
+          .stroke(feature.color.opacity(0.3), lineWidth: 1.5)
+          .frame(width: 42, height: 42)
+
+        Image(systemName: feature.icon)
+          .font(.system(size: 18, weight: .medium))
+          .foregroundColor(feature.color)
+      }
+
+      Text(feature.text)
+        .font(.system(size: 15, weight: .medium))
+        .foregroundColor(.primary)
+
+      Spacer()
+
+      // Checkmark that appears
+      Image(systemName: "checkmark.circle.fill")
+        .font(.system(size: 18))
+        .foregroundColor(feature.color.opacity(0.6))
+        .opacity(isVisible ? 1 : 0)
+        .scaleEffect(isVisible ? 1 : 0.5)
+        .animation(.spring(response: 0.4).delay(Double(index) * 0.1 + 0.3), value: isVisible)
+    }
+    .padding(.horizontal, 18)
+    .padding(.vertical, 12)
+    .background(
+      RoundedRectangle(cornerRadius: 14)
+        .fill(Color.primary.opacity(0.03))
+        .overlay(
+          RoundedRectangle(cornerRadius: 14)
+            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
+    )
+    .offset(x: isVisible ? 0 : 60)
+    .opacity(isVisible ? 1 : 0)
+    .animation(
+      .spring(response: 0.6, dampingFraction: 0.75).delay(Double(index) * 0.12),
+      value: isVisible
+    )
   }
 }
 
 // MARK: - Testimonial Card
 struct TestimonialCard: View {
   let testimonial: Testimonial
+  @State private var isHovered = false
+
+  private var cardBackgroundColor: Color {
+    #if os(iOS)
+    return Color(uiColor: .systemBackground).opacity(0.5)
+    #else
+    return Color(nsColor: .windowBackgroundColor).opacity(0.5)
+    #endif
+  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      // Quote
-      HStack(alignment: .top, spacing: 8) {
+    VStack(alignment: .leading, spacing: 12) {
+      // Quote with feature badge
+      HStack(alignment: .top, spacing: 10) {
         Image(systemName: "quote.opening")
-          .font(.system(size: 16))
-          .foregroundColor(testimonial.color.opacity(0.6))
+          .font(.system(size: 20, weight: .bold))
+          .foregroundColor(testimonial.color.opacity(0.5))
 
-        Text(testimonial.quote)
-          .font(.system(size: 13, design: .serif))
-          .italic()
-          .foregroundColor(.primary.opacity(0.9))
-          .lineLimit(3)
+        VStack(alignment: .leading, spacing: 8) {
+          Text(testimonial.quote)
+            .font(.system(size: 14, weight: .medium, design: .serif))
+            .italic()
+            .foregroundColor(.primary.opacity(0.85))
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+        }
       }
 
-      // Attribution
+      // Attribution with feature tag
       HStack {
+        // Feature tag
+        Text(testimonial.feature)
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundColor(testimonial.color)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 4)
+          .background(
+            Capsule()
+              .fill(testimonial.color.opacity(0.15))
+          )
+
         Spacer()
+
         VStack(alignment: .trailing, spacing: 2) {
           Text(testimonial.name)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
             .foregroundColor(.primary)
           Text(testimonial.role)
             .font(.system(size: 11))
@@ -586,20 +1035,35 @@ struct TestimonialCard: View {
         }
       }
     }
-    .padding(16)
+    .padding(18)
     .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(testimonial.color.opacity(0.08))
+      RoundedRectangle(cornerRadius: 16)
+        .fill(cardBackgroundColor)
         .overlay(
-          RoundedRectangle(cornerRadius: 12)
-            .stroke(testimonial.color.opacity(0.2), lineWidth: 1)
+          RoundedRectangle(cornerRadius: 16)
+            .stroke(
+              LinearGradient(
+                colors: [testimonial.color.opacity(0.3), testimonial.color.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              ),
+              lineWidth: 1.5
+            )
         )
+        .shadow(color: testimonial.color.opacity(0.1), radius: 12, y: 4)
     )
+    .scaleEffect(isHovered ? 1.02 : 1.0)
+    .animation(.spring(response: 0.3), value: isHovered)
+    #if os(macOS)
+    .onHover { hovering in
+      isHovered = hovering
+    }
+    #endif
   }
 }
 
 #Preview("Welcome Walkthrough") {
   WelcomeWalkthroughView()
     .environmentObject(AppState())
-    .frame(width: 600, height: 700)
+    .frame(width: 600, height: 750)
 }

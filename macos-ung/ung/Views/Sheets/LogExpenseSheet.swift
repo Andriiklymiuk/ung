@@ -97,10 +97,10 @@ struct LogExpenseSheet: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Log Expense")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Design.Typography.headingSmall)
                 Text("Track your business expenses")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .font(Design.Typography.bodySmall)
+                    .foregroundColor(Design.Colors.textSecondary)
             }
 
             Spacer()
@@ -108,36 +108,36 @@ struct LogExpenseSheet: View {
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 18))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Design.Colors.textTertiary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DSInteractiveStyle())
         }
-        .padding(16)
+        .padding(Design.Spacing.md)
     }
 
     // MARK: - Description Input
     private var descriptionInputSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
             Text("Description")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.labelSmall)
+                .foregroundColor(Design.Colors.textSecondary)
 
-            HStack(spacing: 8) {
+            HStack(spacing: Design.Spacing.xs) {
                 Image(systemName: "text.alignleft")
-                    .font(.system(size: 12))
-                    .foregroundColor(.orange)
+                    .font(.system(size: Design.IconSize.xs))
+                    .foregroundColor(Design.Colors.primary)
 
                 TextField("What did you spend on?", text: $description)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(Design.Typography.bodyMedium)
             }
-            .padding(10)
+            .padding(Design.Spacing.sm)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Design.Radius.sm)
                     .fill(Design.Colors.controlBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Design.Radius.sm)
+                            .stroke(Design.Colors.primary.opacity(0.3), lineWidth: 1)
                     )
             )
         }
@@ -145,27 +145,27 @@ struct LogExpenseSheet: View {
 
     // MARK: - Amount Input
     private var amountInputSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
             Text("Amount")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.labelSmall)
+                .foregroundColor(Design.Colors.textSecondary)
 
-            HStack(spacing: 8) {
+            HStack(spacing: Design.Spacing.xs) {
                 Image(systemName: "dollarsign.circle.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(.green)
+                    .font(.system(size: Design.IconSize.xs))
+                    .foregroundColor(Design.Colors.success)
 
                 TextField("0.00", text: $amountText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
             }
-            .padding(10)
+            .padding(Design.Spacing.sm)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Design.Radius.sm)
                     .fill(Design.Colors.controlBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Design.Radius.sm)
+                            .stroke(Design.Colors.success.opacity(0.3), lineWidth: 1)
                     )
             )
         }
@@ -173,20 +173,20 @@ struct LogExpenseSheet: View {
 
     // MARK: - Category Selection
     private var categorySelectionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
             Text("Category")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.labelSmall)
+                .foregroundColor(Design.Colors.textSecondary)
 
             LazyVGrid(columns: [
                 GridItem(.flexible()),
                 GridItem(.flexible())
-            ], spacing: 8) {
+            ], spacing: Design.Spacing.xs) {
                 ForEach(ExpenseCategory.allCases, id: \.self) { category in
                     CategoryButton(
                         category: category,
                         isSelected: selectedCategory == category,
-                        action: { selectedCategory = category }
+                        action: { withAnimation(Design.Animation.snappy) { selectedCategory = category } }
                     )
                 }
             }
@@ -195,12 +195,11 @@ struct LogExpenseSheet: View {
 
     // MARK: - Footer
     private var footerSection: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Design.Spacing.sm) {
             Button("Cancel") {
                 dismiss()
             }
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
+            .buttonStyle(DSGhostButtonStyle())
 
             Spacer()
 
@@ -209,25 +208,18 @@ struct LogExpenseSheet: View {
                     if isLogging {
                         ProgressView()
                             .scaleEffect(0.7)
+                            .tint(.white)
                     } else {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 10))
                     }
                     Text("Log Expense")
-                        .font(.system(size: 12, weight: .semibold))
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isValid ? Color.orange : Color.gray)
-                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DSCompactButtonStyle(isDisabled: !isValid))
             .disabled(!isValid || isLogging)
         }
-        .padding(16)
+        .padding(Design.Spacing.md)
     }
 
     // MARK: - Actions
@@ -257,29 +249,29 @@ struct CategoryButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: Design.Spacing.xs) {
                 Image(systemName: category.icon)
                     .font(.system(size: 11))
-                    .foregroundColor(isSelected ? category.color : .secondary)
+                    .foregroundColor(isSelected ? Design.Colors.primary : Design.Colors.textSecondary)
 
                 Text(category.rawValue)
-                    .font(.system(size: 11))
-                    .foregroundColor(isSelected ? .primary : .secondary)
+                    .font(Design.Typography.labelSmall)
+                    .foregroundColor(isSelected ? Design.Colors.textPrimary : Design.Colors.textSecondary)
                     .lineLimit(1)
 
                 Spacer()
             }
-            .padding(8)
+            .padding(Design.Spacing.xs)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? category.color.opacity(0.15) : Design.Colors.controlBackground)
+                RoundedRectangle(cornerRadius: Design.Radius.xs)
+                    .fill(isSelected ? Design.Colors.primary.opacity(0.15) : Design.Colors.controlBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(isSelected ? category.color.opacity(0.5) : Color.clear, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Design.Radius.xs)
+                            .stroke(isSelected ? Design.Colors.primary.opacity(0.5) : Color.clear, lineWidth: 1)
                     )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DSInteractiveStyle())
     }
 }
 

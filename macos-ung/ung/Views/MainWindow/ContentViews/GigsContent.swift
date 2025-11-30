@@ -282,13 +282,13 @@ struct GigsContent: View {
     // MARK: - Header Bar
 
     private var headerBar: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: Design.Spacing.md) {
             // Stats pills
-            HStack(spacing: 8) {
+            HStack(spacing: Design.Spacing.xs) {
                 StatPill(
                     value: "\(state.gigs.count)",
                     label: "Total",
-                    color: .blue
+                    color: Design.Colors.primary
                 )
 
                 let inProgressCount = state.gigsForStatus(.inProgress).count
@@ -296,7 +296,7 @@ struct GigsContent: View {
                     StatPill(
                         value: "\(inProgressCount)",
                         label: "In Progress",
-                        color: .blue
+                        color: Design.Colors.primary
                     )
                 }
             }
@@ -305,7 +305,7 @@ struct GigsContent: View {
 
             // Add button
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(Design.Animation.snappy) {
                     state.showNewGigSheet = true
                 }
             } label: {
@@ -313,24 +313,9 @@ struct GigsContent: View {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
                     Text("New Gig")
-                        .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.blue, Color.blue.opacity(0.8)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
-                )
             }
-            .buttonStyle(ScaleButtonStyle())
+            .buttonStyle(DSPrimaryButtonStyle(size: .small))
         }
     }
 
@@ -338,7 +323,7 @@ struct GigsContent: View {
 
     private var quickAddButton: some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(Design.Animation.snappy) {
                 state.showNewGigSheet = true
             }
         } label: {
@@ -346,24 +331,24 @@ struct GigsContent: View {
                 Image(systemName: "plus.circle.fill")
                     .font(.title3)
                 Text("Add New Gig")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(Design.Typography.labelLarge)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Design.Colors.textSecondary)
             }
-            .foregroundColor(.blue)
-            .padding(14)
+            .foregroundColor(Design.Colors.primary)
+            .padding(Design.Spacing.sm)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.08))
+                RoundedRectangle(cornerRadius: Design.Radius.md)
+                    .fill(Design.Colors.primary.opacity(0.08))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Design.Radius.md)
+                            .stroke(Design.Colors.primary.opacity(0.2), lineWidth: 1)
                     )
             )
         }
-        .buttonStyle(ScaleButtonStyle())
+        .buttonStyle(DSInteractiveStyle())
     }
 }
 
@@ -375,16 +360,16 @@ struct StatPill: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Design.Spacing.xxs) {
             Text(value)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundColor(color)
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.labelSmall)
+                .foregroundColor(Design.Colors.textSecondary)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.horizontal, Design.Spacing.sm)
+        .padding(.vertical, Design.Spacing.xxs)
         .background(
             Capsule()
                 .fill(color.opacity(0.1))
@@ -401,47 +386,47 @@ struct CompactStatusSection: View {
     @State private var isExpanded = true
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Design.Spacing.sm) {
             // Section Header
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(Design.Animation.gentle) {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: Design.Spacing.sm) {
                     Circle()
                         .fill(status.color)
                         .frame(width: 8, height: 8)
 
                     Text(status.displayName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .font(Design.Typography.labelLarge)
+                        .foregroundColor(Design.Colors.textPrimary)
 
                     Text("\(gigs.count)")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Design.Colors.textSecondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(Color.secondary.opacity(0.12))
+                                .fill(Design.Colors.textSecondary.opacity(0.12))
                         )
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Design.Colors.textSecondary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, Design.Spacing.md)
+                .padding(.vertical, Design.Spacing.sm)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DSInteractiveStyle())
 
             // Cards
             if isExpanded && !gigs.isEmpty {
-                VStack(spacing: 10) {
+                VStack(spacing: Design.Spacing.sm) {
                     ForEach(gigs) { gig in
                         CompactGigCard(gig: gig, state: state)
                             .transition(.asymmetric(
@@ -450,15 +435,15 @@ struct CompactStatusSection: View {
                             ))
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Design.Spacing.md)
             }
 
             // Empty state
             if isExpanded && gigs.isEmpty {
                 Text("No gigs")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.vertical, 8)
+                    .font(Design.Typography.bodySmall)
+                    .foregroundColor(Design.Colors.textTertiary)
+                    .padding(.vertical, Design.Spacing.xs)
             }
         }
     }
@@ -476,17 +461,17 @@ struct CompactGigCard: View {
         Button {
             state.selectedGig = gig
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Design.Spacing.sm) {
                 // Progress indicator
                 ZStack {
                     Circle()
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 3)
+                        .stroke(Design.Colors.textSecondary.opacity(0.2), lineWidth: 3)
 
                     Circle()
                         .trim(from: 0, to: gig.progress)
                         .stroke(gig.gig.gigStatus.color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: gig.progress)
+                        .animation(Design.Animation.smooth, value: gig.progress)
 
                     if !gig.tasks.isEmpty {
                         Text("\(gig.completedTasksCount)")
@@ -497,23 +482,23 @@ struct CompactGigCard: View {
                 .frame(width: 36, height: 36)
 
                 // Content
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
                     Text(gig.gig.name)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.primary)
+                        .font(Design.Typography.labelLarge)
+                        .foregroundColor(Design.Colors.textPrimary)
                         .lineLimit(1)
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: Design.Spacing.xs) {
                         if let client = gig.client {
                             Text(client.name)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(Design.Typography.labelSmall)
+                                .foregroundColor(Design.Colors.textSecondary)
                         }
 
                         if gig.gig.totalHoursTracked > 0 {
                             Label(String(format: "%.1fh", gig.gig.totalHoursTracked), systemImage: "clock")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .font(Design.Typography.labelSmall)
+                                .foregroundColor(Design.Colors.textSecondary)
                         }
                     }
                 }
@@ -523,16 +508,16 @@ struct CompactGigCard: View {
                 // Chevron
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.secondary.opacity(0.5))
+                    .foregroundColor(Design.Colors.textTertiary)
             }
-            .padding(12)
+            .padding(Design.Spacing.sm)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(colorScheme == .dark ? Color(white: 0.15) : .white)
-                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.06), radius: 8, y: 2)
+                RoundedRectangle(cornerRadius: Design.Radius.md)
+                    .fill(Design.Colors.surfaceElevated(colorScheme))
+                    .shadow(color: Design.Shadow.sm.color, radius: Design.Shadow.sm.radius, y: Design.Shadow.sm.y)
             )
         }
-        .buttonStyle(ScaleButtonStyle())
+        .buttonStyle(DSInteractiveStyle())
     }
 }
 
@@ -549,14 +534,14 @@ struct KanbanColumn: View {
     var body: some View {
         VStack(spacing: 0) {
             // Column Header
-            HStack(spacing: 8) {
+            HStack(spacing: Design.Spacing.xs) {
                 Circle()
                     .fill(status.color)
                     .frame(width: 8, height: 8)
 
                 Text(status.displayName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .font(Design.Typography.labelLarge)
+                    .foregroundColor(Design.Colors.textPrimary)
 
                 Spacer()
 
@@ -570,12 +555,12 @@ struct KanbanColumn: View {
                             .fill(status.color.opacity(0.15))
                     )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Design.Spacing.sm)
+            .padding(.vertical, Design.Spacing.sm)
 
             // Cards
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 10) {
+                LazyVStack(spacing: Design.Spacing.sm) {
                     ForEach(gigs) { gig in
                         GigCard(gig: gig, state: state)
                             .draggable(gig.id) {
@@ -599,29 +584,29 @@ struct KanbanColumn: View {
                         emptyColumnView
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 16)
+                .padding(.horizontal, Design.Spacing.sm)
+                .padding(.bottom, Design.Spacing.md)
             }
         }
         .frame(width: 260)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.97))
+            RoundedRectangle(cornerRadius: Design.Radius.lg)
+                .fill(Design.Colors.backgroundSecondary(colorScheme))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: Design.Radius.lg)
                         .stroke(
                             isTargeted ? status.color.opacity(0.5) : Color.clear,
                             lineWidth: 2
                         )
                 )
                 .shadow(
-                    color: isTargeted ? status.color.opacity(0.2) : .black.opacity(colorScheme == .dark ? 0.3 : 0.05),
-                    radius: isTargeted ? 12 : 8,
-                    y: 2
+                    color: isTargeted ? status.color.opacity(0.2) : Design.Shadow.sm.color,
+                    radius: isTargeted ? 12 : Design.Shadow.sm.radius,
+                    y: Design.Shadow.sm.y
                 )
         )
         .scaleEffect(isTargeted ? 1.02 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isTargeted)
+        .animation(Design.Animation.snappy, value: isTargeted)
         .dropDestination(for: Int64.self) { items, _ in
             guard let gigId = items.first else { return false }
             Task {
@@ -629,24 +614,24 @@ struct KanbanColumn: View {
             }
             return true
         } isTargeted: { targeted in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+            withAnimation(Design.Animation.snappy) {
                 isTargeted = targeted
             }
         }
     }
 
     private var emptyColumnView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Design.Spacing.xs) {
             Image(systemName: status.emptyIcon)
                 .font(.system(size: 24))
-                .foregroundColor(.secondary.opacity(0.5))
+                .foregroundColor(Design.Colors.textTertiary)
 
             Text("No gigs")
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(Design.Typography.bodySmall)
+                .foregroundColor(Design.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
+        .padding(.vertical, Design.Spacing.xl)
     }
 }
 
@@ -662,20 +647,20 @@ struct GigCard: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Design.Spacing.sm) {
             // Header
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
                     Text(gig.gig.name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .font(Design.Typography.labelLarge)
+                        .foregroundColor(Design.Colors.textPrimary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let client = gig.client {
                         Text(client.name)
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                            .font(Design.Typography.bodySmall)
+                            .foregroundColor(Design.Colors.textSecondary)
                     }
                 }
 
@@ -694,7 +679,7 @@ struct GigCard: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Design.Colors.textSecondary)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
@@ -704,11 +689,11 @@ struct GigCard: View {
 
             // Progress bar (if has tasks)
             if !gig.tasks.isEmpty {
-                VStack(spacing: 4) {
+                VStack(spacing: Design.Spacing.xxs) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(Color.secondary.opacity(0.15))
+                                .fill(Design.Colors.textSecondary.opacity(0.15))
 
                             Capsule()
                                 .fill(
@@ -719,15 +704,15 @@ struct GigCard: View {
                                     )
                                 )
                                 .frame(width: geo.size.width * gig.progress)
-                                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: gig.progress)
+                                .animation(Design.Animation.smooth, value: gig.progress)
                         }
                     }
                     .frame(height: 4)
 
                     HStack {
                         Text("\(gig.completedTasksCount)/\(gig.tasks.count) tasks")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.secondary)
+                            .font(Design.Typography.labelSmall)
+                            .foregroundColor(Design.Colors.textSecondary)
                         Spacer()
                     }
                 }
@@ -735,15 +720,15 @@ struct GigCard: View {
 
             // Stats
             if gig.gig.totalHoursTracked > 0 || gig.gig.hourlyRate != nil {
-                HStack(spacing: 10) {
+                HStack(spacing: Design.Spacing.sm) {
                     if gig.gig.totalHoursTracked > 0 {
                         HStack(spacing: 3) {
                             Image(systemName: "clock")
                                 .font(.system(size: 9))
                             Text(String(format: "%.1fh", gig.gig.totalHoursTracked))
-                                .font(.system(size: 10, weight: .medium))
+                                .font(Design.Typography.labelSmall)
                         }
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Design.Colors.textSecondary)
                     }
 
                     if let rate = gig.gig.hourlyRate {
@@ -753,7 +738,7 @@ struct GigCard: View {
                             Text("/h")
                                 .font(.system(size: 9))
                         }
-                        .foregroundColor(.green)
+                        .foregroundColor(Design.Colors.success)
                     }
                 }
             }
@@ -762,21 +747,21 @@ struct GigCard: View {
             if isAddingTask {
                 HStack(spacing: 6) {
                     Circle()
-                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1.5)
+                        .stroke(Design.Colors.textSecondary.opacity(0.3), lineWidth: 1.5)
                         .frame(width: 14, height: 14)
 
                     TextField("Add task...", text: $newTaskTitle)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12))
+                        .font(Design.Typography.bodySmall)
                         .focused($taskFieldFocused)
                         .onSubmit {
                             submitTask()
                         }
                 }
-                .padding(8)
+                .padding(Design.Spacing.xs)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.secondary.opacity(0.08))
+                    RoundedRectangle(cornerRadius: Design.Radius.sm)
+                        .fill(Design.Colors.textSecondary.opacity(0.08))
                 )
                 .transition(.scale(scale: 0.95).combined(with: .opacity))
             }
@@ -784,35 +769,35 @@ struct GigCard: View {
             // Add task button
             if !isAddingTask {
                 Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    withAnimation(Design.Animation.snappy) {
                         isAddingTask = true
                     }
                     taskFieldFocused = true
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Design.Spacing.xxs) {
                         Image(systemName: "plus")
                             .font(.system(size: 10, weight: .medium))
                         Text("Add task")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(Design.Typography.labelSmall)
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Design.Colors.textSecondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(DSInteractiveStyle())
                 .opacity(isHovered ? 1 : 0.6)
             }
         }
-        .padding(12)
+        .padding(Design.Spacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(colorScheme == .dark ? Color(white: 0.18) : .white)
+            RoundedRectangle(cornerRadius: Design.Radius.md)
+                .fill(Design.Colors.surfaceElevated(colorScheme))
                 .shadow(
-                    color: .black.opacity(colorScheme == .dark ? 0.4 : 0.08),
-                    radius: isHovered ? 8 : 4,
-                    y: isHovered ? 4 : 2
+                    color: isHovered ? Design.Shadow.md.color : Design.Shadow.sm.color,
+                    radius: isHovered ? Design.Shadow.md.radius : Design.Shadow.sm.radius,
+                    y: isHovered ? Design.Shadow.md.y : Design.Shadow.sm.y
                 )
         )
         .scaleEffect(isHovered ? 1.01 : 1.0)
-        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isHovered)
+        .animation(Design.Animation.snappy, value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -823,7 +808,7 @@ struct GigCard: View {
 
     private func submitTask() {
         guard !newTaskTitle.isEmpty else {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            withAnimation(Design.Animation.snappy) {
                 isAddingTask = false
             }
             return
@@ -831,7 +816,7 @@ struct GigCard: View {
         Task {
             await state.addTask(to: gig.id, title: newTaskTitle)
             newTaskTitle = ""
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            withAnimation(Design.Animation.snappy) {
                 isAddingTask = false
             }
         }
@@ -1033,20 +1018,20 @@ struct TaskDetailRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Design.Spacing.sm) {
             Button {
                 Task { await state.toggleTask(task.id!) }
             } label: {
                 Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
-                    .foregroundColor(task.completed ? .green : .secondary)
+                    .foregroundColor(task.completed ? Design.Colors.success : Design.Colors.textSecondary)
                     .contentTransition(.symbolEffect(.replace))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DSInteractiveStyle())
 
             Text(task.title)
                 .strikethrough(task.completed)
-                .foregroundColor(task.completed ? .secondary : .primary)
+                .foregroundColor(task.completed ? Design.Colors.textSecondary : Design.Colors.textPrimary)
 
             Spacer()
 
@@ -1056,26 +1041,15 @@ struct TaskDetailRow: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Design.Colors.textSecondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(DSInteractiveStyle())
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Design.Spacing.xxxs)
         .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
-    }
-}
-
-// MARK: - Scale Button Style
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+        .animation(Design.Animation.quick, value: isHovered)
     }
 }
 
@@ -1084,12 +1058,12 @@ struct ScaleButtonStyle: ButtonStyle {
 extension GigStatus {
     var color: Color {
         switch self {
-        case .todo: return .gray
-        case .inProgress: return .blue
-        case .sent: return .orange
-        case .done: return .green
-        case .onHold: return .yellow
-        case .cancelled: return .red
+        case .todo: return Design.Colors.textSecondary
+        case .inProgress: return Design.Colors.primary
+        case .sent: return Design.Colors.warning
+        case .done: return Design.Colors.success
+        case .onHold: return Design.Colors.warning.opacity(0.7)
+        case .cancelled: return Design.Colors.error
         }
     }
 

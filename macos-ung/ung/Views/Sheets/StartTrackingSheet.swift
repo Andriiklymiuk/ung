@@ -59,10 +59,10 @@ struct StartTrackingSheet: View {
     HStack {
       VStack(alignment: .leading, spacing: 2) {
         Text("Start Tracking")
-          .font(.system(size: 14, weight: .semibold))
+          .font(Design.Typography.headingSmall)
         Text("What are you working on?")
-          .font(.system(size: 11))
-          .foregroundColor(.secondary)
+          .font(Design.Typography.bodySmall)
+          .foregroundColor(Design.Colors.textSecondary)
       }
 
       Spacer()
@@ -70,36 +70,36 @@ struct StartTrackingSheet: View {
       Button(action: { dismiss() }) {
         Image(systemName: "xmark.circle.fill")
           .font(.system(size: 18))
-          .foregroundColor(.secondary)
+          .foregroundColor(Design.Colors.textTertiary)
       }
-      .buttonStyle(.plain)
+      .buttonStyle(DSInteractiveStyle())
     }
-    .padding(16)
+    .padding(Design.Spacing.md)
   }
 
   // MARK: - Project Input
   private var projectInputSection: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: Design.Spacing.xs) {
       Text("Project / Task")
-        .font(.system(size: 11, weight: .medium))
-        .foregroundColor(.secondary)
+        .font(Design.Typography.labelSmall)
+        .foregroundColor(Design.Colors.textSecondary)
 
-      HStack(spacing: 8) {
+      HStack(spacing: Design.Spacing.xs) {
         Image(systemName: "folder.fill")
-          .font(.system(size: 12))
-          .foregroundColor(.blue)
+          .font(.system(size: Design.IconSize.xs))
+          .foregroundColor(Design.Colors.primary)
 
         TextField("Enter project name...", text: $projectName)
           .textFieldStyle(.plain)
-          .font(.system(size: 13))
+          .font(Design.Typography.bodyMedium)
       }
-      .padding(10)
+      .padding(Design.Spacing.sm)
       .background(
-        RoundedRectangle(cornerRadius: 8)
+        RoundedRectangle(cornerRadius: Design.Radius.sm)
           .fill(Design.Colors.controlBackground)
           .overlay(
-            RoundedRectangle(cornerRadius: 8)
-              .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Design.Radius.sm)
+              .stroke(Design.Colors.primary.opacity(0.3), lineWidth: 1)
           )
       )
     }
@@ -107,22 +107,21 @@ struct StartTrackingSheet: View {
 
   // MARK: - Quick Select
   private var quickSelectSection: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: Design.Spacing.xs) {
       Text("Quick Select")
-        .font(.system(size: 11, weight: .medium))
-        .foregroundColor(.secondary)
+        .font(Design.Typography.labelSmall)
+        .foregroundColor(Design.Colors.textSecondary)
 
       FlowLayout(spacing: 6) {
         ForEach(recentProjects, id: \.self) { project in
-          Button(action: { projectName = project }) {
+          Button(action: {
+            withAnimation(Design.Animation.snappy) {
+              projectName = project
+            }
+          }) {
             Text(project)
-              .font(.system(size: 11))
-              .padding(.horizontal, 10)
-              .padding(.vertical, 6)
-              .background(Design.Colors.controlBackground)
-              .cornerRadius(6)
           }
-          .buttonStyle(.plain)
+          .buttonStyle(DSPillButtonStyle(color: Design.Colors.primary, isSelected: projectName == project))
         }
       }
     }
@@ -130,41 +129,41 @@ struct StartTrackingSheet: View {
 
   // MARK: - Client Selection
   private var clientSelectionSection: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: Design.Spacing.xs) {
       Text("Client (Optional)")
-        .font(.system(size: 11, weight: .medium))
-        .foregroundColor(.secondary)
+        .font(Design.Typography.labelSmall)
+        .foregroundColor(Design.Colors.textSecondary)
 
       if appState.clients.isEmpty {
-        HStack(spacing: 8) {
+        HStack(spacing: Design.Spacing.xs) {
           Image(systemName: "person.fill.questionmark")
-            .font(.system(size: 12))
-            .foregroundColor(.secondary)
+            .font(.system(size: Design.IconSize.xs))
+            .foregroundColor(Design.Colors.textTertiary)
 
           Text("No clients yet")
-            .font(.system(size: 12))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textTertiary)
         }
-        .padding(10)
+        .padding(Design.Spacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-          RoundedRectangle(cornerRadius: 8)
+          RoundedRectangle(cornerRadius: Design.Radius.sm)
             .fill(Design.Colors.controlBackground)
         )
       } else {
-        VStack(spacing: 4) {
+        VStack(spacing: Design.Spacing.xxs) {
           // None option
           ClientOptionRow(
             client: nil,
             isSelected: selectedClientId == nil,
-            action: { selectedClientId = nil }
+            action: { withAnimation(Design.Animation.snappy) { selectedClientId = nil } }
           )
 
           ForEach(appState.clients) { client in
             ClientOptionRow(
               client: client,
               isSelected: selectedClientId == client.id,
-              action: { selectedClientId = client.id }
+              action: { withAnimation(Design.Animation.snappy) { selectedClientId = client.id } }
             )
           }
         }
@@ -178,8 +177,7 @@ struct StartTrackingSheet: View {
       Button("Cancel") {
         dismiss()
       }
-      .buttonStyle(.plain)
-      .foregroundColor(.secondary)
+      .buttonStyle(DSGhostButtonStyle())
 
       Spacer()
 
@@ -188,22 +186,15 @@ struct StartTrackingSheet: View {
           if isStarting {
             ProgressView()
               .scaleEffect(0.7)
+              .tint(.white)
           } else {
             Image(systemName: "play.fill")
               .font(.system(size: 10))
           }
           Text("Start")
-            .font(.system(size: 12, weight: .semibold))
         }
-        .foregroundColor(.white)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-          RoundedRectangle(cornerRadius: 8)
-            .fill(projectName.isEmpty ? Color.gray : Color.green)
-        )
       }
-      .buttonStyle(.plain)
+      .buttonStyle(DSCompactButtonStyle(isDisabled: projectName.isEmpty))
       .disabled(projectName.isEmpty || isStarting)
     }
     .padding(16)
@@ -228,33 +219,33 @@ struct ClientOptionRow: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 8) {
+      HStack(spacing: Design.Spacing.xs) {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-          .font(.system(size: 12))
-          .foregroundColor(isSelected ? .blue : .secondary)
+          .font(.system(size: Design.IconSize.xs))
+          .foregroundColor(isSelected ? Design.Colors.primary : Design.Colors.textTertiary)
 
         if let client = client {
           Image(systemName: "person.fill")
             .font(.system(size: 10))
-            .foregroundColor(.secondary)
+            .foregroundColor(Design.Colors.textSecondary)
           Text(client.name)
-            .font(.system(size: 12))
-            .foregroundColor(.primary)
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textPrimary)
         } else {
           Text("No Client")
-            .font(.system(size: 12))
-            .foregroundColor(.secondary)
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
         }
 
         Spacer()
       }
-      .padding(8)
+      .padding(Design.Spacing.xs)
       .background(
-        RoundedRectangle(cornerRadius: 6)
-          .fill(isSelected ? Color.blue.opacity(0.1) : Color.clear)
+        RoundedRectangle(cornerRadius: Design.Radius.xs)
+          .fill(isSelected ? Design.Colors.primary.opacity(0.1) : Color.clear)
       )
     }
-    .buttonStyle(.plain)
+    .buttonStyle(DSInteractiveStyle())
   }
 }
 

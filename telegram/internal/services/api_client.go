@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"time"
 )
@@ -1492,6 +1493,58 @@ func (c *APIClient) UpdateHunterProfile(token string, profile *HunterProfile) (*
 	}
 
 	return &updatedProfile, nil
+}
+
+// ImportProfileFromPDF imports a hunter profile from a PDF CV file
+func (c *APIClient) ImportProfileFromPDF(token string, pdfData []byte, filename string) (*HunterProfile, error) {
+	// Create multipart form
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add the file
+	part, err := writer.CreateFormFile("cv", filename)
+	if err != nil {
+		return nil, err
+	}
+	part.Write(pdfData)
+	writer.Close()
+
+	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/hunter/profile/import", body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Longer timeout for PDF processing
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(respBody))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var profile HunterProfile
+	if err := json.Unmarshal(apiResp.Data, &profile); err != nil {
+		return nil, err
+	}
+
+	return &profile, nil
 }
 
 // HuntJobs triggers a job hunt/scrape

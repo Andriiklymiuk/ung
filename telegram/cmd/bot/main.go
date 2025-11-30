@@ -238,6 +238,22 @@ func handleMessage(
 			return hunterHandler.HandleSkillsInput(message)
 		case models.StateHunterProfileRate:
 			return hunterHandler.HandleRateInput(message)
+		case models.StateHunterAwaitingPDF:
+			// Check if a document was sent
+			if message.Document != nil {
+				return hunterHandler.HandlePDFUpload(message)
+			}
+			// If not a document, remind user
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Please send your CV as a *PDF file*, or tap the button below to enter manually.")
+			msg.ParseMode = "Markdown"
+			keyboard := tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("✍️ Enter manually", "hunter_profile_create"),
+				),
+			)
+			msg.ReplyMarkup = keyboard
+			bot.Send(msg)
+			return nil
 		}
 	}
 

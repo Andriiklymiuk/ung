@@ -82,4 +82,5 @@ const (
 	StateHunterProfileTitle     SessionState = "hunter_profile_title"
 	StateHunterProfileSkills    SessionState = "hunter_profile_skills"
 	StateHunterProfileRate      SessionState = "hunter_profile_rate"
+	StateHunterAwaitingPDF      SessionState = "hunter_awaiting_pdf"
 )

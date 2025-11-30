@@ -28,6 +28,19 @@ struct SettingsSection: View {
   @State private var biometricsAvailable = false
   @State private var biometricType: LABiometryType = .none
   @State private var isTogglingICloud = false
+  @State private var showEncryptionSheet = false
+  @State private var encryptionPassword = ""
+  @State private var encryptionPasswordConfirm = ""
+  @State private var currentPassword = ""
+  @State private var newPassword = ""
+  @State private var encryptionAction: EncryptionSheetAction = .enable
+  @State private var isProcessingEncryption = false
+
+  enum EncryptionSheetAction {
+    case enable
+    case disable
+    case changePassword
+  }
 
   enum UpdateCheckResult {
     case upToDate
@@ -43,6 +56,9 @@ struct SettingsSection: View {
       // Notifications
       notificationsCard
 
+      // Database Encryption
+      encryptionCard
+
       // Security & Privacy - Most important first
       securityCard
 
@@ -57,6 +73,9 @@ struct SettingsSection: View {
     }
     .onAppear {
       checkBiometrics()
+    }
+    .sheet(isPresented: $showEncryptionSheet) {
+      encryptionSheet
     }
   }
 
@@ -149,6 +168,266 @@ struct SettingsSection: View {
         }
       }
     }
+  }
+
+  // MARK: - Encryption Card
+  private var encryptionCard: some View {
+    SettingsCard(title: "Database Encryption", icon: "lock.shield.fill", color: .orange) {
+      VStack(spacing: Design.Spacing.sm) {
+        SettingsRow(
+          icon: appState.databaseEncrypted ? "lock.fill" : "lock.open.fill",
+          title: "Encrypt Database",
+          subtitle: appState.databaseEncrypted
+            ? "Your data is encrypted with AES-256"
+            : "Protect your data with encryption"
+        ) {
+          Toggle(
+            "",
+            isOn: Binding(
+              get: { appState.databaseEncrypted },
+              set: { newValue in
+                if newValue {
+                  encryptionAction = .enable
+                  encryptionPassword = ""
+                  encryptionPasswordConfirm = ""
+                  showEncryptionSheet = true
+                } else {
+                  encryptionAction = .disable
+                  currentPassword = ""
+                  showEncryptionSheet = true
+                }
+              }
+            )
+          )
+          .toggleStyle(.switch)
+          .controlSize(.small)
+          .labelsHidden()
+        }
+
+        if appState.databaseEncrypted {
+          Divider().padding(.vertical, 4)
+
+          // Change Password
+          SettingsActionRow(
+            icon: "key.fill",
+            title: "Change Password",
+            subtitle: "Update your encryption password",
+            color: .orange
+          ) {
+            encryptionAction = .changePassword
+            currentPassword = ""
+            newPassword = ""
+            encryptionPasswordConfirm = ""
+            showEncryptionSheet = true
+          }
+
+          // Save to Keychain Status
+          HStack(spacing: Design.Spacing.xs) {
+            Image(systemName: appState.hasEncryptionPassword ? "key.icloud.fill" : "key.icloud")
+              .font(.system(size: 12))
+              .foregroundColor(appState.hasEncryptionPassword ? .green : .secondary)
+            Text(
+              appState.hasEncryptionPassword
+                ? "Password saved in Keychain"
+                : "Password not saved in Keychain"
+            )
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
+
+            Spacer()
+
+            if appState.hasEncryptionPassword {
+              Button("Remove") {
+                _ = appState.clearEncryptionPasswordFromKeychain()
+              }
+              .font(Design.Typography.labelSmall)
+              .foregroundColor(.red)
+            }
+          }
+          .padding(.top, 4)
+        }
+
+        // CLI Compatibility Note
+        HStack(spacing: Design.Spacing.xs) {
+          Image(systemName: "info.circle.fill")
+            .font(.system(size: 12))
+            .foregroundColor(.blue)
+          Text("Compatible with UNG CLI encryption")
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
+        }
+        .padding(.top, 4)
+      }
+    }
+  }
+
+  // MARK: - Encryption Sheet
+  private var encryptionSheet: some View {
+    VStack(spacing: Design.Spacing.lg) {
+      // Header
+      HStack {
+        Image(systemName: encryptionAction == .enable ? "lock.fill" : (encryptionAction == .disable ? "lock.open.fill" : "key.fill"))
+          .font(.system(size: 24))
+          .foregroundColor(.orange)
+
+        VStack(alignment: .leading, spacing: 2) {
+          Text(encryptionSheetTitle)
+            .font(Design.Typography.headingSmall)
+          Text(encryptionSheetSubtitle)
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
+        }
+
+        Spacer()
+
+        Button {
+          showEncryptionSheet = false
+          clearEncryptionFields()
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .font(.system(size: 20))
+            .foregroundColor(Design.Colors.textTertiary)
+        }
+        .buttonStyle(.plain)
+      }
+      .padding(.bottom, Design.Spacing.sm)
+
+      // Password Fields
+      VStack(spacing: Design.Spacing.md) {
+        if encryptionAction == .changePassword || encryptionAction == .disable {
+          SecureField("Current Password", text: $currentPassword)
+            .textFieldStyle(.roundedBorder)
+        }
+
+        if encryptionAction == .enable || encryptionAction == .changePassword {
+          SecureField(encryptionAction == .changePassword ? "New Password" : "Password", text: $encryptionPassword)
+            .textFieldStyle(.roundedBorder)
+
+          SecureField("Confirm Password", text: $encryptionPasswordConfirm)
+            .textFieldStyle(.roundedBorder)
+
+          if !encryptionPassword.isEmpty && encryptionPassword != encryptionPasswordConfirm {
+            HStack {
+              Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+              Text("Passwords do not match")
+                .font(Design.Typography.bodySmall)
+                .foregroundColor(.orange)
+            }
+          }
+
+          if !encryptionPassword.isEmpty && encryptionPassword.count < 8 {
+            HStack {
+              Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+              Text("Password should be at least 8 characters")
+                .font(Design.Typography.bodySmall)
+                .foregroundColor(.orange)
+            }
+          }
+        }
+      }
+
+      // Save to Keychain option
+      if encryptionAction == .enable || encryptionAction == .changePassword {
+        HStack {
+          Image(systemName: "key.icloud")
+            .foregroundColor(.secondary)
+          Text("Password will be saved to Keychain for convenience")
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
+          Spacer()
+        }
+      }
+
+      Spacer()
+
+      // Action Buttons
+      HStack(spacing: Design.Spacing.md) {
+        Button("Cancel") {
+          showEncryptionSheet = false
+          clearEncryptionFields()
+        }
+        .buttonStyle(.bordered)
+
+        Button(action: performEncryptionAction) {
+          if isProcessingEncryption {
+            ProgressView()
+              .scaleEffect(0.8)
+          } else {
+            Text(encryptionActionButtonTitle)
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(encryptionAction == .disable ? .red : .orange)
+        .disabled(!isEncryptionActionValid || isProcessingEncryption)
+      }
+    }
+    .padding(Design.Spacing.lg)
+    .frame(width: 400, height: encryptionAction == .disable ? 280 : 380)
+  }
+
+  private var encryptionSheetTitle: String {
+    switch encryptionAction {
+    case .enable: return "Enable Encryption"
+    case .disable: return "Disable Encryption"
+    case .changePassword: return "Change Password"
+    }
+  }
+
+  private var encryptionSheetSubtitle: String {
+    switch encryptionAction {
+    case .enable: return "Protect your database with AES-256 encryption"
+    case .disable: return "Remove encryption from your database"
+    case .changePassword: return "Update your encryption password"
+    }
+  }
+
+  private var encryptionActionButtonTitle: String {
+    switch encryptionAction {
+    case .enable: return "Enable Encryption"
+    case .disable: return "Disable Encryption"
+    case .changePassword: return "Change Password"
+    }
+  }
+
+  private var isEncryptionActionValid: Bool {
+    switch encryptionAction {
+    case .enable:
+      return encryptionPassword.count >= 8 && encryptionPassword == encryptionPasswordConfirm
+    case .disable:
+      return !currentPassword.isEmpty
+    case .changePassword:
+      return !currentPassword.isEmpty && encryptionPassword.count >= 8 && encryptionPassword == encryptionPasswordConfirm
+    }
+  }
+
+  private func performEncryptionAction() {
+    isProcessingEncryption = true
+
+    Task {
+      switch encryptionAction {
+      case .enable:
+        await appState.enableEncryption(password: encryptionPassword)
+      case .disable:
+        await appState.disableEncryption(password: currentPassword)
+      case .changePassword:
+        await appState.changeEncryptionPassword(currentPassword: currentPassword, newPassword: encryptionPassword)
+      }
+
+      await MainActor.run {
+        isProcessingEncryption = false
+        showEncryptionSheet = false
+        clearEncryptionFields()
+      }
+    }
+  }
+
+  private func clearEncryptionFields() {
+    encryptionPassword = ""
+    encryptionPasswordConfirm = ""
+    currentPassword = ""
+    newPassword = ""
   }
 
   // MARK: - Security Card

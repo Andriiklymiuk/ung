@@ -52,11 +52,18 @@ enum SyncStatus: Equatable {
 actor DatabaseService {
     private var dbPool: DatabasePool?
     private let fileManager = FileManager.default
+    private let encryption = DatabaseEncryptionService.shared
 
     // iCloud sync state
     private(set) var iCloudEnabled: Bool = false
     private(set) var syncStatus: SyncStatus = .idle
     private var metadataQuery: NSMetadataQuery?
+
+    // Encryption state
+    private(set) var encryptionEnabled: Bool = false
+    private(set) var encryptionStatus: EncryptionStatus = .disabled
+    private var currentPassword: String?
+    private var workingDatabasePath: String?  // Path to decrypted working copy
 
     // Singleton for app-wide access
     static let shared = DatabaseService()
@@ -64,6 +71,7 @@ actor DatabaseService {
     private init() {
         // Load iCloud preference
         iCloudEnabled = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+        encryptionEnabled = UserDefaults.standard.bool(forKey: "databaseEncryptionEnabled")
     }
 
     // MARK: - iCloud Availability
@@ -131,6 +139,16 @@ actor DatabaseService {
         return iCloudURL.appendingPathComponent("ung.db").path
     }
 
+    /// Returns the encrypted database path
+    var encryptedDatabasePath: String {
+        return databasePath + EncryptionConstants.encryptedFileExtension
+    }
+
+    /// Returns the path to the working (decrypted) database
+    var workingPath: String {
+        return workingDatabasePath ?? databasePath
+    }
+
     /// Returns the directory for storing invoices
     var invoicesDirectory: URL {
         #if os(iOS)
@@ -154,11 +172,56 @@ actor DatabaseService {
     }
 
     /// Initialize the database and run migrations
+    /// If encryption is enabled and password is available, decrypts the database first
     func initialize() async throws {
         // Create the .ung directory if needed
         let dbURL = URL(fileURLWithPath: databasePath)
         let dbDir = dbURL.deletingLastPathComponent()
         try? fileManager.createDirectory(at: dbDir, withIntermediateDirectories: true)
+
+        // Determine which database path to use
+        var actualDbPath = databasePath
+
+        // Check if there's an encrypted database
+        let encPath = encryptedDatabasePath
+        if fileManager.fileExists(atPath: encPath) {
+            encryptionEnabled = true
+            encryptionStatus = .enabled
+            UserDefaults.standard.set(true, forKey: "databaseEncryptionEnabled")
+
+            // Need password to decrypt
+            if let password = currentPassword {
+                let decryptedPath = databasePath + ".decrypted"
+                do {
+                    try await encryption.decryptDatabase(
+                        inputPath: encPath,
+                        outputPath: decryptedPath,
+                        password: password
+                    )
+                    actualDbPath = decryptedPath
+                    workingDatabasePath = decryptedPath
+                    print("[DatabaseService] Decrypted database to working copy")
+                } catch {
+                    print("[DatabaseService] Failed to decrypt database: \(error)")
+                    throw DatabaseError.migrationFailed("Failed to decrypt database: \(error.localizedDescription)")
+                }
+            } else {
+                // No password available - cannot open encrypted database
+                throw DatabaseError.migrationFailed("Database is encrypted. Please provide password.")
+            }
+        } else if fileManager.fileExists(atPath: databasePath) {
+            // Plain database exists
+            encryptionEnabled = false
+            encryptionStatus = .disabled
+            actualDbPath = databasePath
+            workingDatabasePath = nil
+        } else {
+            // No database exists yet - will create new one
+            encryptionEnabled = false
+            encryptionStatus = .disabled
+            actualDbPath = databasePath
+            workingDatabasePath = nil
+        }
 
         // Open the database
         var config = Configuration()
@@ -167,15 +230,226 @@ actor DatabaseService {
             try db.execute(sql: "PRAGMA foreign_keys = ON")
         }
 
-        dbPool = try DatabasePool(path: databasePath, configuration: config)
+        dbPool = try DatabasePool(path: actualDbPath, configuration: config)
 
         // Run migrations
         try await runMigrations()
     }
 
+    /// Initialize with a password (for encrypted databases)
+    func initialize(withPassword password: String) async throws {
+        currentPassword = password
+        try await initialize()
+    }
+
     /// Close the database connection
-    func close() {
+    /// If encryption is enabled, re-encrypts the working copy
+    func close() async {
         dbPool = nil
+
+        // Re-encrypt if needed
+        if encryptionEnabled, let password = currentPassword, let workingPath = workingDatabasePath {
+            do {
+                try await encryption.encryptDatabase(
+                    inputPath: workingPath,
+                    outputPath: encryptedDatabasePath,
+                    password: password
+                )
+                // Remove the decrypted working copy
+                try? fileManager.removeItem(atPath: workingPath)
+                workingDatabasePath = nil
+                print("[DatabaseService] Re-encrypted database and cleaned up working copy")
+            } catch {
+                print("[DatabaseService] Failed to re-encrypt database: \(error)")
+            }
+        }
+    }
+
+    /// Close synchronously (for non-async contexts)
+    func closeSync() {
+        dbPool = nil
+        // Note: encryption is not handled in sync close
+    }
+
+    // MARK: - Encryption Management
+
+    /// Check if the database is encrypted
+    func checkEncryptionStatus() -> EncryptionStatus {
+        let encPath = encryptedDatabasePath
+        if fileManager.fileExists(atPath: encPath) {
+            return .enabled
+        }
+        return .disabled
+    }
+
+    /// Check if an encrypted database exists (needs password)
+    var needsPassword: Bool {
+        return fileManager.fileExists(atPath: encryptedDatabasePath)
+    }
+
+    /// Set the password for encrypted database operations
+    func setPassword(_ password: String) {
+        currentPassword = password
+    }
+
+    /// Clear the stored password
+    func clearPassword() {
+        currentPassword = nil
+    }
+
+    /// Enable encryption on the database
+    /// This will encrypt the existing database and require a password for future access
+    func enableEncryption(password: String) async throws {
+        guard !encryptionEnabled else {
+            throw DatabaseError.invalidData("Encryption is already enabled")
+        }
+
+        // Close the current connection
+        dbPool = nil
+
+        // Encrypt the database
+        let plainPath = workingDatabasePath ?? databasePath
+        let encPath = encryptedDatabasePath
+
+        guard fileManager.fileExists(atPath: plainPath) else {
+            throw DatabaseError.notInitialized
+        }
+
+        do {
+            try await encryption.encryptDatabase(
+                inputPath: plainPath,
+                outputPath: encPath,
+                password: password
+            )
+
+            // Remove the plain database
+            try fileManager.removeItem(atPath: plainPath)
+
+            // Update state
+            currentPassword = password
+            encryptionEnabled = true
+            encryptionStatus = .enabled
+            UserDefaults.standard.set(true, forKey: "databaseEncryptionEnabled")
+
+            // Reinitialize with the encrypted database
+            try await initialize()
+
+            print("[DatabaseService] Encryption enabled successfully")
+        } catch {
+            throw DatabaseError.migrationFailed("Failed to enable encryption: \(error.localizedDescription)")
+        }
+    }
+
+    /// Disable encryption on the database
+    /// This will decrypt the database and store it in plain text
+    func disableEncryption(password: String) async throws {
+        guard encryptionEnabled else {
+            throw DatabaseError.invalidData("Encryption is not enabled")
+        }
+
+        // Close the current connection
+        dbPool = nil
+
+        let encPath = encryptedDatabasePath
+        let plainPath = databasePath
+
+        guard fileManager.fileExists(atPath: encPath) else {
+            throw DatabaseError.notInitialized
+        }
+
+        do {
+            // Decrypt to the plain path
+            try await encryption.decryptDatabase(
+                inputPath: encPath,
+                outputPath: plainPath,
+                password: password
+            )
+
+            // Remove the encrypted database
+            try fileManager.removeItem(atPath: encPath)
+
+            // Remove working copy if exists
+            if let workingPath = workingDatabasePath {
+                try? fileManager.removeItem(atPath: workingPath)
+            }
+
+            // Update state
+            currentPassword = nil
+            workingDatabasePath = nil
+            encryptionEnabled = false
+            encryptionStatus = .disabled
+            UserDefaults.standard.set(false, forKey: "databaseEncryptionEnabled")
+
+            // Reinitialize with the plain database
+            try await initialize()
+
+            print("[DatabaseService] Encryption disabled successfully")
+        } catch {
+            throw DatabaseError.migrationFailed("Failed to disable encryption: \(error.localizedDescription)")
+        }
+    }
+
+    /// Change the encryption password
+    func changePassword(currentPassword: String, newPassword: String) async throws {
+        guard encryptionEnabled else {
+            throw DatabaseError.invalidData("Encryption is not enabled")
+        }
+
+        // Verify current password by trying to decrypt
+        let encPath = encryptedDatabasePath
+        let tempPath = databasePath + ".temp_decrypt"
+
+        do {
+            // Decrypt with current password
+            try await encryption.decryptDatabase(
+                inputPath: encPath,
+                outputPath: tempPath,
+                password: currentPassword
+            )
+
+            // Re-encrypt with new password
+            try await encryption.encryptDatabase(
+                inputPath: tempPath,
+                outputPath: encPath,
+                password: newPassword
+            )
+
+            // Clean up temp file
+            try? fileManager.removeItem(atPath: tempPath)
+
+            // Update stored password
+            self.currentPassword = newPassword
+
+            print("[DatabaseService] Password changed successfully")
+        } catch {
+            // Clean up temp file on failure
+            try? fileManager.removeItem(atPath: tempPath)
+            throw DatabaseError.migrationFailed("Failed to change password: \(error.localizedDescription)")
+        }
+    }
+
+    /// Verify a password against the encrypted database
+    func verifyPassword(_ password: String) async -> Bool {
+        let encPath = encryptedDatabasePath
+        let tempPath = databasePath + ".verify_temp"
+
+        guard fileManager.fileExists(atPath: encPath) else {
+            return false
+        }
+
+        do {
+            try await encryption.decryptDatabase(
+                inputPath: encPath,
+                outputPath: tempPath,
+                password: password
+            )
+            // Clean up
+            try? fileManager.removeItem(atPath: tempPath)
+            return true
+        } catch {
+            try? fileManager.removeItem(atPath: tempPath)
+            return false
+        }
     }
 
     // MARK: - iCloud Sync

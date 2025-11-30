@@ -64,10 +64,10 @@ struct CreateInvoiceSheet: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Create Invoice")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Design.Typography.headingSmall)
                 Text("Generate from tracked time")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .font(Design.Typography.bodySmall)
+                    .foregroundColor(Design.Colors.textSecondary)
             }
 
             Spacer()
@@ -75,66 +75,66 @@ struct CreateInvoiceSheet: View {
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 18))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Design.Colors.textTertiary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DSInteractiveStyle())
         }
-        .padding(16)
+        .padding(Design.Spacing.md)
     }
 
     // MARK: - Info Banner
     private var infoBanner: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Design.Spacing.sm) {
             Image(systemName: "info.circle.fill")
-                .font(.system(size: 14))
-                .foregroundColor(.blue)
+                .font(.system(size: Design.IconSize.sm))
+                .foregroundColor(Design.Colors.primary)
 
             Text("Invoice will be generated from unbilled time tracked for the selected client.")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.bodySmall)
+                .foregroundColor(Design.Colors.textSecondary)
         }
-        .padding(12)
+        .padding(Design.Spacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.blue.opacity(0.1))
+            RoundedRectangle(cornerRadius: Design.Radius.sm)
+                .fill(Design.Colors.primary.opacity(0.1))
         )
     }
 
     // MARK: - Client Selection
     private var clientSelectionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
             Text("Select Client")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.labelSmall)
+                .foregroundColor(Design.Colors.textSecondary)
 
             if appState.clients.isEmpty {
-                HStack(spacing: 10) {
+                HStack(spacing: Design.Spacing.sm) {
                     Image(systemName: "person.fill.questionmark")
-                        .font(.system(size: 16))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: Design.IconSize.md))
+                        .foregroundColor(Design.Colors.textTertiary)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("No clients found")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(Design.Typography.labelMedium)
                         Text("Create a client to start invoicing")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
+                            .font(Design.Typography.labelSmall)
+                            .foregroundColor(Design.Colors.textSecondary)
                     }
                 }
-                .padding(12)
+                .padding(Design.Spacing.sm)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: Design.Radius.sm)
                         .fill(Design.Colors.controlBackground)
                 )
             } else {
-                VStack(spacing: 4) {
+                VStack(spacing: Design.Spacing.xxs) {
                     ForEach(appState.clients) { client in
                         InvoiceClientRow(
                             client: client,
                             isSelected: selectedClientId == client.id,
-                            action: { selectedClientId = client.id }
+                            action: { withAnimation(Design.Animation.snappy) { selectedClientId = client.id } }
                         )
                     }
                 }
@@ -144,33 +144,32 @@ struct CreateInvoiceSheet: View {
 
     // MARK: - Options Hint
     private var optionsHint: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
             Text("Invoice includes:")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(Design.Typography.labelSmall)
+                .foregroundColor(Design.Colors.textSecondary)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Design.Spacing.xs) {
                 IncludeItem(icon: "clock.fill", text: "Unbilled time sessions")
                 IncludeItem(icon: "dollarsign.circle.fill", text: "Contract rates applied")
                 IncludeItem(icon: "calendar", text: "Current billing period")
             }
         }
-        .padding(12)
+        .padding(Design.Spacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: Design.Radius.sm)
                 .fill(Design.Colors.controlBackground)
         )
     }
 
     // MARK: - Footer
     private var footerSection: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Design.Spacing.sm) {
             Button("Cancel") {
                 dismiss()
             }
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
+            .buttonStyle(DSGhostButtonStyle())
 
             Spacer()
 
@@ -179,25 +178,18 @@ struct CreateInvoiceSheet: View {
                     if isCreating {
                         ProgressView()
                             .scaleEffect(0.7)
+                            .tint(.white)
                     } else {
                         Image(systemName: "doc.text.fill")
                             .font(.system(size: 10))
                     }
                     Text("Generate")
-                        .font(.system(size: 12, weight: .semibold))
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(selectedClientId != nil ? Color.blue : Color.gray)
-                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DSCompactButtonStyle(isDisabled: selectedClientId == nil))
             .disabled(selectedClientId == nil || isCreating)
         }
-        .padding(16)
+        .padding(Design.Spacing.md)
     }
 
     // MARK: - Actions
@@ -244,41 +236,41 @@ struct InvoiceClientRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: Design.Spacing.sm) {
                 // Selection indicator
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 14))
-                    .foregroundColor(isSelected ? .blue : .secondary)
+                    .font(.system(size: Design.IconSize.sm))
+                    .foregroundColor(isSelected ? Design.Colors.primary : Design.Colors.textTertiary)
 
                 // Avatar
                 ZStack {
                     Circle()
-                        .fill(Color.blue.opacity(0.15))
+                        .fill(Design.Colors.primary.opacity(0.15))
                         .frame(width: 32, height: 32)
 
                     Text(String(client.name.prefix(1)).uppercased())
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.blue)
+                        .font(Design.Typography.labelMedium)
+                        .foregroundColor(Design.Colors.primary)
                 }
 
                 // Name
                 Text(client.name)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.primary)
+                    .font(Design.Typography.labelLarge)
+                    .foregroundColor(Design.Colors.textPrimary)
 
                 Spacer()
             }
-            .padding(10)
+            .padding(Design.Spacing.sm)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.blue.opacity(0.1) : Design.Colors.controlBackground)
+                RoundedRectangle(cornerRadius: Design.Radius.sm)
+                    .fill(isSelected ? Design.Colors.primary.opacity(0.1) : Design.Colors.controlBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? Color.blue.opacity(0.5) : Color.clear, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Design.Radius.sm)
+                            .stroke(isSelected ? Design.Colors.primary.opacity(0.5) : Color.clear, lineWidth: 1)
                     )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DSInteractiveStyle())
     }
 }
 
@@ -288,15 +280,15 @@ struct IncludeItem: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Design.Spacing.xs) {
             Image(systemName: icon)
                 .font(.system(size: 10))
-                .foregroundColor(.green)
-                .frame(width: 16)
+                .foregroundColor(Design.Colors.success)
+                .frame(width: Design.Spacing.md)
 
             Text(text)
-                .font(.system(size: 11))
-                .foregroundColor(.primary)
+                .font(Design.Typography.bodySmall)
+                .foregroundColor(Design.Colors.textPrimary)
         }
     }
 }

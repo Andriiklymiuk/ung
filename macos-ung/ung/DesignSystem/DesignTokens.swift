@@ -158,6 +158,10 @@ enum Design {
     static let standard = SwiftUI.Animation.easeInOut(duration: 0.25)
     static let smooth = SwiftUI.Animation.spring(response: 0.35, dampingFraction: 0.8)
     static let bounce = SwiftUI.Animation.spring(response: 0.4, dampingFraction: 0.6)
+    // Micro-interactions
+    static let microBounce = SwiftUI.Animation.spring(response: 0.25, dampingFraction: 0.6)
+    static let snappy = SwiftUI.Animation.spring(response: 0.2, dampingFraction: 0.7)
+    static let gentle = SwiftUI.Animation.spring(response: 0.3, dampingFraction: 0.85)
   }
 
   // MARK: - Icon Sizes
@@ -199,7 +203,120 @@ struct DSCard<Content: View>: View {
 }
 
 // MARK: - Button Styles
+
+/// Primary action button with micro-interactions
+/// Use for main CTAs: Start, Create, Save, Generate
 struct DSPrimaryButtonStyle: ButtonStyle {
+  let color: Color
+  let isDisabled: Bool
+  let size: ButtonSize
+
+  enum ButtonSize {
+    case small, medium, large
+
+    var horizontalPadding: CGFloat {
+      switch self {
+      case .small: return Design.Spacing.sm
+      case .medium: return Design.Spacing.md
+      case .large: return Design.Spacing.lg
+      }
+    }
+
+    var verticalPadding: CGFloat {
+      switch self {
+      case .small: return Design.Spacing.xs
+      case .medium: return Design.Spacing.sm
+      case .large: return Design.Spacing.sm
+      }
+    }
+
+    var font: Font {
+      switch self {
+      case .small: return Design.Typography.labelSmall
+      case .medium: return Design.Typography.labelMedium
+      case .large: return Design.Typography.labelLarge
+      }
+    }
+  }
+
+  init(color: Color = Design.Colors.primary, isDisabled: Bool = false, size: ButtonSize = .medium) {
+    self.color = color
+    self.isDisabled = isDisabled
+    self.size = size
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(size.font)
+      .fontWeight(.semibold)
+      .foregroundColor(.white)
+      .padding(.horizontal, size.horizontalPadding)
+      .padding(.vertical, size.verticalPadding)
+      .background(
+        RoundedRectangle(cornerRadius: Design.Radius.sm)
+          .fill(isDisabled ? Color.gray.opacity(0.5) : color)
+          .shadow(
+            color: isDisabled ? .clear : color.opacity(configuration.isPressed ? 0.2 : 0.25),
+            radius: configuration.isPressed ? 2 : 6,
+            y: configuration.isPressed ? 1 : 3
+          )
+      )
+      .opacity(configuration.isPressed ? 0.95 : 1)
+      .scaleEffect(configuration.isPressed ? 0.97 : 1)
+      .animation(Design.Animation.snappy, value: configuration.isPressed)
+  }
+}
+
+/// Secondary button for alternative actions
+struct DSSecondaryButtonStyle: ButtonStyle {
+  @Environment(\.colorScheme) var colorScheme
+  let size: DSPrimaryButtonStyle.ButtonSize
+
+  init(size: DSPrimaryButtonStyle.ButtonSize = .medium) {
+    self.size = size
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(size.font)
+      .fontWeight(.medium)
+      .foregroundColor(Design.Colors.textPrimary)
+      .padding(.horizontal, size.horizontalPadding)
+      .padding(.vertical, size.verticalPadding)
+      .background(
+        RoundedRectangle(cornerRadius: Design.Radius.sm)
+          .fill(Design.Colors.backgroundSecondary(colorScheme))
+          .overlay(
+            RoundedRectangle(cornerRadius: Design.Radius.sm)
+              .stroke(Design.Colors.border, lineWidth: 1)
+          )
+      )
+      .opacity(configuration.isPressed ? 0.85 : 1)
+      .scaleEffect(configuration.isPressed ? 0.98 : 1)
+      .animation(Design.Animation.snappy, value: configuration.isPressed)
+  }
+}
+
+/// Ghost/text button for tertiary actions
+struct DSGhostButtonStyle: ButtonStyle {
+  let color: Color
+
+  init(color: Color = Design.Colors.textSecondary) {
+    self.color = color
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(Design.Typography.labelMedium)
+      .foregroundColor(color)
+      .opacity(configuration.isPressed ? 0.6 : 1)
+      .scaleEffect(configuration.isPressed ? 0.98 : 1)
+      .animation(Design.Animation.quick, value: configuration.isPressed)
+  }
+}
+
+/// Compact action button for sheets and modals
+struct DSCompactButtonStyle: ButtonStyle {
   let color: Color
   let isDisabled: Bool
 
@@ -210,47 +327,59 @@ struct DSPrimaryButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(Design.Typography.labelLarge)
+      .font(.system(size: 12, weight: .semibold))
       .foregroundColor(.white)
-      .padding(.horizontal, Design.Spacing.lg)
-      .padding(.vertical, Design.Spacing.sm)
+      .padding(.horizontal, Design.Spacing.md)
+      .padding(.vertical, Design.Spacing.xs)
       .background(
         RoundedRectangle(cornerRadius: Design.Radius.sm)
-          .fill(isDisabled ? Color.gray : color)
+          .fill(isDisabled ? Color.gray.opacity(0.5) : color)
+          .shadow(
+            color: isDisabled ? .clear : color.opacity(configuration.isPressed ? 0.15 : 0.2),
+            radius: configuration.isPressed ? 1 : 4,
+            y: configuration.isPressed ? 0 : 2
+          )
       )
-      .opacity(configuration.isPressed ? 0.85 : 1)
-      .scaleEffect(configuration.isPressed ? 0.98 : 1)
-      .animation(Design.Animation.quick, value: configuration.isPressed)
+      .scaleEffect(configuration.isPressed ? 0.96 : 1)
+      .animation(Design.Animation.snappy, value: configuration.isPressed)
   }
 }
 
-struct DSSecondaryButtonStyle: ButtonStyle {
+/// Interactive card/row style with hover and press states
+struct DSInteractiveStyle: ButtonStyle {
   @Environment(\.colorScheme) var colorScheme
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(Design.Typography.labelLarge)
-      .foregroundColor(Design.Colors.textPrimary)
-      .padding(.horizontal, Design.Spacing.lg)
-      .padding(.vertical, Design.Spacing.sm)
-      .background(
-        RoundedRectangle(cornerRadius: Design.Radius.sm)
-          .fill(Design.Colors.backgroundSecondary(colorScheme))
-      )
-      .opacity(configuration.isPressed ? 0.85 : 1)
-      .animation(Design.Animation.quick, value: configuration.isPressed)
+      .scaleEffect(configuration.isPressed ? 0.98 : 1)
+      .opacity(configuration.isPressed ? 0.9 : 1)
+      .animation(Design.Animation.snappy, value: configuration.isPressed)
   }
 }
 
-struct DSGhostButtonStyle: ButtonStyle {
+/// Pill button style for tags and quick actions
+struct DSPillButtonStyle: ButtonStyle {
   let color: Color
+  let isSelected: Bool
+
+  init(color: Color = Design.Colors.primary, isSelected: Bool = false) {
+    self.color = color
+    self.isSelected = isSelected
+  }
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(Design.Typography.labelMedium)
-      .foregroundColor(color)
-      .opacity(configuration.isPressed ? 0.6 : 1)
-      .animation(Design.Animation.quick, value: configuration.isPressed)
+      .font(Design.Typography.labelSmall)
+      .fontWeight(.medium)
+      .foregroundColor(isSelected ? .white : color)
+      .padding(.horizontal, Design.Spacing.sm)
+      .padding(.vertical, Design.Spacing.xxs)
+      .background(
+        Capsule()
+          .fill(isSelected ? color : color.opacity(0.1))
+      )
+      .scaleEffect(configuration.isPressed ? 0.95 : 1)
+      .animation(Design.Animation.microBounce, value: configuration.isPressed)
   }
 }
 

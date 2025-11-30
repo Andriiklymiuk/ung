@@ -1309,5 +1309,5 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         }
     }
 
-    static let accentColor = Color(red: 0.20, green: 0.45, blue: 0.90)
+    static var accentColor: Color { Design.Colors.primary }
 }

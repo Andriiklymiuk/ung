@@ -17,6 +17,7 @@ import UIKit
 
 struct SettingsSection: View {
   @EnvironmentObject var appState: AppState
+  @StateObject private var themeManager = ThemeManager.shared
   @Environment(\.colorScheme) var colorScheme
   @State private var showImportPicker = false
   @State private var importError: String?
@@ -50,6 +51,9 @@ struct SettingsSection: View {
 
   var body: some View {
     VStack(spacing: Design.Spacing.md) {
+      // Appearance / Theme
+      appearanceCard
+
       // iCloud Sync
       iCloudCard
 
@@ -85,6 +89,48 @@ struct SettingsSection: View {
     if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
       biometricsAvailable = true
       biometricType = context.biometryType
+    }
+  }
+
+  // MARK: - Appearance Card
+  private var appearanceCard: some View {
+    SettingsCard(title: "Appearance", icon: "paintpalette.fill", color: Design.Colors.primary) {
+      VStack(spacing: Design.Spacing.sm) {
+        // Theme selection
+        VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+          Text("Theme")
+            .font(Design.Typography.labelMedium)
+            .foregroundColor(Design.Colors.textPrimary)
+
+          // Theme grid
+          LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+          ], spacing: Design.Spacing.sm) {
+            ForEach(AppTheme.allCases) { theme in
+              ThemeOptionCard(
+                theme: theme,
+                isSelected: themeManager.currentTheme == theme
+              ) {
+                withAnimation(Design.Animation.smooth) {
+                  themeManager.currentTheme = theme
+                }
+              }
+            }
+          }
+        }
+
+        // Current theme description
+        HStack(spacing: Design.Spacing.xs) {
+          Image(systemName: themeManager.currentTheme.icon)
+            .font(.system(size: 12))
+            .foregroundColor(Design.Colors.primary)
+          Text(themeManager.currentTheme.description)
+            .font(Design.Typography.bodySmall)
+            .foregroundColor(Design.Colors.textSecondary)
+        }
+        .padding(.top, 4)
+      }
     }
   }
 
@@ -1084,6 +1130,62 @@ struct SettingsActionRow: View {
         RoundedRectangle(cornerRadius: Design.Radius.xs)
           .fill(isHovered ? Color.secondary.opacity(0.08) : Color.clear)
       )
+    }
+    .buttonStyle(.plain)
+    .onHover { hovering in
+      withAnimation(Design.Animation.quick) {
+        isHovered = hovering
+      }
+    }
+  }
+}
+
+// MARK: - Theme Option Card
+struct ThemeOptionCard: View {
+  let theme: AppTheme
+  let isSelected: Bool
+  let action: () -> Void
+
+  @Environment(\.colorScheme) var colorScheme
+  @State private var isHovered = false
+
+  var body: some View {
+    Button(action: action) {
+      VStack(spacing: Design.Spacing.xs) {
+        // Theme preview colors
+        HStack(spacing: 3) {
+          ForEach(theme.previewColors.indices, id: \.self) { index in
+            Circle()
+              .fill(theme.previewColors[index])
+              .frame(width: 16, height: 16)
+          }
+        }
+        .padding(.vertical, Design.Spacing.xs)
+
+        // Theme name
+        Text(theme.displayName)
+          .font(Design.Typography.labelMedium)
+          .foregroundColor(Design.Colors.textPrimary)
+
+        // Theme icon
+        Image(systemName: theme.icon)
+          .font(.system(size: 12))
+          .foregroundColor(isSelected ? Design.Colors.primary : Design.Colors.textTertiary)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(Design.Spacing.sm)
+      .background(
+        RoundedRectangle(cornerRadius: Design.Radius.sm)
+          .fill(Design.Colors.backgroundSecondary(colorScheme))
+          .overlay(
+            RoundedRectangle(cornerRadius: Design.Radius.sm)
+              .stroke(
+                isSelected ? Design.Colors.primary : (isHovered ? Design.Colors.border : Color.clear),
+                lineWidth: isSelected ? 2 : 1
+              )
+          )
+      )
+      .scaleEffect(isHovered ? 1.02 : 1.0)
     }
     .buttonStyle(.plain)
     .onHover { hovering in

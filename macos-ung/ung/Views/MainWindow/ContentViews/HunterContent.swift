@@ -47,7 +47,7 @@ struct HunterContent: View {
             }
         }
         .sheet(isPresented: $showImportCV) {
-            ImportCVSheet(hunterState: hunterState, appState: appState)
+            ImportCVSheet(hunterState: hunterState, appState: appState, autoHuntAfterImport: hunterState.profile == nil)
         }
         .sheet(isPresented: $showEditProfile) {
             EditProfileSheet(hunterState: hunterState, appState: appState)
@@ -98,8 +98,14 @@ struct HunterContent: View {
 
             Spacer()
 
-            // Hunt button
-            Button(action: { Task { await hunterState.hunt(appState: appState) } }) {
+            // Hunt button - shows import CV if no profile
+            Button(action: {
+                if hunterState.profile == nil || hunterState.profile?.skillsList.isEmpty == true {
+                    showImportCV = true
+                } else {
+                    Task { await hunterState.hunt(appState: appState) }
+                }
+            }) {
                 HStack(spacing: 6) {
                     if hunterState.isHunting {
                         ProgressView()
@@ -123,7 +129,7 @@ struct HunterContent: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .buttonStyle(.plain)
-            .disabled(hunterState.isHunting || hunterState.profile == nil)
+            .disabled(hunterState.isHunting)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -767,77 +773,123 @@ struct ImportCVSheet: View {
     @State private var selectedFileURL: URL?
     @State private var isImporting = false
     @State private var errorMessage: String?
+    @State private var importComplete = false
+    var autoHuntAfterImport: Bool = true
 
     var body: some View {
         VStack(spacing: 24) {
-            Text("Import CV/Resume")
+            Text(importComplete ? "Profile Created!" : "Import CV/Resume")
                 .font(.system(size: 20, weight: .bold))
 
-            VStack(spacing: 16) {
-                Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 48))
-                    .foregroundColor(.accentColor)
+            if importComplete {
+                // Show imported profile summary
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.green)
 
-                Text("Select a PDF file to import")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-
-                Button("Choose File...") {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.pdf]
-                    panel.allowsMultipleSelection = false
-
-                    if panel.runModal() == .OK {
-                        selectedFileURL = panel.url
-                    }
-                }
-                .buttonStyle(.bordered)
-
-                if let url = selectedFileURL {
-                    Text("Selected: \(url.lastPathComponent)")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-
-                if let error = errorMessage {
-                    Text(error)
-                        .font(.system(size: 13))
-                        .foregroundColor(.red)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                    .foregroundColor(.gray.opacity(0.3))
-            )
-
-            HStack {
-                Button("Cancel") {
-                    dismiss()
-                }
-                .buttonStyle(.bordered)
-
-                Spacer()
-
-                Button("Import") {
-                    guard let url = selectedFileURL else { return }
-                    isImporting = true
-                    errorMessage = nil
-
-                    Task {
-                        do {
-                            try await hunterState.importCV(from: url, appState: appState)
-                            dismiss()
-                        } catch {
-                            errorMessage = error.localizedDescription
+                    if let profile = hunterState.profile {
+                        VStack(spacing: 8) {
+                            Text(profile.name)
+                                .font(.system(size: 18, weight: .semibold))
+                            if let title = profile.title {
+                                Text(title)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary)
+                            }
+                            if !profile.skillsList.isEmpty {
+                                Text("Skills: \(profile.skillsList.prefix(5).joined(separator: ", "))")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                        isImporting = false
+                    }
+
+                    if autoHuntAfterImport {
+                        Text("Starting job hunt...")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+
+                        ProgressView()
+                            .scaleEffect(0.8)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(selectedFileURL == nil || isImporting)
+                .frame(maxWidth: .infinity)
+                .padding(24)
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "doc.badge.plus")
+                        .font(.system(size: 48))
+                        .foregroundColor(.accentColor)
+
+                    Text("Select a PDF file to import your skills")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+
+                    Button("Choose File...") {
+                        let panel = NSOpenPanel()
+                        panel.allowedContentTypes = [.pdf]
+                        panel.allowsMultipleSelection = false
+
+                        if panel.runModal() == .OK {
+                            selectedFileURL = panel.url
+                        }
+                    }
+                    .buttonStyle(.bordered)
+
+                    if let url = selectedFileURL {
+                        Text("Selected: \(url.lastPathComponent)")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let error = errorMessage {
+                        Text(error)
+                            .font(.system(size: 13))
+                            .foregroundColor(.red)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
+                        .foregroundColor(.gray.opacity(0.3))
+                )
+
+                HStack {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .buttonStyle(.bordered)
+
+                    Spacer()
+
+                    Button(isImporting ? "Importing..." : "Import & Hunt") {
+                        guard let url = selectedFileURL else { return }
+                        isImporting = true
+                        errorMessage = nil
+
+                        Task {
+                            do {
+                                try await hunterState.importCV(from: url, appState: appState)
+                                importComplete = true
+
+                                if autoHuntAfterImport {
+                                    // Small delay to show success state
+                                    try? await Task.sleep(nanoseconds: 500_000_000)
+                                    await hunterState.hunt(appState: appState)
+                                    dismiss()
+                                }
+                            } catch {
+                                errorMessage = error.localizedDescription
+                                isImporting = false
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(selectedFileURL == nil || isImporting)
+                }
             }
         }
         .padding(24)

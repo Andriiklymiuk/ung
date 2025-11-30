@@ -339,22 +339,33 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	// ============ SUCCESS! ============
 	fmt.Println()
 
-	successBox := boxStyle.Render(fmt.Sprintf(`%s  You're all set!
+	// Celebration banner
+	celebrationStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFD700"))
+
+	fmt.Println(celebrationStyle.Render("  ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨"))
+	fmt.Println()
+
+	successBox := boxStyle.Render(fmt.Sprintf(`%s
+
+  You're ready to track time, manage gigs, and invoice clients!
 
 %s
-  ung track start     Start tracking time
-  ung next            See what to do next
-  ung hunt            Find freelance gigs
+  ung track start     Start tracking time now
+  ung gig add <name>  Create your first gig
+  ung next            See your daily dashboard
 
 %s
   ung invoice new     Create an invoice
   ung goal status     Check goal progress
-  ung client add      Add more clients`,
-		successStyle.Render("Setup Complete!"),
-		headerStyle.Render("Quick Actions:"),
+  ung hunt            Find freelance opportunities`,
+		successStyle.Render("  🚀 Setup Complete!"),
+		headerStyle.Render("Get Started:"),
 		mutedStyle.Render("More commands:")))
 
 	fmt.Println(successBox)
+	fmt.Println()
+	fmt.Println(celebrationStyle.Render("  ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨"))
 	fmt.Println()
 
 	return nil

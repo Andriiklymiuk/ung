@@ -865,10 +865,56 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 
   private _getReadyHtml(): string {
     return `
+        <style>
+            .confetti {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                pointer-events: none;
+                z-index: 1000;
+            }
+            .confetti-piece {
+                position: absolute;
+                width: 10px;
+                height: 10px;
+                animation: confetti-fall 3s ease-out forwards;
+                opacity: 0;
+            }
+            @keyframes confetti-fall {
+                0% {
+                    transform: translateY(-20px) rotate(0deg);
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateY(100vh) rotate(720deg);
+                    opacity: 0;
+                }
+            }
+        </style>
+        <div class="confetti" id="confetti"></div>
+        <script>
+            (function() {
+                const confetti = document.getElementById('confetti');
+                const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
+                for (let i = 0; i < 50; i++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'confetti-piece';
+                    piece.style.left = Math.random() * 100 + '%';
+                    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    piece.style.animationDelay = Math.random() * 1 + 's';
+                    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                    confetti.appendChild(piece);
+                }
+                setTimeout(() => confetti.remove(), 4000);
+            })();
+        </script>
+
         <div class="success-container">
-            <div class="success-icon">✓</div>
+            <div class="success-icon">🎉</div>
             <h1 class="success-title">You're Ready!</h1>
-            <p class="success-message">Start tracking time and invoicing clients right away.</p>
+            <p class="success-message">Start tracking time, managing gigs, and invoicing clients!</p>
         </div>
 
         <div class="section">

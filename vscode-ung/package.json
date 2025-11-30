@@ -524,6 +524,24 @@
         "icon": "$(add)"
       },
       {
+        "command": "ung.addGig",
+        "title": "Add Gig",
+        "category": "UNG",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ung.setGoal",
+        "title": "Set Income Goal",
+        "category": "UNG",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "ung.viewGoalStatus",
+        "title": "View Goal Progress",
+        "category": "UNG",
+        "icon": "$(dashboard)"
+      },
+      {
         "command": "ung.viewGig",
         "title": "View Gig",
         "category": "UNG"

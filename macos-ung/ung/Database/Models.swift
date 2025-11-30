@@ -974,3 +974,43 @@ struct WorkLog: Codable, FetchableRecord, PersistableRecord, Identifiable {
         id = inserted.rowID
     }
 }
+
+// MARK: - Gig Task
+
+struct GigTask: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: Int64?
+    var gigId: Int64
+    var title: String
+    var description: String?
+    var completed: Bool
+    var completedAt: Date?
+    var dueDate: Date?
+    var sortOrder: Int
+
+    static let databaseTableName = "gig_tasks"
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, completed
+        case gigId = "gig_id"
+        case completedAt = "completed_at"
+        case dueDate = "due_date"
+        case sortOrder = "sort_order"
+    }
+
+    init(id: Int64? = nil, gigId: Int64, title: String, description: String? = nil, completed: Bool = false, completedAt: Date? = nil, dueDate: Date? = nil, sortOrder: Int = 0) {
+        self.id = id
+        self.gigId = gigId
+        self.title = title
+        self.description = description
+        self.completed = completed
+        self.completedAt = completedAt
+        self.dueDate = dueDate
+        self.sortOrder = sortOrder
+    }
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+
+    static let gig = belongsTo(Gig.self)
+}

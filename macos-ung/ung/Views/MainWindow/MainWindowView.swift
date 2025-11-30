@@ -301,6 +301,8 @@ struct iPadDetailView: View {
             switch appState.selectedTab {
             case .next:
                 NextContent()
+            case .gigs:
+                GigsContent()
             case .dashboard:
                 MainDashboardContent()
             case .tracking:
@@ -892,6 +894,8 @@ struct ContentAreaView: View {
         switch appState.selectedTab {
         case .next:
             NextContent()
+        case .gigs:
+            GigsContent()
         case .dashboard:
             MainDashboardContent()
         case .tracking:
@@ -978,6 +982,7 @@ struct ContentAreaView: View {
     private var headerSubtitle: String {
         switch appState.selectedTab {
         case .next: return "What's your next move?"
+        case .gigs: return "Manage your gigs and tasks"
         case .dashboard: return "Overview of your business"
         case .tracking: return "Manage your time sessions"
         case .clients: return "\(appState.clientCount) clients"

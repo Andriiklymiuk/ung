@@ -936,9 +936,17 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             --radius-lg: 16px;
             --radius-full: 9999px;
 
-            /* Transitions */
-            --transition-quick: 0.15s ease-out;
-            --transition-standard: 0.25s ease-in-out;
+            /* Transitions - Aligned with macOS Design.Animation */
+            --transition-quick: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-snappy: 0.2s cubic-bezier(0.34, 1.2, 0.64, 1);
+            --transition-standard: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-gentle: 0.3s cubic-bezier(0.4, 0, 0.6, 1);
+
+            /* Shadows */
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.06);
+            --shadow-brand: 0 3px 6px rgba(51, 115, 232, 0.25);
+            --shadow-brand-hover: 0 4px 12px rgba(51, 115, 232, 0.35);
         }
 
         * {
@@ -1082,12 +1090,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             cursor: pointer;
             font-size: 12px;
             font-weight: 500;
-            transition: all var(--transition-quick);
+            transition: all var(--transition-snappy);
+            box-shadow: 0 2px 4px rgba(230, 90, 90, 0.25);
         }
 
         .stop-btn:hover {
             background-color: #D14545;
             transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(230, 90, 90, 0.35);
+        }
+
+        .stop-btn:active {
+            transform: scale(0.97);
+            box-shadow: 0 1px 2px rgba(230, 90, 90, 0.2);
         }
 
         /* Revenue Bar */
@@ -1163,7 +1178,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             font-size: 12px;
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
-            transition: all var(--transition-quick);
+            transition: all var(--transition-snappy);
             text-align: center;
             font-weight: 500;
         }
@@ -1174,14 +1189,26 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             transform: translateY(-1px);
         }
 
+        .action-btn:active {
+            transform: translateY(0) scale(0.97);
+        }
+
         .action-btn.primary {
             background-color: var(--ung-brand);
             color: white;
             grid-column: span 2;
+            box-shadow: var(--shadow-brand);
         }
 
         .action-btn.primary:hover {
             background-color: var(--ung-brand-dark);
+            box-shadow: var(--shadow-brand-hover);
+            transform: translateY(-1px);
+        }
+
+        .action-btn.primary:active {
+            transform: translateY(0) scale(0.97);
+            box-shadow: var(--shadow-sm);
         }
 
         .action-icon {
@@ -1224,7 +1251,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             font-size: 11px;
             font-family: var(--vscode-font-family);
             color: var(--vscode-foreground);
-            transition: all var(--transition-quick);
+            transition: all var(--transition-snappy);
             position: relative;
         }
 
@@ -1232,6 +1259,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-list-hoverBackground);
             border-color: var(--ung-brand);
             transform: translateY(-1px);
+        }
+
+        .nav-item:active {
+            transform: translateY(0) scale(0.98);
         }
 
         .nav-icon {
@@ -1291,11 +1322,18 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-sideBar-background);
             border-radius: var(--radius-sm);
             cursor: pointer;
-            transition: all var(--transition-quick);
+            transition: all var(--transition-snappy);
+            border: 1px solid transparent;
         }
 
         .setup-step:hover {
             background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--ung-brand);
+            transform: translateX(2px);
+        }
+
+        .setup-step:active {
+            transform: translateX(1px) scale(0.99);
         }
 
         .setup-step.completed {
@@ -1396,13 +1434,18 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-input-background);
             border-radius: var(--radius-sm);
             cursor: pointer;
-            transition: all var(--transition-quick);
+            transition: all var(--transition-snappy);
             border: 1px solid transparent;
         }
 
         .recent-item:hover {
             background-color: var(--vscode-list-hoverBackground);
             border-color: var(--ung-brand);
+            transform: translateX(2px);
+        }
+
+        .recent-item:active {
+            transform: translateX(1px) scale(0.99);
         }
 
         .recent-item-icon {
@@ -1726,11 +1769,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             border: none;
             font-weight: 500;
             margin-top: var(--space-xxs);
-            transition: all var(--transition-quick);
+            transition: all var(--transition-snappy);
+            box-shadow: var(--shadow-brand);
         }
 
         .empty-state-action:hover {
             background-color: var(--ung-brand-dark);
+            box-shadow: var(--shadow-brand-hover);
+            transform: translateY(-1px);
+        }
+
+        .empty-state-action:active {
+            transform: translateY(0) scale(0.97);
+            box-shadow: var(--shadow-sm);
         }
 
         /* Section with view all link */

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -451,7 +450,6 @@ func (h *GigHandler) HandleView(callbackQuery *tgbotapi.CallbackQuery, gigID uin
 
 // HandleMove moves a gig to a new status
 func (h *GigHandler) HandleMove(callbackQuery *tgbotapi.CallbackQuery, gigID uint, newStatus string) error {
-	chatID := callbackQuery.Message.Chat.ID
 	telegramID := callbackQuery.From.ID
 
 	user := h.sessionMgr.GetUser(telegramID)
@@ -553,7 +551,6 @@ func (h *GigHandler) HandleNameInput(message *tgbotapi.Message) error {
 
 // HandleDelete deletes a gig
 func (h *GigHandler) HandleDelete(callbackQuery *tgbotapi.CallbackQuery, gigID uint) error {
-	chatID := callbackQuery.Message.Chat.ID
 	telegramID := callbackQuery.From.ID
 
 	user := h.sessionMgr.GetUser(telegramID)

@@ -77,4 +77,9 @@ const (
 	StatePomodoroProject        SessionState = "pomodoro_project"
 	// Goal states
 	StateGoalAmount             SessionState = "goal_amount"
+	// Hunter states
+	StateHunterProfileName      SessionState = "hunter_profile_name"
+	StateHunterProfileTitle     SessionState = "hunter_profile_title"
+	StateHunterProfileSkills    SessionState = "hunter_profile_skills"
+	StateHunterProfileRate      SessionState = "hunter_profile_rate"
 )

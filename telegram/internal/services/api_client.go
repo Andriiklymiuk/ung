@@ -1346,3 +1346,352 @@ func (c *APIClient) Search(token string, query string) (*SearchResponse, error) 
 
 	return &searchResp, nil
 }
+
+// =====================================
+// Job Hunter API
+// =====================================
+
+// HunterProfile represents a hunter profile
+type HunterProfile struct {
+	ID         uint     `json:"id"`
+	Name       string   `json:"name"`
+	Title      string   `json:"title"`
+	Bio        string   `json:"bio"`
+	Skills     []string `json:"skills"`
+	Experience int      `json:"experience"`
+	Rate       float64  `json:"rate"`
+	Currency   string   `json:"currency"`
+	Location   string   `json:"location"`
+	Remote     bool     `json:"remote"`
+}
+
+// HunterJob represents a scraped job
+type HunterJob struct {
+	ID          uint    `json:"id"`
+	Source      string  `json:"source"`
+	SourceURL   string  `json:"source_url"`
+	Title       string  `json:"title"`
+	Company     string  `json:"company"`
+	Description string  `json:"description"`
+	Skills      []string `json:"skills"`
+	RateMin     float64 `json:"rate_min"`
+	RateMax     float64 `json:"rate_max"`
+	RateType    string  `json:"rate_type"`
+	Currency    string  `json:"currency"`
+	Remote      bool    `json:"remote"`
+	Location    string  `json:"location"`
+	MatchScore  float64 `json:"match_score"`
+	PostedAt    string  `json:"posted_at"`
+}
+
+// HunterApplication represents a job application
+type HunterApplication struct {
+	ID        uint   `json:"id"`
+	JobID     uint   `json:"job_id"`
+	Proposal  string `json:"proposal"`
+	Status    string `json:"status"`
+	AppliedAt string `json:"applied_at"`
+}
+
+// HunterStats represents hunter statistics
+type HunterStats struct {
+	TotalJobs         int            `json:"total_jobs"`
+	TotalApplications int            `json:"total_applications"`
+	StatusCounts      map[string]int `json:"status_counts"`
+	TopSkills         []string       `json:"top_skills"`
+	AverageMatchScore float64        `json:"average_match_score"`
+}
+
+// HuntResult represents the result of a hunt operation
+type HuntResult struct {
+	Jobs       []HunterJob `json:"jobs"`
+	NewCount   int         `json:"new_count"`
+	TotalCount int         `json:"total_count"`
+}
+
+// GetHunterProfile gets the user's hunter profile
+func (c *APIClient) GetHunterProfile(token string) (*HunterProfile, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/hunter/profile", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // No profile yet
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var profile HunterProfile
+	if err := json.Unmarshal(apiResp.Data, &profile); err != nil {
+		return nil, err
+	}
+
+	return &profile, nil
+}
+
+// UpdateHunterProfile updates the user's hunter profile
+func (c *APIClient) UpdateHunterProfile(token string, profile *HunterProfile) (*HunterProfile, error) {
+	jsonData, err := json.Marshal(profile)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", c.baseURL+"/api/v1/hunter/profile", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var updatedProfile HunterProfile
+	if err := json.Unmarshal(apiResp.Data, &updatedProfile); err != nil {
+		return nil, err
+	}
+
+	return &updatedProfile, nil
+}
+
+// HuntJobs triggers a job hunt/scrape
+func (c *APIClient) HuntJobs(token string) (*HuntResult, error) {
+	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/hunter/hunt", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Longer timeout for scraping
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var result HuntResult
+	if err := json.Unmarshal(apiResp.Data, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetHunterJobs gets list of scraped jobs
+func (c *APIClient) GetHunterJobs(token string, limit int) ([]HunterJob, error) {
+	url := fmt.Sprintf("%s/api/v1/hunter/jobs?limit=%d", c.baseURL, limit)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var jobs []HunterJob
+	if err := json.Unmarshal(apiResp.Data, &jobs); err != nil {
+		return nil, err
+	}
+
+	return jobs, nil
+}
+
+// GetHunterStats gets hunter statistics
+func (c *APIClient) GetHunterStats(token string) (*HunterStats, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/hunter/stats", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var stats HunterStats
+	if err := json.Unmarshal(apiResp.Data, &stats); err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}
+
+// CreateHunterApplication creates a job application
+func (c *APIClient) CreateHunterApplication(token string, jobID uint, generateProposal bool) (*HunterApplication, error) {
+	data := map[string]interface{}{
+		"job_id":            jobID,
+		"generate_proposal": generateProposal,
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/hunter/applications", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var application HunterApplication
+	if err := json.Unmarshal(apiResp.Data, &application); err != nil {
+		return nil, err
+	}
+
+	return &application, nil
+}
+
+// GetHunterApplications gets list of applications
+func (c *APIClient) GetHunterApplications(token string) ([]HunterApplication, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/hunter/applications", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var applications []HunterApplication
+	if err := json.Unmarshal(apiResp.Data, &applications); err != nil {
+		return nil, err
+	}
+
+	return applications, nil
+}

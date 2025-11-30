@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -68,7 +70,7 @@ func (h *HunterHandler) HandleMenu(message *tgbotapi.Message) error {
 	return nil
 }
 
-// HandleHunt starts a job hunt
+// HandleHunt starts a job hunt - checks profile first, prompts for PDF if needed
 func (h *HunterHandler) HandleHunt(message *tgbotapi.Message) error {
 	chatID := message.Chat.ID
 	telegramID := message.From.ID
@@ -81,13 +83,47 @@ func (h *HunterHandler) HandleHunt(message *tgbotapi.Message) error {
 
 	user := h.sessionMgr.GetUser(telegramID)
 
+	// Check if profile exists
+	profile, _ := h.apiClient.GetHunterProfile(user.APIToken)
+	if profile == nil || len(profile.Skills) == 0 {
+		// No profile - ask for PDF
+		h.sessionMgr.SetSession(&models.Session{
+			TelegramID: telegramID,
+			State:      string(models.StateHunterAwaitingPDF),
+			Data:       make(map[string]interface{}),
+		})
+
+		msg := tgbotapi.NewMessage(chatID,
+			"🎯 *Job Hunter*\n\n"+
+				"To find jobs matching your skills, I need your CV.\n\n"+
+				"📄 *Send me your CV as a PDF file*\n\n"+
+				"_I'll extract your skills and start hunting!_")
+		msg.ParseMode = "Markdown"
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("✍️ Enter manually instead", "hunter_profile_create"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+
+		h.bot.Send(msg)
+		return nil
+	}
+
+	// Has profile - start hunting
+	return h.doHunt(chatID, user.APIToken)
+}
+
+// doHunt performs the actual job hunting
+func (h *HunterHandler) doHunt(chatID int64, token string) error {
 	// Show "hunting" message
 	huntingMsg := tgbotapi.NewMessage(chatID,
 		"🔍 *Hunting for jobs...*\n\n"+
 			"_Searching across multiple platforms:_\n"+
-			"• HackerNews Jobs\n"+
-			"• RemoteOK\n"+
-			"• WeWorkRemotely\n"+
+			"• HackerNews Jobs 🇺🇸\n"+
+			"• RemoteOK 🇺🇸\n"+
+			"• WeWorkRemotely 🇺🇸\n"+
 			"• Djinni 🇺🇦\n"+
 			"• DOU 🇺🇦\n"+
 			"• Netherlands 🇳🇱\n"+
@@ -96,13 +132,14 @@ func (h *HunterHandler) HandleHunt(message *tgbotapi.Message) error {
 	huntingMsg.ParseMode = "Markdown"
 	h.bot.Send(huntingMsg)
 
-	result, err := h.apiClient.HuntJobs(user.APIToken)
+	result, err := h.apiClient.HuntJobs(token)
 	if err != nil {
 		msg := tgbotapi.NewMessage(chatID, "Failed to hunt jobs: "+err.Error())
 		h.bot.Send(msg)
 		return err
 	}
 
+	// Show results with top jobs inline
 	var text strings.Builder
 	text.WriteString("--------------------\n")
 	text.WriteString("      *Hunt Complete!*\n")
@@ -110,24 +147,46 @@ func (h *HunterHandler) HandleHunt(message *tgbotapi.Message) error {
 	text.WriteString(fmt.Sprintf("🆕 *New Jobs:* %d\n", result.NewCount))
 	text.WriteString(fmt.Sprintf("📊 *Total Jobs:* %d\n\n", result.TotalCount))
 
-	if result.NewCount > 0 {
-		text.WriteString("_View your matched jobs with /jobs_")
-	} else {
-		text.WriteString("_No new jobs found. Try again later!_")
+	// Show top 3 jobs if available
+	if len(result.Jobs) > 0 {
+		text.WriteString("*Top Matches:*\n")
+		for i, job := range result.Jobs {
+			if i >= 3 {
+				break
+			}
+			sourceFlag := getSourceFlag(job.Source)
+			matchEmoji := getMatchEmoji(job.MatchScore)
+			text.WriteString(fmt.Sprintf("%s %s *%s*\n", matchEmoji, sourceFlag, truncate(job.Title, 30)))
+			if job.Company != "" {
+				text.WriteString(fmt.Sprintf("   🏢 %s | %.0f%% match\n", job.Company, job.MatchScore))
+			}
+		}
+		text.WriteString("\n")
 	}
 
 	msg := tgbotapi.NewMessage(chatID, text.String())
 	msg.ParseMode = "Markdown"
 
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+	// Create job buttons for top 3
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i, job := range result.Jobs {
+		if i >= 3 {
+			break
+		}
+		shortTitle := truncate(job.Title, 25)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("📄 %s", shortTitle), fmt.Sprintf("hunter_job_%d", job.ID)),
+		))
+	}
+
+	rows = append(rows,
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📋 View Jobs", "hunter_jobs"),
+			tgbotapi.NewInlineKeyboardButtonData("📋 All Jobs", "hunter_jobs"),
 			tgbotapi.NewInlineKeyboardButtonData("🎯 Hunt Again", "hunter_hunt"),
 		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("« Hunter Menu", "action_hunter"),
-		),
 	)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	msg.ReplyMarkup = keyboard
 
 	h.bot.Send(msg)
@@ -825,6 +884,98 @@ func (h *HunterHandler) HandleApply(callbackQuery *tgbotapi.CallbackQuery, jobID
 
 	h.bot.Send(msg)
 	return nil
+}
+
+// HandlePDFUpload handles PDF CV upload for profile import
+func (h *HunterHandler) HandlePDFUpload(message *tgbotapi.Message) error {
+	chatID := message.Chat.ID
+	telegramID := message.From.ID
+
+	user := h.sessionMgr.GetUser(telegramID)
+
+	// Get the document
+	doc := message.Document
+	if doc == nil {
+		msg := tgbotapi.NewMessage(chatID, "Please send a PDF file.")
+		h.bot.Send(msg)
+		return nil
+	}
+
+	// Check if it's a PDF
+	if doc.MimeType != "application/pdf" {
+		msg := tgbotapi.NewMessage(chatID, "Please send a *PDF* file only.")
+		msg.ParseMode = "Markdown"
+		h.bot.Send(msg)
+		return nil
+	}
+
+	// Show processing message
+	processingMsg := tgbotapi.NewMessage(chatID,
+		"📄 *Processing your CV...*\n\n"+
+			"_Extracting skills and experience..._")
+	processingMsg.ParseMode = "Markdown"
+	h.bot.Send(processingMsg)
+
+	// Download the file
+	fileConfig := tgbotapi.FileConfig{FileID: doc.FileID}
+	file, err := h.bot.GetFile(fileConfig)
+	if err != nil {
+		msg := tgbotapi.NewMessage(chatID, "Failed to download file: "+err.Error())
+		h.bot.Send(msg)
+		return err
+	}
+
+	// Get file URL and download
+	fileURL := file.Link(h.bot.Token)
+	resp, err := http.Get(fileURL)
+	if err != nil {
+		msg := tgbotapi.NewMessage(chatID, "Failed to download file: "+err.Error())
+		h.bot.Send(msg)
+		return err
+	}
+	defer resp.Body.Close()
+
+	pdfData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		msg := tgbotapi.NewMessage(chatID, "Failed to read file: "+err.Error())
+		h.bot.Send(msg)
+		return err
+	}
+
+	// Import profile from PDF
+	profile, err := h.apiClient.ImportProfileFromPDF(user.APIToken, pdfData, doc.FileName)
+	if err != nil {
+		msg := tgbotapi.NewMessage(chatID, "Failed to process CV: "+err.Error())
+		h.bot.Send(msg)
+		return err
+	}
+
+	// Clear the waiting state
+	h.sessionMgr.ClearSession(telegramID)
+
+	// Show extracted profile
+	var text strings.Builder
+	text.WriteString("✅ *Profile Created from CV!*\n\n")
+	if profile.Name != "" {
+		text.WriteString(fmt.Sprintf("👤 *Name:* %s\n", profile.Name))
+	}
+	if profile.Title != "" {
+		text.WriteString(fmt.Sprintf("💼 *Title:* %s\n", profile.Title))
+	}
+	if len(profile.Skills) > 0 {
+		text.WriteString(fmt.Sprintf("🛠 *Skills:* %s\n", strings.Join(profile.Skills, ", ")))
+	}
+	if profile.Experience > 0 {
+		text.WriteString(fmt.Sprintf("📅 *Experience:* %d years\n", profile.Experience))
+	}
+	text.WriteString("\n_Starting job hunt..._")
+
+	msg := tgbotapi.NewMessage(chatID, text.String())
+	msg.ParseMode = "Markdown"
+	h.bot.Send(msg)
+
+	// Automatically start hunting
+	return h.doHunt(chatID, user.APIToken)
 }
 
 // Helper functions

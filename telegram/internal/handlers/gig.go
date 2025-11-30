@@ -26,23 +26,19 @@ func NewGigHandler(bot *tgbotapi.BotAPI, apiClient *services.APIClient, sessionM
 	}
 }
 
-// Status workflow: pipeline → negotiating → active → delivered → invoiced → complete
-var statusFlow = []string{"pipeline", "negotiating", "active", "delivered", "invoiced", "complete"}
+// Status workflow: todo → in_progress → sent → done
+var statusFlow = []string{"todo", "in_progress", "sent", "done"}
 
 // Helper to get status emoji
 func getGigStatusEmoji(status string) string {
 	switch status {
-	case "pipeline":
-		return "📥"
-	case "negotiating":
-		return "💬"
-	case "active":
-		return "🔵"
-	case "delivered":
+	case "todo":
+		return "📋"
+	case "in_progress":
+		return "🚀"
+	case "sent":
 		return "📦"
-	case "invoiced":
-		return "💰"
-	case "complete":
+	case "done":
 		return "✅"
 	case "on_hold":
 		return "⏸️"
@@ -115,10 +111,10 @@ func (h *GigHandler) HandleMenu(message *tgbotapi.Message) error {
 
 		text.WriteString("\n")
 
-		// Show active gigs first
-		if active := byStatus["active"]; len(active) > 0 {
-			text.WriteString("*Active:*\n")
-			for _, gig := range active {
+		// Show in_progress gigs first
+		if inProgress := byStatus["in_progress"]; len(inProgress) > 0 {
+			text.WriteString("*In Progress:*\n")
+			for _, gig := range inProgress {
 				text.WriteString(fmt.Sprintf("• %s", gig.Name))
 				if gig.TotalHoursTracked > 0 {
 					text.WriteString(fmt.Sprintf(" _%.1fh_", gig.TotalHoursTracked))
@@ -128,12 +124,12 @@ func (h *GigHandler) HandleMenu(message *tgbotapi.Message) error {
 			text.WriteString("\n")
 		}
 
-		// Show pipeline (potential)
-		if pipeline := byStatus["pipeline"]; len(pipeline) > 0 {
-			text.WriteString("*Pipeline:*\n")
-			for i, gig := range pipeline {
+		// Show todo (queued)
+		if todo := byStatus["todo"]; len(todo) > 0 {
+			text.WriteString("*Todo:*\n")
+			for i, gig := range todo {
 				if i >= 3 {
-					text.WriteString(fmt.Sprintf("_+%d more_\n", len(pipeline)-3))
+					text.WriteString(fmt.Sprintf("_+%d more_\n", len(todo)-3))
 					break
 				}
 				text.WriteString(fmt.Sprintf("• %s\n", gig.Name))
@@ -164,9 +160,9 @@ func (h *GigHandler) HandleMenu(message *tgbotapi.Message) error {
 
 	// Filter by status buttons
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("📥 Pipeline", "gig_filter_pipeline"),
-		tgbotapi.NewInlineKeyboardButtonData("🔵 Active", "gig_filter_active"),
-		tgbotapi.NewInlineKeyboardButtonData("📦 Delivered", "gig_filter_delivered"),
+		tgbotapi.NewInlineKeyboardButtonData("📋 Todo", "gig_filter_todo"),
+		tgbotapi.NewInlineKeyboardButtonData("🚀 In Progress", "gig_filter_in_progress"),
+		tgbotapi.NewInlineKeyboardButtonData("📦 Sent", "gig_filter_sent"),
 	))
 
 	// Action buttons
@@ -504,10 +500,10 @@ func (h *GigHandler) HandleNameInput(message *tgbotapi.Message) error {
 
 	user := h.sessionMgr.GetUser(telegramID)
 
-	// Create the gig directly in pipeline status
+	// Create the gig directly in todo status
 	req := services.GigCreateRequest{
 		Name:    name,
-		Status:  "pipeline",
+		Status:  "todo",
 		GigType: "hourly",
 	}
 
@@ -523,7 +519,7 @@ func (h *GigHandler) HandleNameInput(message *tgbotapi.Message) error {
 
 	// Show success and gig view
 	var text strings.Builder
-	text.WriteString(fmt.Sprintf("✅ *Created!*\n\n📋 %s\n📥 Pipeline", gig.Name))
+	text.WriteString(fmt.Sprintf("✅ *Created!*\n\n📋 %s\n📋 Todo", gig.Name))
 
 	msg := tgbotapi.NewMessage(chatID, text.String())
 	msg.ParseMode = "Markdown"

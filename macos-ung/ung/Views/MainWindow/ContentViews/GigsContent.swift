@@ -40,7 +40,7 @@ class GigBoardState: ObservableObject {
         }
     }
 
-    let visibleStatuses: [GigStatus] = [.pipeline, .negotiating, .active, .delivered, .invoiced, .complete]
+    let visibleStatuses: [GigStatus] = [.todo, .inProgress, .sent, .done]
 
     func loadData() async {
         do {
@@ -79,7 +79,7 @@ class GigBoardState: ObservableObject {
         }
     }
 
-    func createGig(name: String, clientId: Int64?, status: GigStatus = .pipeline) async {
+    func createGig(name: String, clientId: Int64?, status: GigStatus = .todo, project: String? = nil) async {
         let gig = Gig(
             name: name,
             clientId: clientId,
@@ -101,6 +101,7 @@ class GigBoardState: ObservableObject {
             completedAt: nil,
             description: nil,
             notes: nil,
+            project: project,
             createdAt: nil,
             updatedAt: nil
         )
@@ -290,12 +291,12 @@ struct GigsContent: View {
                     color: .blue
                 )
 
-                let activeCount = state.gigsForStatus(.active).count
-                if activeCount > 0 {
+                let inProgressCount = state.gigsForStatus(.inProgress).count
+                if inProgressCount > 0 {
                     StatPill(
-                        value: "\(activeCount)",
-                        label: "Active",
-                        color: .green
+                        value: "\(inProgressCount)",
+                        label: "In Progress",
+                        color: .blue
                     )
                 }
             }
@@ -844,7 +845,7 @@ struct NewGigSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var selectedClientId: Int64?
-    @State private var selectedStatus: GigStatus = .pipeline
+    @State private var selectedStatus: GigStatus = .todo
     @FocusState private var nameFocused: Bool
 
     var body: some View {
@@ -916,7 +917,7 @@ struct GigDetailSheet: View {
     @ObservedObject var state: GigBoardState
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
-    @State private var status: GigStatus = .pipeline
+    @State private var status: GigStatus = .todo
     @State private var newTaskTitle = ""
 
     var body: some View {
@@ -1083,12 +1084,10 @@ struct ScaleButtonStyle: ButtonStyle {
 extension GigStatus {
     var color: Color {
         switch self {
-        case .pipeline: return .gray
-        case .negotiating: return .purple
-        case .active: return .blue
-        case .delivered: return .orange
-        case .invoiced: return .cyan
-        case .complete: return .green
+        case .todo: return .gray
+        case .inProgress: return .blue
+        case .sent: return .orange
+        case .done: return .green
         case .onHold: return .yellow
         case .cancelled: return .red
         }
@@ -1096,12 +1095,10 @@ extension GigStatus {
 
     var emptyIcon: String {
         switch self {
-        case .pipeline: return "tray"
-        case .negotiating: return "bubble.left.and.bubble.right"
-        case .active: return "bolt"
-        case .delivered: return "paperplane"
-        case .invoiced: return "doc.text"
-        case .complete: return "checkmark.seal"
+        case .todo: return "tray"
+        case .inProgress: return "bolt"
+        case .sent: return "paperplane"
+        case .done: return "checkmark.seal"
         case .onHold: return "pause.circle"
         case .cancelled: return "xmark.circle"
         }

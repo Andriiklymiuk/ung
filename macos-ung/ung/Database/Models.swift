@@ -849,24 +849,21 @@ struct HunterStats: Codable {
 
 // MARK: - Gig Status
 
+// Simplified flow: todo → in_progress → sent → done
 enum GigStatus: String, Codable, CaseIterable {
-    case pipeline
-    case negotiating
-    case active
-    case delivered
-    case invoiced
-    case complete
+    case todo
+    case inProgress = "in_progress"
+    case sent
+    case done
     case onHold = "on_hold"
     case cancelled
 
     var displayName: String {
         switch self {
-        case .pipeline: return "Pipeline"
-        case .negotiating: return "Negotiating"
-        case .active: return "Active"
-        case .delivered: return "Delivered"
-        case .invoiced: return "Invoiced"
-        case .complete: return "Complete"
+        case .todo: return "Todo"
+        case .inProgress: return "In Progress"
+        case .sent: return "Sent"
+        case .done: return "Done"
         case .onHold: return "On Hold"
         case .cancelled: return "Cancelled"
         }
@@ -874,15 +871,18 @@ enum GigStatus: String, Codable, CaseIterable {
 
     var color: String {
         switch self {
-        case .pipeline: return "gray"
-        case .negotiating: return "purple"
-        case .active: return "blue"
-        case .delivered: return "orange"
-        case .invoiced: return "cyan"
-        case .complete: return "green"
+        case .todo: return "gray"
+        case .inProgress: return "blue"
+        case .sent: return "orange"
+        case .done: return "green"
         case .onHold: return "yellow"
         case .cancelled: return "red"
         }
+    }
+
+    // Main workflow statuses (excludes on_hold and cancelled)
+    static var workflowStatuses: [GigStatus] {
+        [.todo, .inProgress, .sent, .done]
     }
 }
 
@@ -910,13 +910,14 @@ struct Gig: Codable, FetchableRecord, PersistableRecord, Identifiable {
     var completedAt: Date?
     var description: String?
     var notes: String?
+    var project: String?
     var createdAt: Date?
     var updatedAt: Date?
 
     static let databaseTableName = "gigs"
 
     enum CodingKeys: String, CodingKey {
-        case id, name, status, priority, currency, description, notes
+        case id, name, status, priority, currency, description, notes, project
         case clientId = "client_id"
         case contractId = "contract_id"
         case applicationId = "application_id"
@@ -940,7 +941,7 @@ struct Gig: Codable, FetchableRecord, PersistableRecord, Identifiable {
     }
 
     var gigStatus: GigStatus {
-        GigStatus(rawValue: status) ?? .pipeline
+        GigStatus(rawValue: status) ?? .todo
     }
 
     static let client = belongsTo(ClientModel.self)

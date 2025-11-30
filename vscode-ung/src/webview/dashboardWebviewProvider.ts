@@ -72,6 +72,67 @@ interface RecentExpense {
 }
 
 /**
+ * Recent gig info
+ */
+interface RecentGig {
+  id: number;
+  name: string;
+  client: string;
+  status: string;
+  hours: number;
+  type: string;
+}
+
+/**
+ * Gig status configuration for display
+ */
+const GIG_STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; bgColor: string }
+> = {
+  pipeline: {
+    label: 'Pipeline',
+    color: '#808080',
+    bgColor: 'rgba(128, 128, 128, 0.15)',
+  },
+  negotiating: {
+    label: 'Negotiating',
+    color: '#8C59B2',
+    bgColor: 'rgba(140, 89, 178, 0.15)',
+  },
+  active: {
+    label: 'Active',
+    color: '#3373E8',
+    bgColor: 'rgba(51, 115, 232, 0.15)',
+  },
+  delivered: {
+    label: 'Delivered',
+    color: '#F29932',
+    bgColor: 'rgba(242, 153, 50, 0.15)',
+  },
+  invoiced: {
+    label: 'Invoiced',
+    color: '#00BCD4',
+    bgColor: 'rgba(0, 188, 212, 0.15)',
+  },
+  complete: {
+    label: 'Complete',
+    color: '#33A756',
+    bgColor: 'rgba(51, 167, 86, 0.15)',
+  },
+  on_hold: {
+    label: 'On Hold',
+    color: '#FFD93D',
+    bgColor: 'rgba(255, 217, 61, 0.15)',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    color: '#E65A5A',
+    bgColor: 'rgba(230, 90, 90, 0.15)',
+  },
+};
+
+/**
  * Dashboard webview provider for the sidebar
  * Shows a professional dashboard with metrics, quick actions, and navigation
  */
@@ -98,6 +159,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private _recentInvoices: RecentInvoice[] = [];
   private _recentSessions: RecentSession[] = [];
   private _recentExpenses: RecentExpense[] = [];
+  private _recentGigs: RecentGig[] = [];
   private _weeklyHours: number = 0;
   private _weeklyTarget: number = 40;
   private _trackingStreak: number = 0;
@@ -263,6 +325,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             this._view.webview.html = this._getHtmlForWebview();
           }
           break;
+        case 'openGigBoard':
+          vscode.commands.executeCommand('ung.openGigBoard');
+          break;
+        case 'createGig':
+          vscode.commands.executeCommand('ung.createGig');
+          break;
+        case 'viewGig':
+          if (message.gigId) {
+            vscode.commands.executeCommand('ung.viewGig', message.gigId);
+          }
+          break;
+        case 'moveGig':
+          if (message.gigId) {
+            vscode.commands.executeCommand('ung.moveGig', message.gigId);
+          }
+          break;
       }
     });
 
@@ -288,6 +366,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       this._loadRecentInvoices(),
       this._loadRecentSessions(),
       this._loadRecentExpenses(),
+      this._loadRecentGigs(),
       this._loadWeeklyHours(),
       this._loadWeeklyTarget(),
       this._loadTrackingStreak(),
@@ -595,6 +674,49 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
     }
     return expenses;
+  }
+
+  private async _loadRecentGigs(): Promise<void> {
+    try {
+      const result = await this.cli.listGigs();
+      if (result.success && result.stdout) {
+        this._recentGigs = this._parseGigsFromOutput(result.stdout);
+      } else {
+        this._recentGigs = [];
+      }
+    } catch {
+      this._recentGigs = [];
+    }
+  }
+
+  private _parseGigsFromOutput(output: string): RecentGig[] {
+    const lines = output
+      .split('\n')
+      .filter((l) => l.trim() && !l.includes('─') && !l.includes('ID'));
+    if (lines.length < 2) return [];
+
+    const gigs: RecentGig[] = [];
+    // Skip header line, get up to 5 most recent
+    for (let i = 1; i < lines.length && gigs.length < 5; i++) {
+      const parts = lines[i]
+        .split(/\s{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p);
+      if (parts.length >= 5) {
+        const id = parseInt(parts[0], 10);
+        if (!Number.isNaN(id)) {
+          gigs.push({
+            id,
+            name: parts[1] || 'Unnamed Gig',
+            client: parts[2] || '-',
+            status: (parts[3] || 'pipeline').toLowerCase().replace(' ', '_'),
+            hours: parseFloat(parts[4]) || 0,
+            type: parts[5] || 'hourly',
+          });
+        }
+      }
+    }
+    return gigs;
   }
 
   private async _loadWeeklyHours(): Promise<void> {
@@ -1363,6 +1485,56 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             border-radius: var(--radius-xs);
         }
 
+        /* Gig styles */
+        .gig-item {
+            position: relative;
+        }
+
+        .gig-actions {
+            display: flex;
+            gap: var(--space-xxs);
+            margin-left: auto;
+            margin-right: var(--space-xs);
+        }
+
+        .gig-action-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border: none;
+            background: rgba(128, 128, 128, 0.1);
+            border-radius: var(--radius-xs);
+            cursor: pointer;
+            color: var(--vscode-descriptionForeground);
+            transition: all var(--transition-quick);
+            font-size: 11px;
+            font-family: var(--vscode-font-family);
+            font-weight: 500;
+        }
+
+        .gig-item:hover .gig-action-btn {
+            display: flex;
+        }
+
+        .gig-action-btn:hover {
+            background: var(--vscode-list-hoverBackground);
+            color: var(--vscode-foreground);
+        }
+
+        .gig-action-btn.move:hover {
+            background: var(--ung-brand);
+            color: white;
+        }
+
+        .gig-status-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: var(--radius-xs);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
         /* Delete button */
         .delete-btn {
             display: none;
@@ -1611,6 +1783,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     const command = target.getAttribute('data-command');
                     const invoiceId = target.getAttribute('data-invoice-id');
                     const expenseId = target.getAttribute('data-expense-id');
+                    const gigId = target.getAttribute('data-gig-id');
                     if (command) {
                         const message = { command: command };
                         if (invoiceId) {
@@ -1618,6 +1791,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                         }
                         if (expenseId) {
                             message.expenseId = parseInt(expenseId, 10);
+                        }
+                        if (gigId) {
+                            message.gigId = parseInt(gigId, 10);
                         }
                         vscode.postMessage(message);
                     }
@@ -1699,6 +1875,15 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                 ${this._recentSessions.length > 0 ? '<button class="section-link" data-command="openTracking">All</button>' : ''}
             </div>
             ${this._getRecentSessionsHtml()}
+        </div>
+
+        <!-- Gigs Section -->
+        <div class="section">
+            <div class="section-header-with-link">
+                <span class="section-title">Gigs</span>
+                <button class="section-link" data-command="openGigBoard">Board</button>
+            </div>
+            ${this._getRecentGigsHtml()}
         </div>
 
         <!-- Recent Contracts -->
@@ -1972,6 +2157,46 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
                     <div class="recent-item-subtitle">${subtitle}</div>
                 </div>
                 <span class="session-duration">${this._maskDuration(s.duration)}</span>
+            </div>
+        `;
+      })
+      .join('');
+
+    return `<div class="recent-list">${items}</div>`;
+  }
+
+  private _getRecentGigsHtml(): string {
+    if (this._recentGigs.length === 0) {
+      return `
+            <div class="empty-state compact">
+                <div class="empty-state-text">No gigs yet</div>
+                <button class="empty-state-action" data-command="createGig">+ Create Gig</button>
+            </div>
+        `;
+    }
+
+    const items = this._recentGigs
+      .map((g) => {
+        const statusKey = g.status.toLowerCase().replace(' ', '_');
+        const statusConfig =
+          GIG_STATUS_CONFIG[statusKey] || GIG_STATUS_CONFIG.pipeline;
+        const hoursDisplay = this._secureMode
+          ? '**h'
+          : `${g.hours.toFixed(1)}h`;
+        const clientDisplay = g.client && g.client !== '-' ? g.client : '';
+
+        return `
+            <div class="recent-item gig-item" data-gig-id="${g.id}">
+                <div class="recent-item-content" data-command="viewGig" data-gig-id="${g.id}">
+                    <div class="recent-item-title">${g.name}</div>
+                    <div class="recent-item-subtitle">${clientDisplay}${clientDisplay ? ' • ' : ''}${hoursDisplay} tracked</div>
+                </div>
+                <div class="gig-actions">
+                    <button class="gig-action-btn move" data-command="moveGig" data-gig-id="${g.id}" title="Move to status">
+                        Move
+                    </button>
+                </div>
+                <span class="gig-status-badge" style="background-color: ${statusConfig.bgColor}; color: ${statusConfig.color};">${statusConfig.label}</span>
             </div>
         `;
       })

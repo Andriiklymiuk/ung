@@ -69,6 +69,22 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
         case 'refresh':
           await this.refresh();
           break;
+        // Quick actions for ready state
+        case 'startTracking':
+          vscode.commands.executeCommand('ung.startTracking');
+          break;
+        case 'createInvoice':
+          vscode.commands.executeCommand('ung.createInvoice');
+          break;
+        case 'addGig':
+          vscode.commands.executeCommand('ung.addGig');
+          break;
+        case 'setGoal':
+          vscode.commands.executeCommand('ung.setGoal');
+          break;
+        case 'openDashboard':
+          vscode.commands.executeCommand('ung.openDashboard');
+          break;
       }
     });
 
@@ -618,12 +634,12 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
                 <span class="logo-icon">U</span>
             </div>
             <h1 class="title">Welcome to UNG</h1>
-            <p class="subtitle">Professional billing and time tracking for freelancers</p>
+            <p class="subtitle">Track time, manage gigs, and invoice clients</p>
         </div>
 
         <div style="text-align: center;">
-            <span class="status-badge warning">
-                <span>CLI Required</span>
+            <span class="status-badge info">
+                <span>⏱️ Ready in 2 minutes</span>
             </span>
         </div>
 
@@ -747,12 +763,15 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
                 <span class="logo-icon">U</span>
             </div>
             <h1 class="title">Almost There!</h1>
-            <p class="subtitle">UNG CLI detected. Let's set up your workspace.</p>
+            <p class="subtitle">One click and you're ready to track time and manage gigs</p>
         </div>
 
         <div style="text-align: center;">
             <span class="status-badge success">
-                <span>CLI Installed</span>
+                <span>✓ CLI Installed</span>
+            </span>
+            <span class="status-badge info" style="margin-left: 8px;">
+                <span>30 seconds left</span>
             </span>
         </div>
 
@@ -848,16 +867,55 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
     return `
         <div class="success-container">
             <div class="success-icon">✓</div>
-            <h1 class="success-title">All Set!</h1>
-            <p class="success-message">UNG is ready. Check out the sidebar views to get started.</p>
+            <h1 class="success-title">You're Ready!</h1>
+            <p class="success-message">Start tracking time and invoicing clients right away.</p>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">⚡</span>
+                <h2 class="section-title">Start Now</h2>
+            </div>
+
+            <button class="btn btn-primary" data-command="startTracking">
+                <span class="btn-icon">▶️</span>
+                <span class="btn-content">
+                    <span class="btn-label">Start Tracking Time</span>
+                    <span class="btn-description">Begin a work session now</span>
+                </span>
+            </button>
+
+            <button class="btn btn-secondary" data-command="createInvoice">
+                <span class="btn-icon">📄</span>
+                <span class="btn-content">
+                    <span class="btn-label">Create Invoice</span>
+                    <span class="btn-description">Bill your clients</span>
+                </span>
+            </button>
+
+            <button class="btn btn-secondary" data-command="addGig">
+                <span class="btn-icon">🎯</span>
+                <span class="btn-content">
+                    <span class="btn-label">Add a Gig</span>
+                    <span class="btn-description">Track projects on your kanban board</span>
+                </span>
+            </button>
+
+            <button class="btn btn-secondary" data-command="setGoal">
+                <span class="btn-icon">📊</span>
+                <span class="btn-content">
+                    <span class="btn-label">Set Income Goal</span>
+                    <span class="btn-description">Track progress toward your target</span>
+                </span>
+            </button>
         </div>
 
         <div class="info-box">
-            <span class="info-box-icon">🚀</span>
+            <span class="info-box-icon">💡</span>
             <div class="info-box-content">
-                <div class="info-box-title">Quick Start</div>
+                <div class="info-box-title">Pro Tip</div>
                 <div class="info-box-text">
-                    Use the Dashboard, Invoices, Clients, and Time Tracking views in the sidebar to manage your freelance business.
+                    Use <strong>Ctrl+Alt+T</strong> (Cmd+Alt+T on Mac) to quickly start/stop time tracking from anywhere in VS Code.
                 </div>
             </div>
         </div>
@@ -865,6 +923,10 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
         <div class="divider"></div>
 
         <div class="footer-links">
+            <a class="link" data-command="openDashboard">
+                <span class="link-icon">📊</span>
+                Dashboard
+            </a>
             <a class="link" data-command="openDocs">
                 <span class="link-icon">📚</span>
                 Documentation

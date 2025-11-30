@@ -14,11 +14,14 @@ import (
 var nextCmd = &cobra.Command{
 	Use:   "next",
 	Short: "What's your next move?",
-	Long:  "Shows your next actions: work to do, invoices to send, jobs to apply for, and goal progress",
+	Long:  "Shows your next actions: work to do, invoices to send, gigs to complete, and goal progress",
 	RunE:  runNext,
 }
 
+var nextShowAll bool
+
 func init() {
+	nextCmd.Flags().BoolVarP(&nextShowAll, "all", "a", false, "Show all sections including empty ones")
 	rootCmd.AddCommand(nextCmd)
 }
 
@@ -201,11 +204,79 @@ func runNext(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
+	// ========== GIGS ==========
+	fmt.Println(cardTitleStyle.Render("GIGS"))
+
+	var gigs []models.Gig
+	db.GormDB.Where("status IN ?", []string{"todo", "in_progress", "sent"}).
+		Order("CASE status WHEN 'in_progress' THEN 1 WHEN 'sent' THEN 2 WHEN 'todo' THEN 3 END, updated_at DESC").
+		Limit(5).
+		Find(&gigs)
+
+	if len(gigs) > 0 {
+		statusColors := map[models.GigStatus]lipgloss.Style{
+			models.GigStatusTodo:       mutedStyle,
+			models.GigStatusInProgress: valueStyle,
+			models.GigStatusSent:       warningStyle,
+		}
+
+		statusIcons := map[models.GigStatus]string{
+			models.GigStatusTodo:       "○",
+			models.GigStatusInProgress: "●",
+			models.GigStatusSent:       "◉",
+		}
+
+		for _, gig := range gigs {
+			style := statusColors[gig.Status]
+			icon := statusIcons[gig.Status]
+			fmt.Printf("  %s %s %s\n", style.Render(icon), gig.Name, mutedStyle.Render(fmt.Sprintf("(%s)", gig.Status)))
+		}
+
+		// Count by status
+		var todoCount, inProgressCount, sentCount int64
+		db.GormDB.Model(&models.Gig{}).Where("status = ?", "todo").Count(&todoCount)
+		db.GormDB.Model(&models.Gig{}).Where("status = ?", "in_progress").Count(&inProgressCount)
+		db.GormDB.Model(&models.Gig{}).Where("status = ?", "sent").Count(&sentCount)
+
+		fmt.Println()
+		fmt.Printf("  %s todo: %d  |  in_progress: %d  |  sent: %d\n",
+			mutedStyle.Render(""),
+			todoCount, inProgressCount, sentCount)
+		fmt.Printf("  %s ung gig list    - See all gigs\n", mutedStyle.Render("→"))
+	} else {
+		fmt.Printf("  %s\n", mutedStyle.Render("No active gigs"))
+		fmt.Printf("  %s ung gig add <name>  - Create a gig\n", mutedStyle.Render("→"))
+	}
+	fmt.Println()
+
 	// ========== QUICK ACTIONS ==========
 	fmt.Println(cardTitleStyle.Render("QUICK ACTIONS"))
-	fmt.Printf("  %s ung track start   - Start tracking time\n", mutedStyle.Render("→"))
-	fmt.Printf("  %s ung invoice new   - Create an invoice\n", mutedStyle.Render("→"))
-	fmt.Printf("  %s ung hunt          - Find new jobs\n", mutedStyle.Render("→"))
+
+	// Contextual actions based on state
+	if activeSession == nil {
+		fmt.Printf("  %s ung track start      Start tracking time\n", successStyle.Render("→"))
+	} else {
+		fmt.Printf("  %s ung track stop       Stop current session\n", warningStyle.Render("→"))
+	}
+
+	if unbilledHours > 0 {
+		fmt.Printf("  %s ung invoice new      Create invoice (%.1fh unbilled)\n", warningStyle.Render("→"), unbilledHours)
+	} else {
+		fmt.Printf("  %s ung invoice new      Create an invoice\n", mutedStyle.Render("→"))
+	}
+
+	if len(gigs) == 0 {
+		fmt.Printf("  %s ung gig add <name>   Add a gig to track\n", mutedStyle.Render("→"))
+	} else {
+		fmt.Printf("  %s ung gig list         View your gigs\n", mutedStyle.Render("→"))
+	}
+
+	if !hasGoal {
+		fmt.Printf("  %s ung goal set <amt>   Set income goal\n", mutedStyle.Render("→"))
+	} else {
+		fmt.Printf("  %s ung goal status      Check goal progress\n", mutedStyle.Render("→"))
+	}
+
 	fmt.Println()
 
 	return nil

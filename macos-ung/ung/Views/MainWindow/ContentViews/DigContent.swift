@@ -285,13 +285,23 @@ struct DigContent: View {
                 Text(digState.currentSession?.title ?? "Untitled Idea")
                     .font(Design.Typography.headingMedium)
 
-                if let score = digState.currentSession?.overallScore {
-                    HStack(spacing: Design.Spacing.sm) {
+                HStack(spacing: Design.Spacing.sm) {
+                    if let score = digState.currentSession?.overallScore {
                         ScoreBadge(score: score)
+                    }
 
-                        if let recommendation = digState.currentSession?.recommendation {
-                            RecommendationBadge(recommendation: recommendation)
-                        }
+                    if let recommendation = digState.currentSession?.recommendation {
+                        RecommendationBadge(recommendation: recommendation)
+                    }
+
+                    // Early exit indicator
+                    if digState.currentSession?.wasStoppedEarly == true {
+                        EarlyExitBadge()
+                    }
+
+                    // Pivot focus indicator
+                    if digState.currentSession?.isFocusingOnPivots == true {
+                        PivotFocusBadge()
                     }
                 }
             }
@@ -351,6 +361,17 @@ struct DigContent: View {
 
     private var overviewTab: some View {
         VStack(alignment: .leading, spacing: Design.Spacing.lg) {
+            // Viability Check Alert (for early exit or pivot focus)
+            if let session = digState.currentSession,
+               (session.wasStoppedEarly || session.isFocusingOnPivots),
+               let viability = session.viabilityCheckData {
+                ViabilityAlertCard(
+                    viability: viability,
+                    isEarlyExit: session.wasStoppedEarly,
+                    earlyExitReason: session.earlyExitReason
+                )
+            }
+
             // Original Idea
             SectionCard(title: "Original Idea", icon: "lightbulb") {
                 Text(digState.currentSession?.rawIdea ?? "")
@@ -368,7 +389,7 @@ struct DigContent: View {
             // Quick scores
             if let analyses = digState.currentSession?.analyses, !analyses.isEmpty {
                 SectionCard(title: "Perspective Scores", icon: "chart.bar") {
-                    HStack(spacing: Design.Spacing.md) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: Design.Spacing.md) {
                         ForEach(analyses) { analysis in
                             VStack(spacing: Design.Spacing.xs) {
                                 ZStack {
@@ -390,10 +411,16 @@ struct DigContent: View {
                                 Text(analysis.perspective.displayName)
                                     .font(Design.Typography.labelSmall)
                                     .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
                         }
                     }
                 }
+            }
+
+            // Viability Check Details (if present)
+            if let viability = digState.currentSession?.viabilityCheckData {
+                ViabilityDetailsCard(viability: viability)
             }
         }
         .padding()
@@ -969,6 +996,258 @@ struct AlternativeCard: View {
                     Label(potential.replacingOccurrences(of: "_", with: " ").capitalized, systemImage: "arrow.up.right")
                         .font(Design.Typography.labelSmall)
                         .foregroundColor(alternative.potentialColor)
+                }
+            }
+        }
+        .padding()
+        .background(Design.Colors.cardBackground)
+        .cornerRadius(Design.Radius.md)
+    }
+}
+
+// MARK: - Agentic Status Badges
+
+struct EarlyExitBadge: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 10))
+            Text("Early Exit")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.red)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.red.opacity(0.1))
+        .cornerRadius(Design.Radius.xs)
+        .help("Analysis was stopped early because the idea is fundamentally flawed")
+    }
+}
+
+struct PivotFocusBadge: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                .font(.system(size: 10))
+            Text("Pivot Focus")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.orange)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(Design.Radius.xs)
+        .help("This idea needs significant changes - analysis focused on finding better directions")
+    }
+}
+
+// MARK: - Viability Cards
+
+struct ViabilityAlertCard: View {
+    let viability: ViabilityCheckResult
+    let isEarlyExit: Bool
+    let earlyExitReason: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Design.Spacing.md) {
+            // Alert header
+            HStack {
+                Image(systemName: isEarlyExit ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(isEarlyExit ? .red : .orange)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isEarlyExit ? "Analysis Stopped Early" : "Pivot Recommended")
+                        .font(Design.Typography.headingSmall)
+
+                    Text(isEarlyExit
+                        ? "This idea has fundamental flaws that can't be fixed with minor changes"
+                        : "This idea needs significant changes to become viable")
+                        .font(Design.Typography.bodySmall)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+
+            Divider()
+
+            // Summary
+            if let summary = viability.summary {
+                Text(summary)
+                    .font(Design.Typography.bodyMedium)
+            }
+
+            // Early exit reason
+            if let reason = earlyExitReason, !reason.isEmpty {
+                VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+                    Text("Why Analysis Stopped:")
+                        .font(Design.Typography.labelMedium)
+                        .foregroundColor(.secondary)
+                    Text(reason)
+                        .font(Design.Typography.bodySmall)
+                }
+            }
+
+            // Flaw type indicator
+            if let flawType = viability.flawType {
+                HStack {
+                    Text("Flaw Type:")
+                        .font(Design.Typography.labelSmall)
+                        .foregroundColor(.secondary)
+                    Text(flawType.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(Design.Typography.labelMedium)
+                        .foregroundColor(.red)
+                }
+            }
+
+            // Pivot potential
+            if let pivotPotential = viability.pivotPotential {
+                HStack {
+                    Text("Pivot Potential:")
+                        .font(Design.Typography.labelSmall)
+                        .foregroundColor(.secondary)
+                    Text(pivotPotential.capitalized)
+                        .font(Design.Typography.labelMedium)
+                        .foregroundColor(viability.pivotPotentialColor)
+                }
+            }
+
+            // Call to action
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                Text("Check the **Alternatives** tab for better directions")
+                    .font(Design.Typography.bodySmall)
+            }
+            .padding(Design.Spacing.sm)
+            .background(Color.yellow.opacity(0.1))
+            .cornerRadius(Design.Radius.sm)
+        }
+        .padding()
+        .background(isEarlyExit ? Color.red.opacity(0.05) : Color.orange.opacity(0.05))
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.Radius.md)
+                .stroke(isEarlyExit ? Color.red.opacity(0.3) : Color.orange.opacity(0.3), lineWidth: 1)
+        )
+        .cornerRadius(Design.Radius.md)
+    }
+}
+
+struct ViabilityDetailsCard: View {
+    let viability: ViabilityCheckResult
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Design.Spacing.md) {
+            // Header
+            Button(action: { withAnimation { isExpanded.toggle() } }) {
+                HStack {
+                    Image(systemName: "checkmark.shield")
+                        .foregroundColor(.purple)
+                        .frame(width: 30)
+
+                    Text("Viability Assessment")
+                        .font(Design.Typography.headingSmall)
+
+                    Spacer()
+
+                    if let pivotPotential = viability.pivotPotential {
+                        Text(pivotPotential.capitalized)
+                            .font(Design.Typography.labelSmall)
+                            .foregroundColor(viability.pivotPotentialColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(viability.pivotPotentialColor.opacity(0.1))
+                            .cornerRadius(Design.Radius.xs)
+                    }
+
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                Divider()
+
+                // Pivot Paths
+                if let pivotPaths = viability.pivotPaths, !pivotPaths.isEmpty {
+                    VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+                        Text("Suggested Pivot Directions")
+                            .font(Design.Typography.labelMedium)
+                            .foregroundColor(.purple)
+
+                        ForEach(Array(pivotPaths.enumerated()), id: \.offset) { index, path in
+                            HStack(alignment: .top, spacing: Design.Spacing.sm) {
+                                Text("\(index + 1).")
+                                    .font(Design.Typography.labelMedium)
+                                    .foregroundColor(.purple)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    if let direction = path.direction {
+                                        Text(direction)
+                                            .font(Design.Typography.bodyMedium)
+                                    }
+                                    if let why = path.whyItHelps {
+                                        Text(why)
+                                            .font(Design.Typography.bodySmall)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    if let newViability = path.newViability {
+                                        HStack {
+                                            Text("New viability:")
+                                            Text("\(Int(newViability))%")
+                                                .foregroundColor(newViability >= 60 ? .green : .orange)
+                                        }
+                                        .font(Design.Typography.labelSmall)
+                                    }
+                                }
+                            }
+                            .padding(Design.Spacing.sm)
+                            .background(Design.Colors.inputBackground)
+                            .cornerRadius(Design.Radius.sm)
+                        }
+                    }
+                }
+
+                // Salvage Recommendations
+                if let salvage = viability.salvageRecommendations, !salvage.isEmpty {
+                    VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+                        Text("How to Salvage This")
+                            .font(Design.Typography.labelMedium)
+                            .foregroundColor(.blue)
+
+                        ForEach(salvage, id: \.self) { rec in
+                            HStack(alignment: .top, spacing: Design.Spacing.xs) {
+                                Image(systemName: "wrench.and.screwdriver")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 12))
+                                Text(rec)
+                                    .font(Design.Typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+
+                // Similar Pivots That Worked
+                if let similar = viability.similarPivotsThatWorked, !similar.isEmpty {
+                    VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+                        Text("Companies That Made Similar Pivots")
+                            .font(Design.Typography.labelMedium)
+                            .foregroundColor(.green)
+
+                        ForEach(similar, id: \.self) { example in
+                            HStack(alignment: .top, spacing: Design.Spacing.xs) {
+                                Image(systemName: "building.2")
+                                    .foregroundColor(.green)
+                                    .font(.system(size: 12))
+                                Text(example)
+                                    .font(Design.Typography.bodySmall)
+                            }
+                        }
+                    }
                 }
             }
         }

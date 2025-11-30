@@ -27,6 +27,13 @@ struct DigSession: Codable, Identifiable {
     let createdAt: Date?
     var updatedAt: Date?
 
+    // Agentic early-exit fields
+    var earlyExit: Bool?
+    var earlyExitReason: String?
+    var viabilityCheck: String?
+    var pivotFocus: Bool?
+    var flawType: String?
+
     // Relationships (when loaded)
     var analyses: [DigAnalysis]?
     var executionPlan: DigExecutionPlan?
@@ -45,6 +52,11 @@ struct DigSession: Codable, Identifiable {
         case completedAt = "completed_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case earlyExit = "early_exit"
+        case earlyExitReason = "early_exit_reason"
+        case viabilityCheck = "viability_check"
+        case pivotFocus = "pivot_focus"
+        case flawType = "flaw_type"
         case analyses
         case executionPlan = "execution_plan"
         case marketing
@@ -64,6 +76,83 @@ struct DigSession: Codable, Identifiable {
     var progressPercentage: Double {
         let totalStages = 9.0 // 5 perspectives + 4 generation stages
         return (Double(stagesCompletedArray.count) / totalStages) * 100
+    }
+
+    /// Returns true if the analysis was stopped early due to fundamental flaws
+    var wasStoppedEarly: Bool {
+        earlyExit ?? false
+    }
+
+    /// Returns true if the analysis is focusing on finding pivots rather than execution
+    var isFocusingOnPivots: Bool {
+        pivotFocus ?? false
+    }
+
+    /// Parses the viability check JSON and returns structured data
+    var viabilityCheckData: ViabilityCheckResult? {
+        guard let json = viabilityCheck,
+              let data = json.data(using: .utf8) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(ViabilityCheckResult.self, from: data)
+    }
+}
+
+/// Structured viability check result from the agentic gate
+struct ViabilityCheckResult: Codable {
+    let summary: String?
+    let isFundamentallyFlawed: Bool?
+    let flawType: String?
+    let pivotPotential: String?
+    let verdict: String?
+    let reasoning: String?
+    let timeWorthInvesting: Bool?
+    let pivotPaths: [PivotPath]?
+    let salvageRecommendations: [String]?
+    let similarPivotsThatWorked: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case summary
+        case isFundamentallyFlawed = "is_fundamentally_flawed"
+        case flawType = "flaw_type"
+        case pivotPotential = "pivot_potential"
+        case verdict
+        case reasoning
+        case timeWorthInvesting = "time_worth_investing"
+        case pivotPaths = "pivot_paths"
+        case salvageRecommendations = "salvage_recommendations"
+        case similarPivotsThatWorked = "similar_pivots_that_worked"
+    }
+
+    var pivotPotentialColor: Color {
+        switch pivotPotential?.lowercased() {
+        case "high": return .green
+        case "medium": return .yellow
+        case "low": return .orange
+        default: return .red
+        }
+    }
+
+    var verdictDisplayName: String {
+        switch verdict?.lowercased() {
+        case "abandon": return "Abandon This Direction"
+        case "pivot_required": return "Pivot Required"
+        case "continue_analysis": return "Continue Analysis"
+        default: return verdict ?? "Unknown"
+        }
+    }
+}
+
+/// A suggested pivot direction from the viability check
+struct PivotPath: Codable {
+    let direction: String?
+    let whyItHelps: String?
+    let newViability: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case direction
+        case whyItHelps = "why_it_helps"
+        case newViability = "new_viability"
     }
 }
 

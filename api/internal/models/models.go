@@ -488,6 +488,13 @@ type DigSession struct {
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`
 
+	// Agentic early-exit fields
+	EarlyExit       bool   `gorm:"default:false" json:"early_exit"`        // True if analysis stopped early
+	EarlyExitReason string `json:"early_exit_reason"`                      // Why analysis stopped
+	ViabilityCheck  string `json:"viability_check"`                        // JSON of viability assessment
+	PivotFocus      bool   `gorm:"default:false" json:"pivot_focus"`       // True if focusing on pivots
+	FlawType        string `json:"flaw_type"`                              // Type of fundamental flaw if any
+
 	// Relationships
 	Analyses          []DigAnalysis          `gorm:"foreignKey:SessionID" json:"analyses,omitempty"`
 	ExecutionPlan     *DigExecutionPlan      `gorm:"foreignKey:SessionID" json:"execution_plan,omitempty"`

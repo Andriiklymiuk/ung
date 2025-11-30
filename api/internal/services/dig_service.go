@@ -174,6 +174,139 @@ Provide analysis in this JSON format:
 	}
 }
 
+// GetViabilityCheckPerspective returns a special perspective to evaluate pivot potential
+// This is used by the agentic flow to decide whether to continue analysis
+func (s *DigService) GetViabilityCheckPerspective() AnalysisPerspective {
+	return AnalysisPerspective{
+		Name:        "viability_check",
+		Description: "Viability Gate - Can this idea be saved?",
+		Prompt: `You are an AGENTIC VIABILITY EVALUATOR. Your job is critical: determine if this idea has ANY path to success.
+
+This idea has received a low initial score. Before we waste more analysis time, we need to know:
+1. Is this FUNDAMENTALLY FLAWED (physics, economics, human nature make it impossible)?
+2. Or is it SALVAGEABLE with the right pivots?
+
+For the idea: "%s"
+
+With initial analysis showing these concerns: %s
+
+Be honest and surgical. Consider:
+- Can the CORE problem being solved still be addressed differently?
+- Is there an ADJACENT market that would work better?
+- Can the business model be fundamentally changed to make this viable?
+- Is there a SIMPLER version that removes the fatal flaws?
+- Are there SUCCESSFUL companies that started with similarly flawed ideas and pivoted?
+
+Return JSON:
+{
+  "summary": "2-3 sentence viability assessment",
+  "is_fundamentally_flawed": true/false,
+  "flaw_type": "impossible/wrong_timing/wrong_market/wrong_approach/salvageable",
+  "pivot_potential": "none/low/medium/high",
+  "pivot_paths": [
+    {
+      "direction": "what to change",
+      "why_it_helps": "how this addresses the flaws",
+      "new_viability": 0-100
+    }
+  ],
+  "salvage_recommendations": ["specific changes that could save this"],
+  "similar_pivots_that_worked": ["examples of companies that pivoted from similar situations"],
+  "verdict": "abandon/pivot_required/continue_analysis",
+  "reasoning": "detailed explanation of the verdict",
+  "time_worth_investing": true/false
+}`,
+	}
+}
+
+// EvaluateViability runs a special viability check to determine if analysis should continue
+func (s *DigService) EvaluateViability(idea string, initialAnalyses []models.DigAnalysis, initialScore float64) (*ViabilityResult, error) {
+	// Compile concerns from initial analyses
+	var concerns strings.Builder
+	for _, a := range initialAnalyses {
+		if a.Score != nil && *a.Score < 50 {
+			concerns.WriteString(fmt.Sprintf("%s (score: %.0f): %s\n", a.Perspective, *a.Score, a.Summary))
+			if a.Weaknesses != "" {
+				concerns.WriteString(fmt.Sprintf("Weaknesses: %s\n", a.Weaknesses))
+			}
+		}
+	}
+
+	perspective := s.GetViabilityCheckPerspective()
+	prompt := fmt.Sprintf(perspective.Prompt, idea, concerns.String())
+
+	response, err := s.aiService.chat(prompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed viability check: %w", err)
+	}
+
+	jsonStr := extractJSON(response)
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		// Default to continue if parsing fails
+		return &ViabilityResult{
+			ShouldContinue:  true,
+			PivotPotential:  "unknown",
+			Verdict:         "continue_analysis",
+			Reasoning:       response,
+			FullAnalysisJSON: jsonStr,
+		}, nil
+	}
+
+	viability := &ViabilityResult{
+		FullAnalysisJSON: jsonStr,
+	}
+
+	if summary, ok := result["summary"].(string); ok {
+		viability.Summary = summary
+	}
+	if flawed, ok := result["is_fundamentally_flawed"].(bool); ok {
+		viability.IsFundamentallyFlawed = flawed
+	}
+	if flawType, ok := result["flaw_type"].(string); ok {
+		viability.FlawType = flawType
+	}
+	if pivot, ok := result["pivot_potential"].(string); ok {
+		viability.PivotPotential = pivot
+	}
+	if verdict, ok := result["verdict"].(string); ok {
+		viability.Verdict = verdict
+	}
+	if reasoning, ok := result["reasoning"].(string); ok {
+		viability.Reasoning = reasoning
+	}
+	if worth, ok := result["time_worth_investing"].(bool); ok {
+		viability.TimeWorthInvesting = worth
+	}
+
+	// Determine if we should continue based on verdict
+	switch viability.Verdict {
+	case "abandon":
+		viability.ShouldContinue = false
+	case "pivot_required":
+		viability.ShouldContinue = true // Continue but focus on alternatives
+		viability.FocusOnPivots = true
+	default:
+		viability.ShouldContinue = true
+	}
+
+	return viability, nil
+}
+
+// ViabilityResult represents the outcome of a viability check
+type ViabilityResult struct {
+	Summary              string
+	IsFundamentallyFlawed bool
+	FlawType             string
+	PivotPotential       string
+	Verdict              string
+	Reasoning            string
+	TimeWorthInvesting   bool
+	ShouldContinue       bool
+	FocusOnPivots        bool
+	FullAnalysisJSON     string
+}
+
 // GetHarshPerspectives returns harsh/critical analysis perspectives for deeper analysis
 func (s *DigService) GetHarshPerspectives() []AnalysisPerspective {
 	return []AnalysisPerspective{

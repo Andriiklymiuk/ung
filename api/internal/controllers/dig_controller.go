@@ -64,15 +64,16 @@ func (c *DigController) StartSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// runAnalysis performs the multi-step analysis asynchronously
+// runAnalysis performs the multi-step analysis asynchronously with agentic early-exit logic
 func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 	perspectives := c.digService.GetAnalysisPerspectives()
 	var analyses []models.DigAnalysis
 	stagesCompleted := []string{}
 
+	// ========================================
 	// Phase 1: Run core perspective analyses
+	// ========================================
 	for _, perspective := range perspectives {
-		// Update current stage
 		session.CurrentStage = string(perspective.Name)
 		db.Save(session)
 
@@ -89,43 +90,108 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 		analyses = append(analyses, *analysis)
 		stagesCompleted = append(stagesCompleted, string(perspective.Name))
 
-		// Update stages completed
 		stagesJSON, _ := json.Marshal(stagesCompleted)
 		session.StagesCompleted = string(stagesJSON)
 		db.Save(session)
 	}
 
-	// Calculate initial score to determine if we should run harsh analysis
+	// Calculate initial score
 	initialScore := c.digService.CalculateOverallScore(analyses)
 
-	// Phase 2: Run harsh/critical perspectives (for all ideas - provides valuable feedback)
-	// These perspectives stress-test the idea and reveal blind spots
-	harshPerspectives := c.digService.GetHarshPerspectives()
-	for _, perspective := range harshPerspectives {
-		session.CurrentStage = string(perspective.Name)
+	// ========================================
+	// AGENTIC GATE: Viability Check for Low-Scoring Ideas
+	// ========================================
+	// If initial score is concerning (<45), run a viability check to determine:
+	// - Is this fundamentally flawed with no path forward? → Stop early
+	// - Is this salvageable with pivots? → Focus on alternatives
+	// - Is there potential here? → Continue full analysis
+	var shouldContinueHarsh = true
+	var focusOnPivots = false
+
+	if initialScore < 45 {
+		session.CurrentStage = "viability_check"
 		db.Save(session)
 
-		analysis, err := c.digService.AnalyzeIdea(session.RawIdea, perspective)
-		if err != nil {
-			continue
+		viability, err := c.digService.EvaluateViability(session.RawIdea, analyses, initialScore)
+		if err == nil {
+			// Store viability check result
+			session.ViabilityCheck = viability.FullAnalysisJSON
+			session.FlawType = viability.FlawType
+
+			if !viability.ShouldContinue {
+				// EARLY EXIT: Idea is fundamentally flawed with no viable path
+				session.EarlyExit = true
+				session.EarlyExitReason = viability.Reasoning
+				shouldContinueHarsh = false
+				focusOnPivots = true // Still generate alternatives to help them find a better direction
+
+				// Set recommendation immediately
+				session.Recommendation = models.DigRecommendAbandon
+			} else if viability.FocusOnPivots {
+				// PIVOT MODE: Continue but focus on finding better directions
+				focusOnPivots = true
+				session.PivotFocus = true
+				// Run reduced harsh analysis - just devil's advocate to surface key issues
+				shouldContinueHarsh = true // But we'll limit which perspectives we run
+			}
+
+			stagesCompleted = append(stagesCompleted, "viability_check")
+			stagesJSON, _ := json.Marshal(stagesCompleted)
+			session.StagesCompleted = string(stagesJSON)
+			db.Save(session)
 		}
-
-		analysis.SessionID = session.ID
-		if err := db.Create(analysis).Error; err != nil {
-			continue
-		}
-
-		analyses = append(analyses, *analysis)
-		stagesCompleted = append(stagesCompleted, string(perspective.Name))
-
-		stagesJSON, _ := json.Marshal(stagesCompleted)
-		session.StagesCompleted = string(stagesJSON)
-		db.Save(session)
 	}
 
-	// Phase 3: Generate outputs only if initial analysis looks promising (score >= 40)
-	// Even mediocre ideas get execution plans so founders know what it would take
-	if initialScore >= 40 {
+	// ========================================
+	// Phase 2: Run harsh/critical perspectives
+	// ========================================
+	// Only run if idea passed viability gate or we're doing pivot-focused analysis
+	if shouldContinueHarsh && !session.EarlyExit {
+		harshPerspectives := c.digService.GetHarshPerspectives()
+
+		// If focusing on pivots, only run devil's advocate and copycat analysis
+		// to identify what's wrong and what similar ideas succeeded
+		if focusOnPivots {
+			limitedPerspectives := []services.AnalysisPerspective{}
+			for _, p := range harshPerspectives {
+				if p.Name == models.DigPerspectiveDevilsAdvocate || p.Name == models.DigPerspectiveCopycat {
+					limitedPerspectives = append(limitedPerspectives, p)
+				}
+			}
+			harshPerspectives = limitedPerspectives
+		}
+
+		for _, perspective := range harshPerspectives {
+			session.CurrentStage = string(perspective.Name)
+			db.Save(session)
+
+			analysis, err := c.digService.AnalyzeIdea(session.RawIdea, perspective)
+			if err != nil {
+				continue
+			}
+
+			analysis.SessionID = session.ID
+			if err := db.Create(analysis).Error; err != nil {
+				continue
+			}
+
+			analyses = append(analyses, *analysis)
+			stagesCompleted = append(stagesCompleted, string(perspective.Name))
+
+			stagesJSON, _ := json.Marshal(stagesCompleted)
+			session.StagesCompleted = string(stagesJSON)
+			db.Save(session)
+		}
+	}
+
+	// ========================================
+	// Phase 3: Generate outputs (only for viable ideas)
+	// ========================================
+	// Skip execution/marketing/revenue if:
+	// - Early exit (fundamentally flawed)
+	// - Pivot focus (need to find better direction first)
+	// - Very low score (<40)
+	if initialScore >= 40 && !session.EarlyExit && !focusOnPivots {
 		// Generate execution plan
 		session.CurrentStage = "execution_plan"
 		db.Save(session)
@@ -160,7 +226,11 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 		stagesCompleted = append(stagesCompleted, "revenue")
 	}
 
-	// Always generate alternatives - helps founders find better directions
+	// ========================================
+	// Always generate alternatives
+	// ========================================
+	// This is ESPECIALLY important for early-exit and pivot-focus ideas
+	// to help founders find better directions
 	session.CurrentStage = "alternatives"
 	db.Save(session)
 
@@ -173,13 +243,17 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 	}
 	stagesCompleted = append(stagesCompleted, "alternatives")
 
-	// Update final stages
+	// ========================================
+	// Finalize session
+	// ========================================
 	stagesJSON, _ := json.Marshal(stagesCompleted)
 	session.StagesCompleted = string(stagesJSON)
 
-	// Calculate overall score (including harsh perspectives) and recommendation
+	// Calculate overall score and recommendation (if not already set by early exit)
 	overallScore := c.digService.CalculateOverallScore(analyses)
-	recommendation := c.digService.DetermineRecommendation(overallScore, analyses)
+	if session.Recommendation == "" {
+		session.Recommendation = c.digService.DetermineRecommendation(overallScore, analyses)
+	}
 
 	// Get refined idea from first principles analysis
 	for _, a := range analyses {
@@ -197,7 +271,6 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 	now := time.Now()
 	session.Status = models.DigStatusCompleted
 	session.OverallScore = &overallScore
-	session.Recommendation = recommendation
 	session.CurrentStage = "completed"
 	session.CompletedAt = &now
 	db.Save(session)
@@ -261,6 +334,12 @@ func (c *DigController) GetProgress(w http.ResponseWriter, r *http.Request) {
 		"marketing":        "Evaluating market potential...",
 		"technical":        "Assessing technical feasibility...",
 		"financial":        "Running financial analysis...",
+		"viability_check":  "Running viability gate check...",
+		"devils_advocate":  "Playing devil's advocate...",
+		"copycat":          "Analyzing copycat potential...",
+		"user_psychology":  "Evaluating user psychology...",
+		"scalability":      "Stress testing scalability...",
+		"worst_case":       "Mapping worst case scenarios...",
 		"execution_plan":   "Creating execution roadmap...",
 		"revenue":          "Projecting revenue...",
 		"alternatives":     "Generating alternative ideas...",

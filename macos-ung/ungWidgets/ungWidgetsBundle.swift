@@ -3,6 +3,7 @@
 //  ungWidgets
 //
 //  Widget extension for iOS and macOS widgets
+//  Enhanced with premium Live Activities for Dynamic Island
 //
 
 import SwiftUI
@@ -24,8 +25,15 @@ struct ungWidgetsBundle: WidgetBundle {
         // Live Activities - iOS 16.1+ only
         #if os(iOS)
         if #available(iOS 16.1, *) {
+            // Core tracking activities
             TrackingLiveActivity()
             PomodoroLiveActivity()
+
+            // Premium feature activities
+            MilestoneLiveActivity()      // Earnings milestone celebrations
+            InvoiceStatusLiveActivity()  // Invoice tracking with urgency
+            DailySummaryLiveActivity()   // Daily/weekly achievements
+            BreakReminderLiveActivity()  // Health-focused break reminders
         }
         #endif
     }

@@ -1,0 +1,158 @@
+/*
+  Localizable.strings (English)
+  ung
+
+  English localization for UNG - Freelance Billing & Time Tracking
+*/
+
+// MARK: - App General
+"app.name" = "UNG";
+"app.tagline" = "Freelance Billing & Time Tracking";
+
+// MARK: - Siri Shortcuts Titles
+"Start Tracking" = "Start Tracking";
+"Stop Tracking" = "Stop Tracking";
+"Pause Tracking" = "Pause Tracking";
+"Resume Tracking" = "Resume Tracking";
+"Get Status" = "Get Status";
+"Today's Hours" = "Today's Hours";
+"Weekly Report" = "Weekly Report";
+"Today's Earnings" = "Today's Earnings";
+"Monthly Earnings" = "Monthly Earnings";
+"Pending Invoices" = "Pending Invoices";
+"Overdue Invoices" = "Overdue Invoices";
+"Client Balance" = "Client Balance";
+"Start Focus" = "Start Focus";
+"Stop Focus" = "Stop Focus";
+"Take Break" = "Take Break";
+"Log Time" = "Log Time";
+
+// MARK: - Siri Responses - Tracking
+"siri.tracking.started" = "Started tracking %@. Good luck!";
+"siri.tracking.stopped" = "Stopped tracking %@. Duration: %@";
+"siri.tracking.paused" = "Paused %@ at %@. Say 'Resume tracking' to continue.";
+"siri.tracking.resumed" = "Resumed tracking %@. Let's keep going!";
+"siri.tracking.no_active" = "No active tracking session.";
+"siri.tracking.already_active" = "Tracking is already active. You're working on %@.";
+"siri.tracking.no_paused" = "No paused session found. Say 'Start tracking' to begin a new session.";
+
+// MARK: - Siri Responses - Status
+"siri.status.working" = "You're working on %@ for %@.";
+"siri.status.not_tracking" = "You're not tracking anything right now. Ready to start?";
+
+// MARK: - Siri Responses - Hours
+"siri.hours.today" = "You've worked %@ today. Keep it up!";
+"siri.hours.today.none" = "No hours tracked today yet. Time to get started?";
+"siri.hours.weekly" = "This week: %@";
+"siri.hours.weekly.progress" = "This week: %@ (%d%% of your %@ goal)";
+
+// MARK: - Siri Responses - Earnings
+"siri.earnings.today" = "You've earned %@ today. Great work!";
+"siri.earnings.today.none" = "No earnings recorded today yet. Start tracking to begin earning!";
+"siri.earnings.monthly" = "This month: %@";
+"siri.earnings.total" = "Total all-time: %@";
+
+// MARK: - Siri Responses - Invoices
+"siri.invoices.pending" = "You have %d pending invoice%@ totaling %@.";
+"siri.invoices.pending.none" = "No pending invoices. All caught up!";
+"siri.invoices.overdue" = "Warning: You have %d overdue invoice%@ totaling %@. Consider following up with your clients.";
+"siri.invoices.overdue.none" = "Great news! No overdue invoices.";
+"siri.invoices.pending_suffix" = "You have %@ pending in invoices.";
+
+// MARK: - Siri Responses - Clients
+"siri.client.owes" = "%@ owes you %@.";
+"siri.client.no_balance" = "%@ has no outstanding balance.";
+"siri.client.not_found" = "I couldn't find a client named %@. Try saying the full name.";
+"siri.client.total_owed" = "Your clients owe you %@ in total. Specify a client name for details.";
+"siri.client.all_settled" = "All client balances are settled. No outstanding amounts.";
+
+// MARK: - Siri Responses - Focus/Pomodoro
+"siri.focus.started" = "Focus session started. You've got %d minutes. Stay focused!";
+"siri.focus.already_active" = "A focus session is already running.";
+"siri.focus.stopped" = "Focus session ended. You completed %d session%@. Great work!";
+"siri.focus.no_active" = "No active focus session to stop.";
+
+// MARK: - Siri Responses - Break
+"siri.break.started" = "Break started! Take %d minutes to rest. Your health matters. I'll track your break time.";
+
+// MARK: - Siri Responses - Quick Log
+"siri.log.specify_hours" = "Please specify how many hours to log. For example: 'Log 2 hours'";
+"siri.log.success" = "Logged %@ for %@";
+
+// MARK: - Live Activity - Tracking
+"liveactivity.tracking.recording" = "RECORDING";
+"liveactivity.tracking.started" = "Started";
+"liveactivity.tracking.tap_to_stop" = "Tap to stop";
+
+// MARK: - Live Activity - Pomodoro
+"liveactivity.pomodoro.focus" = "Focus Mode";
+"liveactivity.pomodoro.break" = "Break Time";
+"liveactivity.pomodoro.paused" = "PAUSED";
+"liveactivity.pomodoro.tap_to_resume" = "Tap to resume";
+"liveactivity.pomodoro.until_focus" = "until focus";
+"liveactivity.pomodoro.remaining" = "remaining";
+"liveactivity.pomodoro.done" = "done";
+"liveactivity.pomodoro.total" = "total";
+
+// MARK: - Live Activity - Milestone
+"liveactivity.milestone.goal_achieved" = "Goal Achieved!";
+"liveactivity.milestone.exceeded" = "EXCEEDED";
+"liveactivity.milestone.daily" = "Daily";
+"liveactivity.milestone.weekly" = "Weekly";
+"liveactivity.milestone.monthly" = "Monthly";
+"liveactivity.milestone.goal" = "goal";
+"liveactivity.milestone.to_go" = "to go";
+"liveactivity.milestone.over" = "over";
+"liveactivity.milestone.reached" = "MILESTONE REACHED";
+"liveactivity.milestone.remaining" = "remaining";
+
+// MARK: - Live Activity - Invoice
+"liveactivity.invoice.sent" = "SENT";
+"liveactivity.invoice.viewed" = "VIEWED";
+"liveactivity.invoice.paid" = "PAID";
+"liveactivity.invoice.overdue" = "OVERDUE";
+"liveactivity.invoice.payment_received" = "Payment received";
+"liveactivity.invoice.days_overdue" = "%d days overdue";
+"liveactivity.invoice.due_today" = "Due today!";
+"liveactivity.invoice.due_tomorrow" = "Due tomorrow";
+"liveactivity.invoice.due_in_days" = "Due in %d days";
+"liveactivity.invoice.client_viewed" = "Client viewed invoice";
+"liveactivity.invoice.payment_overdue" = "PAYMENT OVERDUE";
+
+// MARK: - Live Activity - Summary
+"liveactivity.summary.new_record" = "New Record!";
+"liveactivity.summary.daily" = "Daily Summary";
+"liveactivity.summary.weekly" = "Weekly Summary";
+"liveactivity.summary.sessions" = "sessions";
+"liveactivity.summary.of_goal" = "of goal";
+"liveactivity.summary.hours_worked" = "hours worked";
+"liveactivity.summary.personal_best" = "PERSONAL BEST";
+"liveactivity.summary.day_streak" = "day streak";
+
+// MARK: - Live Activity - Break Reminder
+"liveactivity.break.needed" = "Break Needed!";
+"liveactivity.break.time_for" = "Time for a Break";
+"liveactivity.break.suggested" = "Break Suggested";
+"liveactivity.break.reminder" = "Break Reminder";
+"liveactivity.break.urgent" = "URGENT";
+"liveactivity.break.recommended" = "RECOMMENDED";
+"liveactivity.break.take_break" = "Take a break";
+"liveactivity.break.break_time" = "Break time";
+"liveactivity.break.consider" = "Consider break";
+"liveactivity.break.on_track" = "On track";
+"liveactivity.break.since_break" = "since break";
+"liveactivity.break.breaks_today" = "breaks today";
+"liveactivity.break.worked" = "worked";
+"liveactivity.break.health_matters" = "Your health matters";
+
+// MARK: - Plurals
+"plural.hour" = "hour";
+"plural.hours" = "hours";
+"plural.minute" = "minute";
+"plural.minutes" = "minutes";
+"plural.session" = "session";
+"plural.sessions" = "sessions";
+"plural.day" = "day";
+"plural.days" = "days";
+"plural.invoice" = "invoice";
+"plural.invoices" = "invoices";

@@ -1,0 +1,181 @@
+/*
+  Localizable.strings (Russian)
+  ung
+
+  Russian localization for UNG - Freelance Billing & Time Tracking
+  Русская локализация для UNG - Учёт времени и выставление счетов
+*/
+
+// MARK: - App General
+"app.name" = "UNG";
+"app.tagline" = "Учёт времени и счета для фрилансеров";
+
+// MARK: - Siri Shortcuts Titles
+"Start Tracking" = "Начать отслеживание";
+"Stop Tracking" = "Остановить отслеживание";
+"Pause Tracking" = "Пауза";
+"Resume Tracking" = "Продолжить";
+"Get Status" = "Показать статус";
+"Today's Hours" = "Часы за сегодня";
+"Weekly Report" = "Еженедельный отчёт";
+"Today's Earnings" = "Заработок за сегодня";
+"Monthly Earnings" = "Заработок за месяц";
+"Pending Invoices" = "Неоплаченные счета";
+"Overdue Invoices" = "Просроченные счета";
+"Client Balance" = "Баланс клиента";
+"Start Focus" = "Начать фокус";
+"Stop Focus" = "Остановить фокус";
+"Take Break" = "Сделать перерыв";
+"Log Time" = "Записать время";
+
+// MARK: - Siri Responses - Tracking
+"siri.tracking.started" = "Начато отслеживание %@. Удачи!";
+"siri.tracking.stopped" = "Остановлено отслеживание %@. Длительность: %@";
+"siri.tracking.paused" = "Пауза %@ на %@. Скажи 'Продолжить отслеживание', чтобы продолжить.";
+"siri.tracking.resumed" = "Продолжено отслеживание %@. Продолжаем!";
+"siri.tracking.no_active" = "Нет активного сеанса отслеживания.";
+"siri.tracking.already_active" = "Отслеживание уже активно. Вы работаете над %@.";
+"siri.tracking.no_paused" = "Нет приостановленного сеанса. Скажи 'Начать отслеживание', чтобы начать новый.";
+
+// MARK: - Siri Responses - Status
+"siri.status.working" = "Вы работаете над %@ уже %@.";
+"siri.status.not_tracking" = "Вы сейчас ничего не отслеживаете. Готовы начать?";
+
+// MARK: - Siri Responses - Hours
+"siri.hours.today" = "Сегодня вы проработали %@. Так держать!";
+"siri.hours.today.none" = "Сегодня ещё нет записей времени. Пора начинать?";
+"siri.hours.weekly" = "На этой неделе: %@";
+"siri.hours.weekly.progress" = "На этой неделе: %@ (%d%% от цели %@)";
+
+// MARK: - Siri Responses - Earnings
+"siri.earnings.today" = "Сегодня вы заработали %@. Отличная работа!";
+"siri.earnings.today.none" = "Сегодня ещё нет заработка. Начните отслеживание, чтобы зарабатывать!";
+"siri.earnings.monthly" = "В этом месяце: %@";
+"siri.earnings.total" = "Всего за всё время: %@";
+
+// MARK: - Siri Responses - Invoices
+"siri.invoices.pending" = "У вас %d неоплаченн%@ на сумму %@.";
+"siri.invoices.pending.none" = "Нет неоплаченных счетов. Всё в порядке!";
+"siri.invoices.overdue" = "Внимание: У вас %d просроченн%@ на сумму %@. Рекомендуем связаться с клиентами.";
+"siri.invoices.overdue.none" = "Отлично! Нет просроченных счетов.";
+"siri.invoices.pending_suffix" = "У вас %@ в неоплаченных счетах.";
+
+// MARK: - Siri Responses - Clients
+"siri.client.owes" = "%@ должен вам %@.";
+"siri.client.no_balance" = "У %@ нет задолженности.";
+"siri.client.not_found" = "Не могу найти клиента %@. Попробуйте назвать полное имя.";
+"siri.client.total_owed" = "Клиенты должны вам %@ в сумме. Назовите имя клиента для подробностей.";
+"siri.client.all_settled" = "Все балансы клиентов погашены. Нет задолженностей.";
+
+// MARK: - Siri Responses - Focus/Pomodoro
+"siri.focus.started" = "Сеанс фокусировки начат. У вас %d минут. Сосредоточьтесь!";
+"siri.focus.already_active" = "Сеанс фокусировки уже запущен.";
+"siri.focus.stopped" = "Сеанс фокусировки завершён. Вы завершили %d сеанс%@. Отличная работа!";
+"siri.focus.no_active" = "Нет активного сеанса фокусировки.";
+
+// MARK: - Siri Responses - Break
+"siri.break.started" = "Перерыв начат! Отдохните %d минут. Ваше здоровье важно. Я буду отслеживать время перерыва.";
+
+// MARK: - Siri Responses - Quick Log
+"siri.log.specify_hours" = "Укажите, сколько часов записать. Например: 'Запиши 2 часа'";
+"siri.log.success" = "Записано %@ для %@";
+
+// MARK: - Live Activity - Tracking
+"liveactivity.tracking.recording" = "ЗАПИСЬ";
+"liveactivity.tracking.started" = "Начато";
+"liveactivity.tracking.tap_to_stop" = "Нажмите, чтобы остановить";
+
+// MARK: - Live Activity - Pomodoro
+"liveactivity.pomodoro.focus" = "Режим фокуса";
+"liveactivity.pomodoro.break" = "Перерыв";
+"liveactivity.pomodoro.paused" = "ПАУЗА";
+"liveactivity.pomodoro.tap_to_resume" = "Нажмите, чтобы продолжить";
+"liveactivity.pomodoro.until_focus" = "до фокуса";
+"liveactivity.pomodoro.remaining" = "осталось";
+"liveactivity.pomodoro.done" = "завершено";
+"liveactivity.pomodoro.total" = "всего";
+
+// MARK: - Live Activity - Milestone
+"liveactivity.milestone.goal_achieved" = "Цель достигнута!";
+"liveactivity.milestone.exceeded" = "ПРЕВЫШЕНО";
+"liveactivity.milestone.daily" = "Дневная";
+"liveactivity.milestone.weekly" = "Недельная";
+"liveactivity.milestone.monthly" = "Месячная";
+"liveactivity.milestone.goal" = "цель";
+"liveactivity.milestone.to_go" = "осталось";
+"liveactivity.milestone.over" = "сверх";
+"liveactivity.milestone.reached" = "ЦЕЛЬ ДОСТИГНУТА";
+"liveactivity.milestone.remaining" = "осталось";
+
+// MARK: - Live Activity - Invoice
+"liveactivity.invoice.sent" = "ОТПРАВЛЕН";
+"liveactivity.invoice.viewed" = "ПРОСМОТРЕН";
+"liveactivity.invoice.paid" = "ОПЛАЧЕН";
+"liveactivity.invoice.overdue" = "ПРОСРОЧЕН";
+"liveactivity.invoice.payment_received" = "Оплата получена";
+"liveactivity.invoice.days_overdue" = "просрочено %d дн.";
+"liveactivity.invoice.due_today" = "Срок сегодня!";
+"liveactivity.invoice.due_tomorrow" = "Срок завтра";
+"liveactivity.invoice.due_in_days" = "Срок через %d дн.";
+"liveactivity.invoice.client_viewed" = "Клиент просмотрел счёт";
+"liveactivity.invoice.payment_overdue" = "ОПЛАТА ПРОСРОЧЕНА";
+
+// MARK: - Live Activity - Summary
+"liveactivity.summary.new_record" = "Новый рекорд!";
+"liveactivity.summary.daily" = "Итоги дня";
+"liveactivity.summary.weekly" = "Итоги недели";
+"liveactivity.summary.sessions" = "сеансов";
+"liveactivity.summary.of_goal" = "от цели";
+"liveactivity.summary.hours_worked" = "часов отработано";
+"liveactivity.summary.personal_best" = "ЛИЧНЫЙ РЕКОРД";
+"liveactivity.summary.day_streak" = "дней подряд";
+
+// MARK: - Live Activity - Break Reminder
+"liveactivity.break.needed" = "Нужен перерыв!";
+"liveactivity.break.time_for" = "Время для перерыва";
+"liveactivity.break.suggested" = "Рекомендуем перерыв";
+"liveactivity.break.reminder" = "Напоминание о перерыве";
+"liveactivity.break.urgent" = "СРОЧНО";
+"liveactivity.break.recommended" = "РЕКОМЕНДУЕТСЯ";
+"liveactivity.break.take_break" = "Сделайте перерыв";
+"liveactivity.break.break_time" = "Время перерыва";
+"liveactivity.break.consider" = "Пора отдохнуть";
+"liveactivity.break.on_track" = "Всё хорошо";
+"liveactivity.break.since_break" = "с перерыва";
+"liveactivity.break.breaks_today" = "перерывов сегодня";
+"liveactivity.break.worked" = "отработано";
+"liveactivity.break.health_matters" = "Ваше здоровье важно";
+
+// MARK: - Plurals (Russian has complex pluralization)
+"plural.hour" = "час";
+"plural.hours" = "часов";
+"plural.hours.few" = "часа";
+"plural.minute" = "минута";
+"plural.minutes" = "минут";
+"plural.minutes.few" = "минуты";
+"plural.session" = "сеанс";
+"plural.sessions" = "сеансов";
+"plural.sessions.few" = "сеанса";
+"plural.day" = "день";
+"plural.days" = "дней";
+"plural.days.few" = "дня";
+"plural.invoice" = "счёт";
+"plural.invoices" = "счетов";
+"plural.invoices.few" = "счёта";
+
+// MARK: - Russian-specific phrases for natural Siri interaction
+"siri.russian.greeting" = "Чем могу помочь?";
+"siri.russian.goodbye" = "До встречи! Продуктивной работы!";
+"siri.russian.error" = "Произошла ошибка. Попробуйте ещё раз.";
+"siri.russian.confirm" = "Готово!";
+"siri.russian.cancel" = "Отменено.";
+
+// MARK: - Time formatting (Russian)
+"time.format.hours_minutes" = "%d ч %d мин";
+"time.format.hours_only" = "%d ч";
+"time.format.minutes_only" = "%d мин";
+
+// MARK: - Currency formatting (Russian)
+"currency.format.rub" = "%@ ₽";
+"currency.format.usd" = "$%@";
+"currency.format.eur" = "€%@";

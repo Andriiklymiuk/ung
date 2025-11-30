@@ -125,7 +125,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	printStep(currentStep, "Your Business")
 
 	companyRepo := repository.NewCompanyRepository()
-	companyCount, _ := companyRepo.Count()
+	companyCount, err := companyRepo.Count()
+	if err != nil {
+		fmt.Printf("%s Could not check company status. Continuing...\n", mutedStyle.Render("!"))
+		companyCount = 0
+	}
 
 	if companyCount == 0 {
 		var companyName, companyEmail, companyAddress string
@@ -175,9 +179,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 		fmt.Printf("%s Company \"%s\" saved!\n", successStyle.Render(""), companyName)
 	} else {
-		companies, _ := companyRepo.List()
-		if len(companies) > 0 {
+		companies, err := companyRepo.List()
+		if err == nil && len(companies) > 0 {
 			fmt.Printf("%s Using existing company: %s\n", successStyle.Render(""), companies[0].Name)
+		} else {
+			fmt.Printf("%s Company configured\n", successStyle.Render(""))
 		}
 	}
 
@@ -186,7 +192,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	printStep(currentStep, "Your First Client")
 
 	clientRepo := repository.NewClientRepository()
-	clientCount, _ := clientRepo.Count()
+	clientCount, err := clientRepo.Count()
+	if err != nil {
+		fmt.Printf("%s Could not check client status. Continuing...\n", mutedStyle.Render("!"))
+		clientCount = 0
+	}
 
 	if clientCount == 0 {
 		var addClient bool
@@ -251,9 +261,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s Skipped - add clients later with: ung client add\n", mutedStyle.Render(""))
 		}
 	} else {
-		clients, _ := clientRepo.List()
-		if len(clients) > 0 {
+		clients, err := clientRepo.List()
+		if err == nil && len(clients) > 0 {
 			fmt.Printf("%s You have %d client(s) already\n", successStyle.Render(""), len(clients))
+		} else {
+			fmt.Printf("%s Clients configured\n", successStyle.Render(""))
 		}
 	}
 
@@ -339,33 +351,30 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	// ============ SUCCESS! ============
 	fmt.Println()
 
-	// Celebration banner
+	// Clean celebration (accessible - no decorative emoji spam)
 	celebrationStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFD700"))
+		Foreground(lipgloss.Color("#22C55E")).
+		Bold(true)
 
-	fmt.Println(celebrationStyle.Render("  ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨"))
-	fmt.Println()
-
+	// Focused success message with single clear next action
 	successBox := boxStyle.Render(fmt.Sprintf(`%s
 
-  You're ready to track time, manage gigs, and invoice clients!
+  Your freelance toolkit is ready!
 
 %s
-  ung track start     Start tracking time now
-  ung gig add <name>  Create your first gig
-  ung next            See your daily dashboard
+
+  ung track start "Project name"
+
+  This will start a billable timer. Stop anytime with: ung track stop
 
 %s
-  ung invoice new     Create an invoice
-  ung goal status     Check goal progress
-  ung hunt            Find freelance opportunities`,
-		successStyle.Render("  🚀 Setup Complete!"),
-		headerStyle.Render("Get Started:"),
-		mutedStyle.Render("More commands:")))
+  ung next     Your personalized dashboard
+  ung help     Explore all features`,
+		celebrationStyle.Render("  Setup Complete!"),
+		headerStyle.Render("Your Next Step:"),
+		mutedStyle.Render("When you're ready:")))
 
 	fmt.Println(successBox)
-	fmt.Println()
-	fmt.Println(celebrationStyle.Render("  ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨ 🎉 ✨"))
 	fmt.Println()
 
 	return nil

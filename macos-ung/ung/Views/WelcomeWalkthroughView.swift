@@ -14,58 +14,37 @@ struct WelcomeWalkthroughView: View {
   @State private var isAnimating = false
   @Namespace private var animation
 
+  // Streamlined 3-page walkthrough (research shows 3-4 pages optimal)
   private let pages: [WalkthroughPage] = [
     WalkthroughPage(
       icon: "clock.badge.checkmark.fill",
       iconColors: [.blue, .purple],
       title: "Track Your Time",
-      subtitle: "Effortlessly log hours for clients and projects",
+      subtitle: "Log billable hours effortlessly",
       features: [
         FeatureItem(icon: "play.circle.fill", text: "One-click time tracking", color: .green),
         FeatureItem(icon: "chart.bar.fill", text: "Weekly & monthly reports", color: .blue),
-        FeatureItem(icon: "bell.badge.fill", text: "Smart reminders", color: .orange),
+        FeatureItem(icon: "target", text: "Set income goals", color: .orange),
       ]
     ),
     WalkthroughPage(
       icon: "doc.text.fill",
       iconColors: [.teal, .cyan],
-      title: "Create Invoices",
-      subtitle: "Professional invoices in seconds, not hours",
+      title: "Invoice & Get Paid",
+      subtitle: "Professional invoices in seconds",
       features: [
         FeatureItem(icon: "wand.and.stars", text: "Auto-generate from tracked time", color: .purple),
-        FeatureItem(icon: "envelope.fill", text: "Send directly to clients", color: .blue),
         FeatureItem(icon: "checkmark.circle.fill", text: "Track payment status", color: .green),
-      ]
-    ),
-    WalkthroughPage(
-      icon: "target",
-      iconColors: [.orange, .red],
-      title: "Set Income Goals",
-      subtitle: "Stay motivated with visual progress tracking",
-      features: [
-        FeatureItem(icon: "chart.line.uptrend.xyaxis", text: "Monthly & yearly targets", color: .green),
-        FeatureItem(icon: "flame.fill", text: "Track your progress", color: .orange),
-        FeatureItem(icon: "trophy.fill", text: "Celebrate achievements", color: .yellow),
-      ]
-    ),
-    WalkthroughPage(
-      icon: "rectangle.3.group.fill",
-      iconColors: [.purple, .pink],
-      title: "Manage Your Gigs",
-      subtitle: "Kanban board to organize projects",
-      features: [
-        FeatureItem(icon: "checklist", text: "Track tasks & milestones", color: .blue),
-        FeatureItem(icon: "arrow.right.circle.fill", text: "Move through workflow", color: .purple),
-        FeatureItem(icon: "person.2.fill", text: "Per-client organization", color: .teal),
+        FeatureItem(icon: "rectangle.3.group.fill", text: "Organize gigs on kanban board", color: .pink),
       ]
     ),
     WalkthroughPage(
       icon: "sparkles",
-      iconColors: [.yellow, .orange],
-      title: "You're Ready!",
-      subtitle: "Start building your freelance business",
+      iconColors: [.green, .teal],
+      title: "You're All Set!",
+      subtitle: "Your freelance toolkit is ready",
       features: [
-        FeatureItem(icon: "lock.shield.fill", text: "Your data stays on your device", color: .green),
+        FeatureItem(icon: "lock.shield.fill", text: "Your data stays private", color: .green),
         FeatureItem(icon: "icloud.fill", text: "Optional iCloud sync", color: .blue),
         FeatureItem(icon: "brain.head.profile", text: "Focus timer included", color: .orange),
       ],
@@ -104,17 +83,23 @@ struct WelcomeWalkthroughView: View {
 
           // Bottom controls
           VStack(spacing: 20) {
-            // Page indicator
-            HStack(spacing: 8) {
-              ForEach(0..<pages.count, id: \.self) { index in
-                Circle()
-                  .fill(currentPage == index ? pages[currentPage].iconColors[0] : Color.secondary.opacity(0.3))
-                  .frame(width: currentPage == index ? 10 : 8, height: currentPage == index ? 10 : 8)
-                  .animation(.spring(response: 0.3), value: currentPage)
-                  .onTapGesture {
-                    withAnimation { currentPage = index }
-                  }
+            // Page indicator with counter
+            VStack(spacing: 8) {
+              HStack(spacing: 8) {
+                ForEach(0..<pages.count, id: \.self) { index in
+                  Circle()
+                    .fill(currentPage == index ? pages[currentPage].iconColors[0] : Color.secondary.opacity(0.3))
+                    .frame(width: currentPage == index ? 10 : 8, height: currentPage == index ? 10 : 8)
+                    .animation(.spring(response: 0.3), value: currentPage)
+                    .onTapGesture {
+                      withAnimation { currentPage = index }
+                    }
+                    .accessibilityLabel("Page \(index + 1) of \(pages.count)")
+                }
               }
+              Text("\(currentPage + 1) of \(pages.count)")
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
             .padding(.bottom, 8)
 

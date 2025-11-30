@@ -380,6 +380,53 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-badge-foreground);
         }
 
+        /* Focus styles for keyboard accessibility */
+        .btn:focus {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+
+        .btn:focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+
+        .link:focus {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
+
+        .link:focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        .collapsible-header:focus {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: -2px;
+        }
+
+        .collapsible-header:focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        /* Screen reader only text */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
         /* Feature Cards */
         .features-grid {
             display: grid;
@@ -594,21 +641,49 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
     <script>
         const vscode = acquireVsCodeApi();
 
-        // Handle button clicks
+        // Handle button clicks and keyboard activation
         document.querySelectorAll('[data-command]').forEach(btn => {
-            btn.addEventListener('click', () => {
+            const handleActivation = () => {
                 const command = btn.getAttribute('data-command');
                 const platform = btn.getAttribute('data-platform');
                 vscode.postMessage({ command, platform });
+            };
+
+            btn.addEventListener('click', handleActivation);
+
+            // Keyboard support for Enter and Space
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleActivation();
+                }
             });
         });
 
-        // Handle collapsible sections
+        // Handle collapsible sections with keyboard support
         document.querySelectorAll('.collapsible-header').forEach(header => {
-            header.addEventListener('click', () => {
+            const toggleCollapsible = () => {
                 header.parentElement.classList.toggle('open');
+                const isOpen = header.parentElement.classList.contains('open');
+                header.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            };
+
+            header.addEventListener('click', toggleCollapsible);
+
+            // Keyboard support for collapsibles
+            header.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleCollapsible();
+                }
             });
         });
+
+        // Set focus to first actionable element on load
+        setTimeout(() => {
+            const firstButton = document.querySelector('.btn');
+            if (firstButton) firstButton.focus();
+        }, 100);
     </script>
 </body>
 </html>`;
@@ -616,8 +691,8 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 
   private _getLoadingHtml(): string {
     return `
-        <div class="loading-container">
-            <div class="spinner"></div>
+        <div class="loading-container" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
             <div class="loading-text">Checking UNG CLI status...</div>
         </div>
     `;
@@ -652,13 +727,13 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             ${
               isMac || isLinux
                 ? `
-            <button class="btn btn-primary" data-command="installHomebrew">
-                <span class="btn-icon">🍺</span>
+            <button class="btn btn-primary" data-command="installHomebrew" aria-label="Install UNG CLI via Homebrew - Recommended">
+                <span class="btn-icon" aria-hidden="true">🍺</span>
                 <span class="btn-content">
                     <span class="btn-label">Install via Homebrew</span>
                     <span class="btn-description">brew install ung</span>
                 </span>
-                <span class="btn-badge">Recommended</span>
+                <span class="btn-badge" aria-hidden="true">Recommended</span>
             </button>
             `
                 : ''
@@ -667,28 +742,28 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
             ${
               isWindows
                 ? `
-            <button class="btn btn-primary" data-command="installScoop">
-                <span class="btn-icon">🪣</span>
+            <button class="btn btn-primary" data-command="installScoop" aria-label="Install UNG CLI via Scoop - Recommended">
+                <span class="btn-icon" aria-hidden="true">🪣</span>
                 <span class="btn-content">
                     <span class="btn-label">Install via Scoop</span>
                     <span class="btn-description">scoop install ung</span>
                 </span>
-                <span class="btn-badge">Recommended</span>
+                <span class="btn-badge" aria-hidden="true">Recommended</span>
             </button>
             `
                 : ''
             }
 
-            <button class="btn btn-secondary" data-command="downloadBinary" data-platform="${platform}">
-                <span class="btn-icon">📦</span>
+            <button class="btn btn-secondary" data-command="downloadBinary" data-platform="${platform}" aria-label="Download UNG binary for ${isMac ? 'macOS' : isWindows ? 'Windows' : 'Linux'}">
+                <span class="btn-icon" aria-hidden="true">📦</span>
                 <span class="btn-content">
                     <span class="btn-label">Download Binary</span>
                     <span class="btn-description">Direct download for ${isMac ? 'macOS' : isWindows ? 'Windows' : 'Linux'}</span>
                 </span>
             </button>
 
-            <button class="btn btn-secondary" data-command="installGo">
-                <span class="btn-icon">🐹</span>
+            <button class="btn btn-secondary" data-command="installGo" aria-label="Install UNG CLI via Go toolchain">
+                <span class="btn-icon" aria-hidden="true">🐹</span>
                 <span class="btn-content">
                     <span class="btn-label">Install via Go</span>
                     <span class="btn-description">go install github.com/Andriiklymiuk/ung@latest</span>
@@ -700,59 +775,59 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
 
         <div class="section">
             <div class="collapsible">
-                <div class="collapsible-header">
-                    <span class="collapsible-icon">▶</span>
+                <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false" aria-controls="features-content">
+                    <span class="collapsible-icon" aria-hidden="true">▶</span>
                     <span class="collapsible-title">What you'll get</span>
                 </div>
-                <div class="collapsible-content">
-                    <div class="features-grid">
-                        <div class="feature-card">
-                            <span class="feature-icon">📄</span>
+                <div class="collapsible-content" id="features-content" role="region">
+                    <ul class="features-grid" role="list" aria-label="Features included">
+                        <li class="feature-card" role="listitem">
+                            <span class="feature-icon" aria-hidden="true">📄</span>
                             <span class="feature-text">Invoices</span>
-                        </div>
-                        <div class="feature-card">
-                            <span class="feature-icon">⏱️</span>
+                        </li>
+                        <li class="feature-card" role="listitem">
+                            <span class="feature-icon" aria-hidden="true">⏱️</span>
                             <span class="feature-text">Time Tracking</span>
-                        </div>
-                        <div class="feature-card">
-                            <span class="feature-icon">👥</span>
+                        </li>
+                        <li class="feature-card" role="listitem">
+                            <span class="feature-icon" aria-hidden="true">👥</span>
                             <span class="feature-text">Clients</span>
-                        </div>
-                        <div class="feature-card">
-                            <span class="feature-icon">📝</span>
+                        </li>
+                        <li class="feature-card" role="listitem">
+                            <span class="feature-icon" aria-hidden="true">📝</span>
                             <span class="feature-text">Contracts</span>
-                        </div>
-                        <div class="feature-card">
-                            <span class="feature-icon">💳</span>
+                        </li>
+                        <li class="feature-card" role="listitem">
+                            <span class="feature-icon" aria-hidden="true">💳</span>
                             <span class="feature-text">Expenses</span>
-                        </div>
-                        <div class="feature-card">
-                            <span class="feature-icon">📊</span>
+                        </li>
+                        <li class="feature-card" role="listitem">
+                            <span class="feature-icon" aria-hidden="true">📊</span>
                             <span class="feature-text">Reports</span>
-                        </div>
-                    </div>
-                    <div class="highlights">
-                        <span class="highlight-tag"><span class="highlight-icon">🔒</span> Privacy First</span>
-                        <span class="highlight-tag"><span class="highlight-icon">📴</span> Offline</span>
-                        <span class="highlight-tag"><span class="highlight-icon">🌍</span> Multi-Currency</span>
-                        <span class="highlight-tag"><span class="highlight-icon">⚡</span> Fast</span>
+                        </li>
+                    </ul>
+                    <div class="highlights" role="list" aria-label="Key benefits">
+                        <span class="highlight-tag" role="listitem"><span class="highlight-icon" aria-hidden="true">🔒</span> Privacy First</span>
+                        <span class="highlight-tag" role="listitem"><span class="highlight-icon" aria-hidden="true">📴</span> Offline</span>
+                        <span class="highlight-tag" role="listitem"><span class="highlight-icon" aria-hidden="true">🌍</span> Multi-Currency</span>
+                        <span class="highlight-tag" role="listitem"><span class="highlight-icon" aria-hidden="true">⚡</span> Fast</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="divider"></div>
+        <div class="divider" role="separator"></div>
 
-        <div class="footer-links">
-            <a class="link" data-command="openDocs">
-                <span class="link-icon">📚</span>
+        <nav class="footer-links" aria-label="Additional links">
+            <button class="link" data-command="openDocs" aria-label="Open documentation">
+                <span class="link-icon" aria-hidden="true">📚</span>
                 Documentation
-            </a>
-            <a class="link" data-command="recheckCli">
-                <span class="link-icon">🔄</span>
+            </button>
+            <button class="link" data-command="recheckCli" aria-label="Recheck CLI installation status">
+                <span class="link-icon" aria-hidden="true">🔄</span>
                 Recheck
-            </a>
-        </div>
+            </button>
+        </nav>
     `;
   }
 
@@ -781,17 +856,17 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
                 <h2 class="section-title">Choose Setup Type</h2>
             </div>
 
-            <button class="btn btn-primary" data-command="initGlobal">
-                <span class="btn-icon">🏠</span>
+            <button class="btn btn-primary" data-command="initGlobal" aria-label="Global setup - Store data in home directory, access from any project - Recommended">
+                <span class="btn-icon" aria-hidden="true">🏠</span>
                 <span class="btn-content">
                     <span class="btn-label">Global Setup</span>
                     <span class="btn-description">Store data in ~/.ung/ - Access from any project</span>
                 </span>
-                <span class="btn-badge">Recommended</span>
+                <span class="btn-badge" aria-hidden="true">Recommended</span>
             </button>
 
-            <button class="btn btn-secondary" data-command="initLocal">
-                <span class="btn-icon">📁</span>
+            <button class="btn btn-secondary" data-command="initLocal" aria-label="Project setup - Store data in current workspace only">
+                <span class="btn-icon" aria-hidden="true">📁</span>
                 <span class="btn-content">
                     <span class="btn-label">Project Setup</span>
                     <span class="btn-description">Store data in .ung/ - Isolated to this workspace</span>
@@ -923,32 +998,32 @@ export class OnboardingWebviewProvider implements vscode.WebviewViewProvider {
                 <h2 class="section-title">Start Now</h2>
             </div>
 
-            <button class="btn btn-primary" data-command="startTracking">
-                <span class="btn-icon">▶️</span>
+            <button class="btn btn-primary" data-command="startTracking" aria-label="Start tracking time - Begin a work session now">
+                <span class="btn-icon" aria-hidden="true">▶️</span>
                 <span class="btn-content">
                     <span class="btn-label">Start Tracking Time</span>
                     <span class="btn-description">Begin a work session now</span>
                 </span>
             </button>
 
-            <button class="btn btn-secondary" data-command="createInvoice">
-                <span class="btn-icon">📄</span>
+            <button class="btn btn-secondary" data-command="createInvoice" aria-label="Create invoice - Bill your clients">
+                <span class="btn-icon" aria-hidden="true">📄</span>
                 <span class="btn-content">
                     <span class="btn-label">Create Invoice</span>
                     <span class="btn-description">Bill your clients</span>
                 </span>
             </button>
 
-            <button class="btn btn-secondary" data-command="addGig">
-                <span class="btn-icon">🎯</span>
+            <button class="btn btn-secondary" data-command="addGig" aria-label="Add a gig - Track projects on your kanban board">
+                <span class="btn-icon" aria-hidden="true">🎯</span>
                 <span class="btn-content">
                     <span class="btn-label">Add a Gig</span>
                     <span class="btn-description">Track projects on your kanban board</span>
                 </span>
             </button>
 
-            <button class="btn btn-secondary" data-command="setGoal">
-                <span class="btn-icon">📊</span>
+            <button class="btn btn-secondary" data-command="setGoal" aria-label="Set income goal - Track progress toward your target">
+                <span class="btn-icon" aria-hidden="true">📊</span>
                 <span class="btn-content">
                     <span class="btn-label">Set Income Goal</span>
                     <span class="btn-description">Track progress toward your target</span>

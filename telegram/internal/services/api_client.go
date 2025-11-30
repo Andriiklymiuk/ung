@@ -1748,3 +1748,350 @@ func (c *APIClient) GetHunterApplications(token string) ([]HunterApplication, er
 
 	return applications, nil
 }
+
+// =====================================
+// Gigs API
+// =====================================
+
+// Gig represents a gig/project from the API
+type Gig struct {
+	ID                uint     `json:"id"`
+	Name              string   `json:"name"`
+	ClientID          *uint    `json:"client_id"`
+	ClientName        string   `json:"client_name,omitempty"`
+	Status            string   `json:"status"`
+	GigType           string   `json:"gig_type"`
+	Priority          int      `json:"priority"`
+	HourlyRate        *float64 `json:"hourly_rate"`
+	TotalHoursTracked float64  `json:"total_hours_tracked"`
+	TotalInvoiced     float64  `json:"total_invoiced"`
+	Description       string   `json:"description"`
+	Notes             string   `json:"notes"`
+}
+
+// GigTask represents a task within a gig
+type GigTask struct {
+	ID        uint   `json:"id"`
+	GigID     uint   `json:"gig_id"`
+	Title     string `json:"title"`
+	Completed bool   `json:"completed"`
+	SortOrder int    `json:"sort_order"`
+}
+
+// GigCreateRequest represents a gig creation request
+type GigCreateRequest struct {
+	Name     string `json:"name"`
+	ClientID *uint  `json:"client_id,omitempty"`
+	Status   string `json:"status"`
+	GigType  string `json:"gig_type"`
+}
+
+// ListGigs fetches all gigs
+func (c *APIClient) ListGigs(token string) ([]Gig, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/gigs", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var gigs []Gig
+	if err := json.Unmarshal(apiResp.Data, &gigs); err != nil {
+		return nil, err
+	}
+
+	return gigs, nil
+}
+
+// GetGig fetches a single gig
+func (c *APIClient) GetGig(token string, gigID uint) (*Gig, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/gigs/%d", c.baseURL, gigID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var gig Gig
+	if err := json.Unmarshal(apiResp.Data, &gig); err != nil {
+		return nil, err
+	}
+
+	return &gig, nil
+}
+
+// CreateGig creates a new gig
+func (c *APIClient) CreateGig(token string, req GigCreateRequest) (*Gig, error) {
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequest("POST", c.baseURL+"/api/v1/gigs", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var gig Gig
+	if err := json.Unmarshal(apiResp.Data, &gig); err != nil {
+		return nil, err
+	}
+
+	return &gig, nil
+}
+
+// UpdateGigStatus updates a gig's status
+func (c *APIClient) UpdateGigStatus(token string, gigID uint, status string) (*Gig, error) {
+	data := map[string]string{"status": status}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/api/v1/gigs/%d/status", c.baseURL, gigID), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var gig Gig
+	if err := json.Unmarshal(apiResp.Data, &gig); err != nil {
+		return nil, err
+	}
+
+	return &gig, nil
+}
+
+// DeleteGig deletes a gig
+func (c *APIClient) DeleteGig(token string, gigID uint) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/gigs/%d", c.baseURL, gigID), nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error: %s", string(body))
+	}
+
+	return nil
+}
+
+// ListGigTasks fetches tasks for a gig
+func (c *APIClient) ListGigTasks(token string, gigID uint) ([]GigTask, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/gigs/%d/tasks", c.baseURL, gigID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var tasks []GigTask
+	if err := json.Unmarshal(apiResp.Data, &tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
+// CreateGigTask creates a task for a gig
+func (c *APIClient) CreateGigTask(token string, gigID uint, title string) (*GigTask, error) {
+	data := map[string]interface{}{
+		"gig_id": gigID,
+		"title":  title,
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/gigs/%d/tasks", c.baseURL, gigID), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var task GigTask
+	if err := json.Unmarshal(apiResp.Data, &task); err != nil {
+		return nil, err
+	}
+
+	return &task, nil
+}
+
+// ToggleGigTask toggles a task's completed status
+func (c *APIClient) ToggleGigTask(token string, taskID uint) (*GigTask, error) {
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/api/v1/gig-tasks/%d/toggle", c.baseURL, taskID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var apiResp APIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, err
+	}
+
+	var task GigTask
+	if err := json.Unmarshal(apiResp.Data, &task); err != nil {
+		return nil, err
+	}
+
+	return &task, nil
+}

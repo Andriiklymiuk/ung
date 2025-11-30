@@ -48,6 +48,7 @@ func main() {
 	settingsHandler := handlers.NewSettingsHandler(bot, apiClient, sessionMgr)
 	searchHandler := handlers.NewSearchHandler(bot, apiClient, sessionMgr)
 	hunterHandler := handlers.NewHunterHandler(bot, apiClient, sessionMgr)
+	gigHandler := handlers.NewGigHandler(bot, apiClient, sessionMgr)
 
 	// Start listening for updates
 	u := tgbotapi.NewUpdate(0)
@@ -60,14 +61,14 @@ func main() {
 	for update := range updates {
 		// Handle messages
 		if update.Message != nil {
-			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, hunterHandler, sessionMgr); err != nil {
+			if err := handleMessage(update.Message, bot, startHandler, helpHandler, invoiceHandler, clientHandler, companyHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, hunterHandler, gigHandler, sessionMgr); err != nil {
 				log.Printf("Error handling message: %v", err)
 			}
 		}
 
 		// Handle callback queries
 		if update.CallbackQuery != nil {
-			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, hunterHandler, sessionMgr); err != nil {
+			if err := handleCallback(update.CallbackQuery, bot, invoiceHandler, clientHandler, contractHandler, expenseHandler, trackingHandler, dashboardHandler, reportHandler, pomodoroHandler, goalsHandler, settingsHandler, searchHandler, hunterHandler, gigHandler, sessionMgr); err != nil {
 				log.Printf("Error handling callback: %v", err)
 			}
 		}
@@ -92,6 +93,7 @@ func handleMessage(
 	settingsHandler *handlers.SettingsHandler,
 	searchHandler *handlers.SearchHandler,
 	hunterHandler *handlers.HunterHandler,
+	gigHandler *handlers.GigHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	// Handle commands
@@ -169,6 +171,9 @@ func handleMessage(
 			return hunterHandler.HandleProfile(message)
 		case "applications":
 			return hunterHandler.HandleApplications(message)
+		// Gig commands
+		case "gig", "gigs":
+			return gigHandler.HandleMenu(message)
 		default:
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Try /help")
 			bot.Send(msg)
@@ -254,6 +259,11 @@ func handleMessage(
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
 			return nil
+		// Gig states
+		case models.StateGigCreateName:
+			return gigHandler.HandleNameInput(message)
+		case models.StateGigTaskAdd:
+			return gigHandler.HandleTaskInput(message)
 		}
 	}
 
@@ -278,6 +288,7 @@ func handleCallback(
 	settingsHandler *handlers.SettingsHandler,
 	searchHandler *handlers.SearchHandler,
 	hunterHandler *handlers.HunterHandler,
+	gigHandler *handlers.GigHandler,
 	sessionMgr *services.SessionManager,
 ) error {
 	data := callbackQuery.Data
@@ -532,28 +543,31 @@ func handleCallback(
 
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("New Invoice", "action_invoice"),
-				tgbotapi.NewInlineKeyboardButtonData("Track Time", "action_track"),
+				tgbotapi.NewInlineKeyboardButtonData("📋 Gigs", "action_gig"),
+				tgbotapi.NewInlineKeyboardButtonData("⏱ Track", "action_track"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Clients", "action_clients"),
-				tgbotapi.NewInlineKeyboardButtonData("Contracts", "action_contracts"),
+				tgbotapi.NewInlineKeyboardButtonData("📄 Invoice", "action_invoice"),
+				tgbotapi.NewInlineKeyboardButtonData("👤 Clients", "action_clients"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Dashboard", "action_reports"),
-				tgbotapi.NewInlineKeyboardButtonData("Expenses", "action_expenses"),
+				tgbotapi.NewInlineKeyboardButtonData("📝 Contracts", "action_contracts"),
+				tgbotapi.NewInlineKeyboardButtonData("💰 Expenses", "action_expenses"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Pomodoro", "action_pomodoro"),
-				tgbotapi.NewInlineKeyboardButtonData("Reports", "report_weekly"),
+				tgbotapi.NewInlineKeyboardButtonData("📊 Dashboard", "action_reports"),
+				tgbotapi.NewInlineKeyboardButtonData("📈 Reports", "report_weekly"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Goals", "goal_status"),
+				tgbotapi.NewInlineKeyboardButtonData("🍅 Pomodoro", "action_pomodoro"),
 				tgbotapi.NewInlineKeyboardButtonData("🎯 Hunter", "action_hunter"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Search", "action_search"),
-				tgbotapi.NewInlineKeyboardButtonData("Settings", "action_settings"),
+				tgbotapi.NewInlineKeyboardButtonData("🎯 Goals", "goal_status"),
+				tgbotapi.NewInlineKeyboardButtonData("🔍 Search", "action_search"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "action_settings"),
 			),
 		)
 		msg.ReplyMarkup = keyboard
@@ -699,6 +713,72 @@ func handleCallback(
 		if len(parts) == 3 {
 			jobID, _ := strconv.Atoi(parts[2])
 			return hunterHandler.HandleApply(callbackQuery, uint(jobID))
+		}
+	}
+
+	// Gig callbacks
+	if data == "action_gig" {
+		msg := &tgbotapi.Message{
+			Chat: callbackQuery.Message.Chat,
+			From: callbackQuery.From,
+		}
+		callback := tgbotapi.NewCallback(callbackQuery.ID, "")
+		bot.Request(callback)
+		return gigHandler.HandleMenu(msg)
+	}
+
+	if data == "gig_create" {
+		return gigHandler.HandleCreate(callbackQuery)
+	}
+
+	if data == "gig_list" {
+		return gigHandler.HandleList(callbackQuery)
+	}
+
+	if strings.HasPrefix(data, "gig_filter_") {
+		status := strings.TrimPrefix(data, "gig_filter_")
+		return gigHandler.HandleFilter(callbackQuery, status)
+	}
+
+	if strings.HasPrefix(data, "gig_view_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 3 {
+			gigID, _ := strconv.Atoi(parts[2])
+			return gigHandler.HandleView(callbackQuery, uint(gigID))
+		}
+	}
+
+	if strings.HasPrefix(data, "gig_move_") {
+		// gig_move_123_active
+		parts := strings.Split(data, "_")
+		if len(parts) == 4 {
+			gigID, _ := strconv.Atoi(parts[2])
+			status := parts[3]
+			return gigHandler.HandleMove(callbackQuery, uint(gigID), status)
+		}
+	}
+
+	if strings.HasPrefix(data, "gig_delete_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 3 {
+			gigID, _ := strconv.Atoi(parts[2])
+			return gigHandler.HandleDelete(callbackQuery, uint(gigID))
+		}
+	}
+
+	if strings.HasPrefix(data, "gig_task_add_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 4 {
+			gigID, _ := strconv.Atoi(parts[3])
+			return gigHandler.HandleTaskAdd(callbackQuery, uint(gigID))
+		}
+	}
+
+	if strings.HasPrefix(data, "gig_task_toggle_") {
+		parts := strings.Split(data, "_")
+		if len(parts) == 4 {
+			taskID, _ := strconv.Atoi(parts[3])
+			return gigHandler.HandleTaskToggle(callbackQuery, uint(taskID))
 		}
 	}
 

@@ -44,6 +44,10 @@ struct HunterContent: View {
         .onAppear {
             Task {
                 await hunterState.loadData(appState: appState)
+                // Auto-prompt CV import if no profile
+                if hunterState.profile == nil || hunterState.profile?.skillsList.isEmpty == true {
+                    showImportCV = true
+                }
             }
         }
         .sheet(isPresented: $showImportCV) {
@@ -161,18 +165,13 @@ struct HunterContent: View {
     }
 
     private var noProfileBanner: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "person.crop.circle.badge.exclamationmark")
-                .font(.system(size: 32))
+        HStack(spacing: 12) {
+            Image(systemName: "doc.badge.plus")
+                .font(.system(size: 20))
                 .foregroundColor(.orange)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Set up your profile first")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Import your CV/Resume to start hunting for matching jobs")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-            }
+            Text("Upload CV to find matching jobs")
+                .font(.system(size: 14))
 
             Spacer()
 
@@ -180,34 +179,30 @@ struct HunterContent: View {
                 showImportCV = true
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.small)
         }
-        .padding(16)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.orange.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-                )
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.orange.opacity(0.08))
         )
     }
 
     private var emptyJobsState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             Image(systemName: "briefcase")
-                .font(.system(size: 48))
+                .font(.system(size: 36))
                 .foregroundColor(.secondary)
 
-            Text("No jobs found yet")
-                .font(.system(size: 18, weight: .semibold))
+            Text("No jobs yet")
+                .font(.system(size: 16, weight: .medium))
 
-            Text("Click \"Hunt Jobs\" to scrape job boards for matching opportunities")
-                .font(.system(size: 14))
+            Text("Click Hunt Jobs to start")
+                .font(.system(size: 13))
                 .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(40)
+        .padding(32)
     }
 
     private var jobsFilterBar: some View {
@@ -329,20 +324,20 @@ struct HunterContent: View {
     }
 
     private var emptyApplicationsState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             Image(systemName: "paperplane")
-                .font(.system(size: 48))
+                .font(.system(size: 36))
                 .foregroundColor(.secondary)
 
             Text("No applications yet")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 16, weight: .medium))
 
-            Text("Apply to jobs and track your progress here")
-                .font(.system(size: 14))
+            Text("Apply to jobs to track progress")
+                .font(.system(size: 13))
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(40)
+        .padding(32)
     }
 
     private var applicationsStats: some View {
@@ -471,36 +466,25 @@ struct HunterContent: View {
     }
 
     private var noProfileState: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 16) {
             Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 64))
+                .font(.system(size: 48))
                 .foregroundColor(.accentColor)
 
-            VStack(spacing: 8) {
-                Text("Create Your Profile")
-                    .font(.system(size: 22, weight: .bold))
-                Text("Import your CV/Resume to automatically extract your skills and experience")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
+            Text("No profile yet")
+                .font(.system(size: 18, weight: .semibold))
 
-            Button(action: { showImportCV = true }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "doc.badge.plus")
-                    Text("Import CV/Resume")
-                }
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(Color.accentColor)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+            Text("Import your CV to extract skills")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+
+            Button("Import CV") {
+                showImportCV = true
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity)
-        .padding(40)
+        .padding(32)
     }
 
     // MARK: - Helpers
@@ -777,60 +761,48 @@ struct ImportCVSheet: View {
     var autoHuntAfterImport: Bool = true
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text(importComplete ? "Profile Created!" : "Import CV/Resume")
-                .font(.system(size: 20, weight: .bold))
-
+        VStack(spacing: 20) {
             if importComplete {
-                // Show imported profile summary
-                VStack(spacing: 16) {
+                // Success state
+                VStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 48))
+                        .font(.system(size: 40))
                         .foregroundColor(.green)
 
+                    Text("Done!")
+                        .font(.system(size: 18, weight: .semibold))
+
                     if let profile = hunterState.profile {
-                        VStack(spacing: 8) {
-                            Text(profile.name)
-                                .font(.system(size: 18, weight: .semibold))
-                            if let title = profile.title {
-                                Text(title)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.secondary)
-                            }
-                            if !profile.skillsList.isEmpty {
-                                Text("Skills: \(profile.skillsList.prefix(5).joined(separator: ", "))")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
+                        Text("\(profile.skillsList.count) skills extracted")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
                     }
 
                     if autoHuntAfterImport {
-                        Text("Starting job hunt...")
-                            .font(.system(size: 14))
-                            .foregroundColor(.secondary)
-
-                        ProgressView()
-                            .scaleEffect(0.8)
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            Text("Hunting jobs...")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(24)
+                .padding(20)
             } else {
-                VStack(spacing: 16) {
+                // Upload state
+                Text("Import CV")
+                    .font(.system(size: 18, weight: .semibold))
+
+                VStack(spacing: 12) {
                     Image(systemName: "doc.badge.plus")
-                        .font(.system(size: 48))
+                        .font(.system(size: 36))
                         .foregroundColor(.accentColor)
 
-                    Text("Select a PDF file to import your skills")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
-
-                    Button("Choose File...") {
+                    Button("Choose PDF...") {
                         let panel = NSOpenPanel()
                         panel.allowedContentTypes = [.pdf]
                         panel.allowsMultipleSelection = false
-
                         if panel.runModal() == .OK {
                             selectedFileURL = panel.url
                         }
@@ -838,34 +810,33 @@ struct ImportCVSheet: View {
                     .buttonStyle(.bordered)
 
                     if let url = selectedFileURL {
-                        Text("Selected: \(url.lastPathComponent)")
-                            .font(.system(size: 13))
+                        Text(url.lastPathComponent)
+                            .font(.system(size: 12))
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
 
                     if let error = errorMessage {
                         Text(error)
-                            .font(.system(size: 13))
+                            .font(.system(size: 12))
                             .foregroundColor(.red)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(24)
+                .padding(20)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(style: StrokeStyle(lineWidth: 1, dash: [6]))
                         .foregroundColor(.gray.opacity(0.3))
                 )
 
                 HStack {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .buttonStyle(.bordered)
+                    Button("Cancel") { dismiss() }
+                        .buttonStyle(.bordered)
 
                     Spacer()
 
-                    Button(isImporting ? "Importing..." : "Import & Hunt") {
+                    Button(isImporting ? "Importing..." : "Import") {
                         guard let url = selectedFileURL else { return }
                         isImporting = true
                         errorMessage = nil
@@ -876,8 +847,7 @@ struct ImportCVSheet: View {
                                 importComplete = true
 
                                 if autoHuntAfterImport {
-                                    // Small delay to show success state
-                                    try? await Task.sleep(nanoseconds: 500_000_000)
+                                    try? await Task.sleep(nanoseconds: 400_000_000)
                                     await hunterState.hunt(appState: appState)
                                     dismiss()
                                 }
@@ -892,8 +862,8 @@ struct ImportCVSheet: View {
                 }
             }
         }
-        .padding(24)
-        .frame(width: 450)
+        .padding(20)
+        .frame(width: 360)
     }
 }
 

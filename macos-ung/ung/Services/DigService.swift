@@ -109,11 +109,19 @@ enum DigRecommendation: String, Codable {
 }
 
 enum DigPerspective: String, Codable, CaseIterable {
+    // Core perspectives
     case firstPrinciples = "first_principles"
     case designer
     case marketing
     case technical
     case financial
+
+    // Harsh/Critical perspectives
+    case devilsAdvocate = "devils_advocate"
+    case copycat
+    case userPsychology = "user_psychology"
+    case scalability
+    case worstCase = "worst_case"
 
     var displayName: String {
         switch self {
@@ -122,6 +130,11 @@ enum DigPerspective: String, Codable, CaseIterable {
         case .marketing: return "Marketing"
         case .technical: return "Technical"
         case .financial: return "Financial"
+        case .devilsAdvocate: return "Devil's Advocate"
+        case .copycat: return "Copycat Analysis"
+        case .userPsychology: return "User Psychology"
+        case .scalability: return "Scalability"
+        case .worstCase: return "Worst Case"
         }
     }
 
@@ -132,6 +145,11 @@ enum DigPerspective: String, Codable, CaseIterable {
         case .marketing: return "megaphone.fill"
         case .technical: return "gearshape.2.fill"
         case .financial: return "chart.line.uptrend.xyaxis"
+        case .devilsAdvocate: return "exclamationmark.triangle.fill"
+        case .copycat: return "doc.on.doc.fill"
+        case .userPsychology: return "brain"
+        case .scalability: return "arrow.up.right.and.arrow.down.left.rectangle"
+        case .worstCase: return "bolt.trianglebadge.exclamationmark.fill"
         }
     }
 
@@ -142,7 +160,29 @@ enum DigPerspective: String, Codable, CaseIterable {
         case .marketing: return .orange
         case .technical: return .blue
         case .financial: return .green
+        case .devilsAdvocate: return .red
+        case .copycat: return .gray
+        case .userPsychology: return .cyan
+        case .scalability: return .indigo
+        case .worstCase: return .red
         }
+    }
+
+    var isHarsh: Bool {
+        switch self {
+        case .devilsAdvocate, .copycat, .userPsychology, .scalability, .worstCase:
+            return true
+        default:
+            return false
+        }
+    }
+
+    static var corePerspectives: [DigPerspective] {
+        [.firstPrinciples, .designer, .marketing, .technical, .financial]
+    }
+
+    static var harshPerspectives: [DigPerspective] {
+        [.devilsAdvocate, .copycat, .userPsychology, .scalability, .worstCase]
     }
 }
 

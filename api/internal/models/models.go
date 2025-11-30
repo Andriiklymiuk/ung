@@ -457,11 +457,19 @@ const (
 type DigPerspective string
 
 const (
+	// Core perspectives (always run)
 	DigPerspectiveFirstPrinciples DigPerspective = "first_principles"
 	DigPerspectiveDesigner        DigPerspective = "designer"
 	DigPerspectiveMarketing       DigPerspective = "marketing"
 	DigPerspectiveTechnical       DigPerspective = "technical"
 	DigPerspectiveFinancial       DigPerspective = "financial"
+
+	// Harsh/Critical perspectives (run for deeper analysis)
+	DigPerspectiveDevilsAdvocate DigPerspective = "devils_advocate"
+	DigPerspectiveCopycat        DigPerspective = "copycat"
+	DigPerspectiveUserPsychology DigPerspective = "user_psychology"
+	DigPerspectiveScalability    DigPerspective = "scalability"
+	DigPerspectiveWorstCase      DigPerspective = "worst_case"
 )
 
 // DigSession represents an idea analysis session

@@ -1368,21 +1368,21 @@ type HunterProfile struct {
 
 // HunterJob represents a scraped job
 type HunterJob struct {
-	ID          uint    `json:"id"`
-	Source      string  `json:"source"`
-	SourceURL   string  `json:"source_url"`
-	Title       string  `json:"title"`
-	Company     string  `json:"company"`
-	Description string  `json:"description"`
+	ID          uint     `json:"id"`
+	Source      string   `json:"source"`
+	SourceURL   string   `json:"source_url"`
+	Title       string   `json:"title"`
+	Company     string   `json:"company"`
+	Description string   `json:"description"`
 	Skills      []string `json:"skills"`
-	RateMin     float64 `json:"rate_min"`
-	RateMax     float64 `json:"rate_max"`
-	RateType    string  `json:"rate_type"`
-	Currency    string  `json:"currency"`
-	Remote      bool    `json:"remote"`
-	Location    string  `json:"location"`
-	MatchScore  float64 `json:"match_score"`
-	PostedAt    string  `json:"posted_at"`
+	RateMin     float64  `json:"rate_min"`
+	RateMax     float64  `json:"rate_max"`
+	RateType    string   `json:"rate_type"`
+	Currency    string   `json:"currency"`
+	Remote      bool     `json:"remote"`
+	Location    string   `json:"location"`
+	MatchScore  float64  `json:"match_score"`
+	PostedAt    string   `json:"posted_at"`
 }
 
 // HunterApplication represents a job application
@@ -1767,6 +1767,7 @@ type Gig struct {
 	TotalInvoiced     float64  `json:"total_invoiced"`
 	Description       string   `json:"description"`
 	Notes             string   `json:"notes"`
+	Project           string   `json:"project"`
 }
 
 // GigTask represents a task within a gig
@@ -1784,6 +1785,7 @@ type GigCreateRequest struct {
 	ClientID *uint  `json:"client_id,omitempty"`
 	Status   string `json:"status"`
 	GigType  string `json:"gig_type"`
+	Project  string `json:"project,omitempty"`
 }
 
 // ListGigs fetches all gigs

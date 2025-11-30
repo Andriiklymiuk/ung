@@ -153,6 +153,7 @@ export class GigPanel {
       status: string;
       hours: number;
       type: string;
+      project: string;
     }>
   > {
     const result = await this._cli.listGigs();
@@ -170,8 +171,10 @@ export class GigPanel {
       status: string;
       hours: number;
       type: string;
+      project: string;
     }> = [];
 
+    // CLI columns: ID, NAME, CLIENT, PROJECT, STATUS, HOURS
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line || line.startsWith('--')) continue;
@@ -184,9 +187,10 @@ export class GigPanel {
             id,
             name: parts[1] || '',
             client: parts[2] || '-',
-            status: parts[3] || 'todo',
-            hours: parseFloat(parts[4]) || 0,
-            type: parts[5] || 'hourly',
+            project: parts[3] || '-',
+            status: parts[4] || 'todo',
+            hours: parseFloat(parts[5]) || 0,
+            type: 'hourly',
           });
         }
       }
@@ -204,6 +208,7 @@ export class GigPanel {
       status: string;
       hours: number;
       type: string;
+      project: string;
     }>
   ): string {
     // Simplified 4-column workflow: todo → in_progress → sent → done
@@ -384,6 +389,16 @@ export class GigPanel {
     .card-client {
       font-size: 12px;
       color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .card-project {
+      font-size: 11px;
+      color: var(--accent);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
       margin-bottom: 8px;
     }
 
@@ -603,6 +618,7 @@ export class GigPanel {
                  ondragend="handleDragEnd(event)">
               <div class="card-name">${escapeHtml(gig.name)}</div>
               <div class="card-client">${escapeHtml(gig.client === '-' ? 'No client' : gig.client)}</div>
+              ${gig.project && gig.project !== '-' ? `<div class="card-project">📁 ${escapeHtml(gig.project)}</div>` : ''}
               <div class="card-meta">
                 <span class="card-hours">⏱ ${gig.hours.toFixed(1)}h</span>
                 <span class="card-type">${gig.type}</span>

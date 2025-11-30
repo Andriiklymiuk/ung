@@ -78,6 +78,7 @@ interface RecentGig {
   id: number;
   name: string;
   client: string;
+  project: string;
   status: string;
   hours: number;
   type: string;
@@ -688,6 +689,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
     const gigs: RecentGig[] = [];
     // Skip header line, get up to 5 most recent
+    // CLI columns: ID, NAME, CLIENT, PROJECT, STATUS, HOURS
     for (let i = 1; i < lines.length && gigs.length < 5; i++) {
       const parts = lines[i]
         .split(/\s{2,}/)
@@ -700,9 +702,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
             id,
             name: parts[1] || 'Unnamed Gig',
             client: parts[2] || '-',
-            status: (parts[3] || 'pipeline').toLowerCase().replace(' ', '_'),
-            hours: parseFloat(parts[4]) || 0,
-            type: parts[5] || 'hourly',
+            project: parts[3] || '-',
+            status: (parts[4] || 'todo').toLowerCase().replace(' ', '_'),
+            hours: parseFloat(parts[5]) || 0,
+            type: 'hourly',
           });
         }
       }
@@ -2170,17 +2173,25 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       .map((g) => {
         const statusKey = g.status.toLowerCase().replace(' ', '_');
         const statusConfig =
-          GIG_STATUS_CONFIG[statusKey] || GIG_STATUS_CONFIG.pipeline;
+          GIG_STATUS_CONFIG[statusKey] || GIG_STATUS_CONFIG.todo;
         const hoursDisplay = this._secureMode
           ? '**h'
           : `${g.hours.toFixed(1)}h`;
         const clientDisplay = g.client && g.client !== '-' ? g.client : '';
+        const projectDisplay = g.project && g.project !== '-' ? g.project : '';
+        const metaParts = [
+          clientDisplay,
+          projectDisplay,
+          `${hoursDisplay} tracked`,
+        ]
+          .filter((p) => p)
+          .join(' • ');
 
         return `
             <div class="recent-item gig-item" data-gig-id="${g.id}">
                 <div class="recent-item-content" data-command="viewGig" data-gig-id="${g.id}">
                     <div class="recent-item-title">${g.name}</div>
-                    <div class="recent-item-subtitle">${clientDisplay}${clientDisplay ? ' • ' : ''}${hoursDisplay} tracked</div>
+                    <div class="recent-item-subtitle">${metaParts}</div>
                 </div>
                 <div class="gig-actions">
                     <button class="gig-action-btn move" data-command="moveGig" data-gig-id="${g.id}" title="Move to status">

@@ -16,7 +16,7 @@ import (
 var gigCmd = &cobra.Command{
 	Use:   "gig",
 	Short: "Manage your gigs (kanban board)",
-	Long:  "Create, view, and manage gigs through a workflow: pipeline → negotiating → active → delivered → invoiced → complete",
+	Long:  "Create, view, and manage gigs through a workflow: todo → in_progress → sent → done",
 }
 
 var gigListCmd = &cobra.Command{
@@ -36,12 +36,10 @@ var gigMoveCmd = &cobra.Command{
 	Use:   "move <gig-id> <status>",
 	Short: "Move a gig to a different status",
 	Long: `Move a gig through the workflow. Available statuses:
-  - pipeline     (potential work)
-  - negotiating  (in discussion)
-  - active       (currently working)
-  - delivered    (work done, awaiting approval)
-  - invoiced     (invoice sent)
-  - complete     (paid and done)
+  - todo         (queued, not started)
+  - in_progress  (actively working)
+  - sent         (delivered, awaiting payment)
+  - done         (completed & paid)
   - on_hold      (paused)
   - cancelled    (cancelled)`,
 	Args: cobra.ExactArgs(2),
@@ -95,6 +93,7 @@ var (
 	gigStatus   string
 	gigType     string
 	gigRate     float64
+	gigProject  string
 )
 
 func init() {
@@ -115,12 +114,14 @@ func init() {
 
 	// Flags for add
 	gigAddCmd.Flags().IntVarP(&gigClientID, "client", "c", 0, "Client ID")
-	gigAddCmd.Flags().StringVarP(&gigStatus, "status", "s", "pipeline", "Initial status")
+	gigAddCmd.Flags().StringVarP(&gigStatus, "status", "s", "todo", "Initial status: todo, in_progress, sent, done")
 	gigAddCmd.Flags().StringVarP(&gigType, "type", "t", "hourly", "Gig type: hourly, fixed, retainer")
 	gigAddCmd.Flags().Float64VarP(&gigRate, "rate", "r", 0, "Hourly rate")
+	gigAddCmd.Flags().StringVarP(&gigProject, "project", "p", "", "Project name (optional grouping)")
 
 	// Flags for list
 	gigListCmd.Flags().StringVarP(&gigStatus, "status", "s", "", "Filter by status")
+	gigListCmd.Flags().StringVarP(&gigProject, "project", "p", "", "Filter by project")
 }
 
 func runGigList(cmd *cobra.Command, args []string) error {
@@ -131,14 +132,12 @@ func runGigList(cmd *cobra.Command, args []string) error {
 
 	statusStyle := func(status models.GigStatus) lipgloss.Style {
 		colors := map[models.GigStatus]string{
-			models.GigStatusPipeline:    "#888888",
-			models.GigStatusNegotiating: "#9966FF",
-			models.GigStatusActive:      "#3366FF",
-			models.GigStatusDelivered:   "#FF9933",
-			models.GigStatusInvoiced:    "#33CCFF",
-			models.GigStatusComplete:    "#22CC55",
-			models.GigStatusOnHold:      "#FFCC00",
-			models.GigStatusCancelled:   "#FF3333",
+			models.GigStatusTodo:       "#888888",
+			models.GigStatusInProgress: "#3366FF",
+			models.GigStatusSent:       "#FF9933",
+			models.GigStatusDone:       "#22CC55",
+			models.GigStatusOnHold:     "#FFCC00",
+			models.GigStatusCancelled:  "#FF3333",
 		}
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(colors[status]))
 	}
@@ -148,6 +147,10 @@ func runGigList(cmd *cobra.Command, args []string) error {
 
 	if gigStatus != "" {
 		query = query.Where("status = ?", gigStatus)
+	}
+
+	if gigProject != "" {
+		query = query.Where("project = ?", gigProject)
 	}
 
 	if err := query.Order("priority DESC, updated_at DESC").Find(&gigs).Error; err != nil {
@@ -164,13 +167,18 @@ func runGigList(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tCLIENT\tSTATUS\tHOURS\tTYPE")
-	fmt.Fprintln(w, "--\t----\t------\t------\t-----\t----")
+	fmt.Fprintln(w, "ID\tNAME\tCLIENT\tPROJECT\tSTATUS\tHOURS")
+	fmt.Fprintln(w, "--\t----\t------\t-------\t------\t-----")
 
 	for _, gig := range gigs {
 		clientName := "-"
 		if gig.Client != nil {
 			clientName = gig.Client.Name
+		}
+
+		projectName := "-"
+		if gig.Project != "" {
+			projectName = gig.Project
 		}
 
 		status := statusStyle(gig.Status).Render(string(gig.Status))
@@ -179,10 +187,10 @@ func runGigList(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
 			gig.ID,
 			truncate(gig.Name, 25),
-			truncate(clientName, 15),
+			truncate(clientName, 12),
+			truncate(projectName, 12),
 			status,
 			hours,
-			gig.GigType,
 		)
 	}
 
@@ -197,12 +205,10 @@ func runGigList(cmd *cobra.Command, args []string) error {
 	}
 
 	statuses := []models.GigStatus{
-		models.GigStatusPipeline,
-		models.GigStatusNegotiating,
-		models.GigStatusActive,
-		models.GigStatusDelivered,
-		models.GigStatusInvoiced,
-		models.GigStatusComplete,
+		models.GigStatusTodo,
+		models.GigStatusInProgress,
+		models.GigStatusSent,
+		models.GigStatusDone,
 	}
 
 	var parts []string
@@ -224,6 +230,7 @@ func runGigAdd(cmd *cobra.Command, args []string) error {
 		Name:    name,
 		Status:  models.GigStatus(gigStatus),
 		GigType: models.GigType(gigType),
+		Project: gigProject,
 	}
 
 	if gigClientID > 0 {
@@ -240,7 +247,11 @@ func runGigAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#22CC55"))
-	fmt.Printf("%s Created gig #%d: %s\n", successStyle.Render("✓"), gig.ID, gig.Name)
+	projectInfo := ""
+	if gig.Project != "" {
+		projectInfo = fmt.Sprintf(" [%s]", gig.Project)
+	}
+	fmt.Printf("%s Created gig #%d: %s%s\n", successStyle.Render("✓"), gig.ID, gig.Name, projectInfo)
 
 	return nil
 }
@@ -255,12 +266,10 @@ func runGigMove(cmd *cobra.Command, args []string) error {
 
 	// Validate status
 	validStatuses := []models.GigStatus{
-		models.GigStatusPipeline,
-		models.GigStatusNegotiating,
-		models.GigStatusActive,
-		models.GigStatusDelivered,
-		models.GigStatusInvoiced,
-		models.GigStatusComplete,
+		models.GigStatusTodo,
+		models.GigStatusInProgress,
+		models.GigStatusSent,
+		models.GigStatusDone,
 		models.GigStatusOnHold,
 		models.GigStatusCancelled,
 	}
@@ -274,7 +283,7 @@ func runGigMove(cmd *cobra.Command, args []string) error {
 	}
 
 	if !valid {
-		return fmt.Errorf("invalid status: %s", newStatus)
+		return fmt.Errorf("invalid status: %s. Use: todo, in_progress, sent, done, on_hold, cancelled", newStatus)
 	}
 
 	var gig models.Gig
@@ -344,6 +353,9 @@ func runGigShow(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("  %s %s\n", labelStyle.Render("Status:"), valueStyle.Render(string(gig.Status)))
 	fmt.Printf("  %s %s\n", labelStyle.Render("Client:"), clientName)
+	if gig.Project != "" {
+		fmt.Printf("  %s %s\n", labelStyle.Render("Project:"), gig.Project)
+	}
 	fmt.Printf("  %s %s\n", labelStyle.Render("Type:"), string(gig.GigType))
 	fmt.Printf("  %s %.1f hours\n", labelStyle.Render("Tracked:"), gig.TotalHoursTracked)
 

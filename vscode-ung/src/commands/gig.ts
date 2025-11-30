@@ -3,41 +3,30 @@ import type { UngCli } from '../cli/ungCli';
 
 /**
  * Gig status configuration
+ * Simplified flow: todo → in_progress → sent → done
  */
 const GIG_STATUSES = [
   {
-    value: 'pipeline',
-    label: 'Pipeline',
+    value: 'todo',
+    label: 'Todo',
     icon: 'circle-outline',
     color: 'charts.gray',
   },
   {
-    value: 'negotiating',
-    label: 'Negotiating',
-    icon: 'comment-discussion',
-    color: 'charts.purple',
-  },
-  {
-    value: 'active',
-    label: 'Active',
+    value: 'in_progress',
+    label: 'In Progress',
     icon: 'play-circle',
     color: 'charts.blue',
   },
   {
-    value: 'delivered',
-    label: 'Delivered',
+    value: 'sent',
+    label: 'Sent',
     icon: 'package',
     color: 'charts.orange',
   },
   {
-    value: 'invoiced',
-    label: 'Invoiced',
-    icon: 'file-text',
-    color: 'charts.cyan',
-  },
-  {
-    value: 'complete',
-    label: 'Complete',
+    value: 'done',
+    label: 'Done',
     icon: 'pass-filled',
     color: 'charts.green',
   },
@@ -284,7 +273,7 @@ export class GigCommands {
     }
 
     vscode.window.showInformationMessage(
-      'Edit gig functionality coming soon. Use CLI: ung gig show ' + gigId
+      `Edit gig functionality coming soon. Use CLI: ung gig show ${gigId}`
     );
   }
 

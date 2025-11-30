@@ -184,7 +184,7 @@ export class GigPanel {
             id,
             name: parts[1] || '',
             client: parts[2] || '-',
-            status: parts[3] || 'pipeline',
+            status: parts[3] || 'todo',
             hours: parseFloat(parts[4]) || 0,
             type: parts[5] || 'hourly',
           });
@@ -206,18 +206,17 @@ export class GigPanel {
       type: string;
     }>
   ): string {
+    // Simplified 4-column workflow: todo → in_progress → sent → done
     const columns = [
-      { key: 'pipeline', label: 'Pipeline', icon: '📋', color: '#6b7280' },
+      { key: 'todo', label: 'Todo', icon: '📋', color: '#6b7280' },
       {
-        key: 'negotiating',
-        label: 'Negotiating',
-        icon: '💬',
-        color: '#a855f7',
+        key: 'in_progress',
+        label: 'In Progress',
+        icon: '🚀',
+        color: '#3b82f6',
       },
-      { key: 'active', label: 'Active', icon: '🚀', color: '#3b82f6' },
-      { key: 'delivered', label: 'Delivered', icon: '📦', color: '#f97316' },
-      { key: 'invoiced', label: 'Invoiced', icon: '💵', color: '#06b6d4' },
-      { key: 'complete', label: 'Complete', icon: '✅', color: '#22c55e' },
+      { key: 'sent', label: 'Sent', icon: '📦', color: '#f97316' },
+      { key: 'done', label: 'Done', icon: '✅', color: '#22c55e' },
     ];
 
     return `<!DOCTYPE html>
@@ -723,7 +722,7 @@ export class GigPanel {
     }
 
     function showMoveMenu(gigId) {
-      const statuses = ['pipeline', 'negotiating', 'active', 'delivered', 'invoiced', 'complete'];
+      const statuses = ['todo', 'in_progress', 'sent', 'done'];
       const status = prompt('Move to: ' + statuses.join(', '));
       if (status && statuses.includes(status)) {
         vscode.postMessage({

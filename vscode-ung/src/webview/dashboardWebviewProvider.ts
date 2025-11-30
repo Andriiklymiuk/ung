@@ -85,38 +85,29 @@ interface RecentGig {
 
 /**
  * Gig status configuration for display
+ * Simplified flow: todo → in_progress → sent → done
  */
 const GIG_STATUS_CONFIG: Record<
   string,
   { label: string; color: string; bgColor: string }
 > = {
-  pipeline: {
-    label: 'Pipeline',
+  todo: {
+    label: 'Todo',
     color: '#808080',
     bgColor: 'rgba(128, 128, 128, 0.15)',
   },
-  negotiating: {
-    label: 'Negotiating',
-    color: '#8C59B2',
-    bgColor: 'rgba(140, 89, 178, 0.15)',
-  },
-  active: {
-    label: 'Active',
+  in_progress: {
+    label: 'In Progress',
     color: '#3373E8',
     bgColor: 'rgba(51, 115, 232, 0.15)',
   },
-  delivered: {
-    label: 'Delivered',
+  sent: {
+    label: 'Sent',
     color: '#F29932',
     bgColor: 'rgba(242, 153, 50, 0.15)',
   },
-  invoiced: {
-    label: 'Invoiced',
-    color: '#00BCD4',
-    bgColor: 'rgba(0, 188, 212, 0.15)',
-  },
-  complete: {
-    label: 'Complete',
+  done: {
+    label: 'Done',
     color: '#33A756',
     bgColor: 'rgba(51, 167, 86, 0.15)',
   },

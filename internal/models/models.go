@@ -107,10 +107,10 @@ type InvoiceLineItem struct {
 	Quantity    float64   `gorm:"not null;default:1" json:"quantity"`
 	Rate        float64   `gorm:"not null" json:"rate"`
 	Amount      float64   `gorm:"not null" json:"amount"`
-	Discount    float64   `gorm:"default:0" json:"discount"`       // Discount amount for this line item
-	DiscountPct float64   `gorm:"default:0" json:"discount_pct"`   // Discount percentage (0-100)
-	TaxRate     float64   `gorm:"default:0" json:"tax_rate"`       // Tax rate for this item (0-1)
-	TaxAmount   float64   `gorm:"default:0" json:"tax_amount"`     // Calculated tax amount
+	Discount    float64   `gorm:"default:0" json:"discount"`     // Discount amount for this line item
+	DiscountPct float64   `gorm:"default:0" json:"discount_pct"` // Discount percentage (0-100)
+	TaxRate     float64   `gorm:"default:0" json:"tax_rate"`     // Tax rate for this item (0-1)
+	TaxAmount   float64   `gorm:"default:0" json:"tax_amount"`   // Calculated tax amount
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -124,8 +124,8 @@ type TrackingSession struct {
 	ProjectName string         `json:"project_name"`
 	StartTime   time.Time      `gorm:"not null" json:"start_time"`
 	EndTime     *time.Time     `json:"end_time"`
-	Duration    *int           `json:"duration"`       // in seconds
-	Hours       *float64       `json:"hours"`          // calculated hours for easier display
+	Duration    *int           `json:"duration"` // in seconds
+	Hours       *float64       `json:"hours"`    // calculated hours for easier display
 	Billable    bool           `gorm:"default:true" json:"billable"`
 	Notes       string         `json:"notes"`
 	CreatedAt   time.Time      `json:"created_at"`
@@ -137,14 +137,14 @@ type TrackingSession struct {
 type ExpenseCategory string
 
 const (
-	ExpenseCategorySoftware      ExpenseCategory = "software"
-	ExpenseCategoryHardware      ExpenseCategory = "hardware"
-	ExpenseCategoryTravel        ExpenseCategory = "travel"
-	ExpenseCategoryMeals         ExpenseCategory = "meals"
+	ExpenseCategorySoftware       ExpenseCategory = "software"
+	ExpenseCategoryHardware       ExpenseCategory = "hardware"
+	ExpenseCategoryTravel         ExpenseCategory = "travel"
+	ExpenseCategoryMeals          ExpenseCategory = "meals"
 	ExpenseCategoryOfficeSupplies ExpenseCategory = "office_supplies"
-	ExpenseCategoryUtilities     ExpenseCategory = "utilities"
-	ExpenseCategoryMarketing     ExpenseCategory = "marketing"
-	ExpenseCategoryOther         ExpenseCategory = "other"
+	ExpenseCategoryUtilities      ExpenseCategory = "utilities"
+	ExpenseCategoryMarketing      ExpenseCategory = "marketing"
+	ExpenseCategoryOther          ExpenseCategory = "other"
 )
 
 // Expense represents a business expense
@@ -184,16 +184,16 @@ type RecurringInvoice struct {
 	Currency           string             `gorm:"default:USD" json:"currency"`
 	Description        string             `json:"description"`
 	Frequency          RecurringFrequency `gorm:"not null" json:"frequency"`
-	DayOfMonth         int                `gorm:"default:1" json:"day_of_month"`       // 1-28 for monthly
-	DayOfWeek          int                `gorm:"default:1" json:"day_of_week"`        // 1-7 for weekly (1=Monday)
+	DayOfMonth         int                `gorm:"default:1" json:"day_of_month"` // 1-28 for monthly
+	DayOfWeek          int                `gorm:"default:1" json:"day_of_week"`  // 1-7 for weekly (1=Monday)
 	NextGenerationDate time.Time          `json:"next_generation_date"`
 	LastGeneratedDate  *time.Time         `json:"last_generated_date"`
 	LastInvoiceID      *uint              `json:"last_invoice_id"`
 	Active             bool               `gorm:"default:true" json:"active"`
-	AutoSend           bool               `gorm:"default:false" json:"auto_send"`      // Auto-send email when generated
-	AutoPDF            bool               `gorm:"default:true" json:"auto_pdf"`        // Auto-generate PDF
-	EmailApp           string             `gorm:"column:email_app" json:"email_app"`   // apple, outlook, gmail
-	GeneratedCount     int                `gorm:"default:0" json:"generated_count"`    // How many invoices generated
+	AutoSend           bool               `gorm:"default:false" json:"auto_send"`    // Auto-send email when generated
+	AutoPDF            bool               `gorm:"default:true" json:"auto_pdf"`      // Auto-generate PDF
+	EmailApp           string             `gorm:"column:email_app" json:"email_app"` // apple, outlook, gmail
+	GeneratedCount     int                `gorm:"default:0" json:"generated_count"`  // How many invoices generated
 	Notes              string             `json:"notes"`
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
@@ -201,11 +201,11 @@ type RecurringInvoice struct {
 
 // UserSettings stores user preferences and dashboard settings
 type UserSettings struct {
-	ID                uint      `gorm:"primaryKey" json:"id"`
-	Key               string    `gorm:"uniqueIndex;not null" json:"key"`
-	Value             string    `gorm:"not null" json:"value"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Key       string    `gorm:"uniqueIndex;not null" json:"key"`
+	Value     string    `gorm:"not null" json:"value"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Settings keys
@@ -219,24 +219,24 @@ const (
 
 // Profile represents the user's professional profile extracted from CV/resume
 type Profile struct {
-	ID           uint      `gorm:"primaryKey" json:"id"`
-	Name         string    `json:"name"`
-	Title        string    `json:"title"`        // e.g., "Senior Go Developer"
-	Bio          string    `json:"bio"`          // Professional summary
-	Skills       string    `json:"skills"`       // JSON array of skills
-	Experience   int       `json:"experience"`   // Years of experience
-	Rate         float64   `json:"rate"`         // Desired hourly rate
-	Currency     string    `gorm:"default:USD" json:"currency"`
-	Location     string    `json:"location"`
-	Remote       bool      `gorm:"default:true" json:"remote"`
-	Languages    string    `json:"languages"`    // JSON array of languages
-	Education    string    `json:"education"`    // JSON array of education
-	Projects     string    `json:"projects"`     // JSON array of notable projects
-	Links        string    `json:"links"`        // JSON: github, linkedin, portfolio
-	PDFPath      string    `gorm:"column:pdf_path" json:"pdf_path"` // Original CV path
-	PDFContent   string    `json:"pdf_content"`  // Extracted text from PDF
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	Name       string    `json:"name"`
+	Title      string    `json:"title"`      // e.g., "Senior Go Developer"
+	Bio        string    `json:"bio"`        // Professional summary
+	Skills     string    `json:"skills"`     // JSON array of skills
+	Experience int       `json:"experience"` // Years of experience
+	Rate       float64   `json:"rate"`       // Desired hourly rate
+	Currency   string    `gorm:"default:USD" json:"currency"`
+	Location   string    `json:"location"`
+	Remote     bool      `gorm:"default:true" json:"remote"`
+	Languages  string    `json:"languages"`                       // JSON array of languages
+	Education  string    `json:"education"`                       // JSON array of education
+	Projects   string    `json:"projects"`                        // JSON array of notable projects
+	Links      string    `json:"links"`                           // JSON: github, linkedin, portfolio
+	PDFPath    string    `gorm:"column:pdf_path" json:"pdf_path"` // Original CV path
+	PDFContent string    `json:"pdf_content"`                     // Extracted text from PDF
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // JobSource represents where jobs are scraped from
@@ -259,26 +259,26 @@ const (
 
 // Job represents a scraped job posting
 type Job struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Source      JobSource `gorm:"not null" json:"source"`
-	SourceID    string    `json:"source_id"`    // External ID from source
-	SourceURL   string    `json:"source_url"`   // Link to original posting
-	Title       string    `gorm:"not null" json:"title"`
-	Company     string    `json:"company"`
-	Description string    `json:"description"`
-	Skills      string    `json:"skills"`       // JSON array of required skills
-	RateMin     float64   `json:"rate_min"`     // Minimum rate/salary
-	RateMax     float64   `json:"rate_max"`     // Maximum rate/salary
-	RateType    string    `json:"rate_type"`    // hourly, monthly, yearly
-	Currency    string    `gorm:"default:USD" json:"currency"`
-	Remote      bool      `gorm:"default:true" json:"remote"`
-	Location    string    `json:"location"`
-	JobType     string    `json:"job_type"`     // contract, fulltime, parttime
-	MatchScore  float64   `json:"match_score"`  // 0-100 match with profile
-	PostedAt    time.Time `json:"posted_at"`
+	ID          uint       `gorm:"primaryKey" json:"id"`
+	Source      JobSource  `gorm:"not null" json:"source"`
+	SourceID    string     `json:"source_id"`  // External ID from source
+	SourceURL   string     `json:"source_url"` // Link to original posting
+	Title       string     `gorm:"not null" json:"title"`
+	Company     string     `json:"company"`
+	Description string     `json:"description"`
+	Skills      string     `json:"skills"`    // JSON array of required skills
+	RateMin     float64    `json:"rate_min"`  // Minimum rate/salary
+	RateMax     float64    `json:"rate_max"`  // Maximum rate/salary
+	RateType    string     `json:"rate_type"` // hourly, monthly, yearly
+	Currency    string     `gorm:"default:USD" json:"currency"`
+	Remote      bool       `gorm:"default:true" json:"remote"`
+	Location    string     `json:"location"`
+	JobType     string     `json:"job_type"`    // contract, fulltime, parttime
+	MatchScore  float64    `json:"match_score"` // 0-100 match with profile
+	PostedAt    time.Time  `json:"posted_at"`
 	ExpiresAt   *time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // ApplicationStatus represents the status of a job application
@@ -297,20 +297,20 @@ const (
 
 // Application represents a job application
 type Application struct {
-	ID           uint              `gorm:"primaryKey" json:"id"`
-	JobID        uint              `gorm:"not null;index" json:"job_id"`
-	Job          Job               `gorm:"foreignKey:JobID" json:"-"`
-	ProfileID    uint              `gorm:"index" json:"profile_id"`
-	Profile      Profile           `gorm:"foreignKey:ProfileID" json:"-"`
-	Proposal     string            `json:"proposal"`     // Generated proposal text
-	ProposalPDF  string            `json:"proposal_pdf"` // Path to PDF proposal
-	CoverLetter  string            `json:"cover_letter"`
-	Status       ApplicationStatus `gorm:"default:draft" json:"status"`
-	Notes        string            `json:"notes"`
-	AppliedAt    *time.Time        `json:"applied_at"`
-	ResponseAt   *time.Time        `json:"response_at"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
+	ID          uint              `gorm:"primaryKey" json:"id"`
+	JobID       uint              `gorm:"not null;index" json:"job_id"`
+	Job         Job               `gorm:"foreignKey:JobID" json:"-"`
+	ProfileID   uint              `gorm:"index" json:"profile_id"`
+	Profile     Profile           `gorm:"foreignKey:ProfileID" json:"-"`
+	Proposal    string            `json:"proposal"`     // Generated proposal text
+	ProposalPDF string            `json:"proposal_pdf"` // Path to PDF proposal
+	CoverLetter string            `json:"cover_letter"`
+	Status      ApplicationStatus `gorm:"default:draft" json:"status"`
+	Notes       string            `json:"notes"`
+	AppliedAt   *time.Time        `json:"applied_at"`
+	ResponseAt  *time.Time        `json:"response_at"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // =====================================
@@ -318,17 +318,16 @@ type Application struct {
 // =====================================
 
 // GigStatus represents the workflow status of a gig
+// Simplified flow: todo → in_progress → sent → done
 type GigStatus string
 
 const (
-	GigStatusPipeline    GigStatus = "pipeline"    // Potential work (from hunter)
-	GigStatusNegotiating GigStatus = "negotiating" // In discussion
-	GigStatusActive      GigStatus = "active"      // Currently working
-	GigStatusDelivered   GigStatus = "delivered"   // Work done, awaiting approval
-	GigStatusInvoiced    GigStatus = "invoiced"    // Invoice sent
-	GigStatusComplete    GigStatus = "complete"    // Paid and done
-	GigStatusOnHold      GigStatus = "on_hold"     // Paused
-	GigStatusCancelled   GigStatus = "cancelled"   // Cancelled
+	GigStatusTodo       GigStatus = "todo"        // Queued, not started
+	GigStatusInProgress GigStatus = "in_progress" // Actively working
+	GigStatusSent       GigStatus = "sent"        // Delivered, awaiting payment
+	GigStatusDone       GigStatus = "done"        // Completed & paid
+	GigStatusOnHold     GigStatus = "on_hold"     // Paused
+	GigStatusCancelled  GigStatus = "cancelled"   // Cancelled
 )
 
 // GigType represents the type of work arrangement
@@ -359,9 +358,10 @@ type Gig struct {
 	Contract      *Contract `gorm:"foreignKey:ContractID" json:"-"`
 	ApplicationID *uint     `gorm:"index" json:"application_id"` // From hunter
 
-	Status   GigStatus `gorm:"not null;default:pipeline" json:"status"`
-	GigType  GigType   `gorm:"default:hourly" json:"gig_type"`
+	Status   GigStatus   `gorm:"not null;default:todo" json:"status"`
+	GigType  GigType     `gorm:"default:hourly" json:"gig_type"`
 	Priority GigPriority `gorm:"default:0" json:"priority"`
+	Project  string      `gorm:"index" json:"project"` // Optional project grouping
 
 	// Financial
 	EstimatedHours  *float64 `json:"estimated_hours"`
@@ -374,8 +374,8 @@ type Gig struct {
 	LastTrackedAt     *time.Time `json:"last_tracked_at"`
 
 	// Billing
-	TotalInvoiced   float64    `gorm:"default:0" json:"total_invoiced"`
-	LastInvoicedAt  *time.Time `json:"last_invoiced_at"`
+	TotalInvoiced  float64    `gorm:"default:0" json:"total_invoiced"`
+	LastInvoicedAt *time.Time `json:"last_invoiced_at"`
 
 	// Dates
 	StartDate   *time.Time `json:"start_date"`
@@ -450,18 +450,18 @@ const (
 
 // IncomeGoal represents an enhanced income/hours/client goal
 type IncomeGoal struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Amount      float64   `gorm:"not null" json:"amount"`
-	Period      string    `gorm:"not null" json:"period"` // monthly, quarterly, yearly
-	Year        int       `gorm:"not null" json:"year"`
-	Month       int       `json:"month"`   // for monthly goals
-	Quarter     int       `json:"quarter"` // for quarterly goals
-	Description string    `json:"description"`
-	GoalType    GoalType  `gorm:"default:income" json:"goal_type"`
+	ID          uint     `gorm:"primaryKey" json:"id"`
+	Amount      float64  `gorm:"not null" json:"amount"`
+	Period      string   `gorm:"not null" json:"period"` // monthly, quarterly, yearly
+	Year        int      `gorm:"not null" json:"year"`
+	Month       int      `json:"month"`   // for monthly goals
+	Quarter     int      `json:"quarter"` // for quarterly goals
+	Description string   `json:"description"`
+	GoalType    GoalType `gorm:"default:income" json:"goal_type"`
 
 	// For different goal types
-	TargetHours   *float64 `json:"target_hours"`   // hours goal
-	TargetClients *int     `json:"target_clients"` // clients goal
+	TargetHours    *float64 `json:"target_hours"`    // hours goal
+	TargetClients  *int     `json:"target_clients"`  // clients goal
 	SavingsPercent *float64 `json:"savings_percent"` // savings goal (e.g., 30%)
 
 	CreatedAt time.Time `json:"created_at"`

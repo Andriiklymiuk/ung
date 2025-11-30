@@ -83,9 +83,9 @@ struct WelcomeWalkthroughView: View {
     ),
   ]
 
-  // Balanced 4-page walkthrough - core features first, Dig as powerful bonus
+  // 6-page walkthrough covering all major features
   private let pages: [WalkthroughPage] = [
-    // Core workflow first - Time Tracking
+    // 1. Time Tracking + Goals
     WalkthroughPage(
       icon: "clock.badge.checkmark.fill",
       iconColors: [.blue, .purple],
@@ -94,11 +94,24 @@ struct WelcomeWalkthroughView: View {
       features: [
         FeatureItem(icon: "play.circle.fill", text: "One-click tracking - start in a second", color: .green),
         FeatureItem(icon: "chart.bar.fill", text: "See where your time actually goes", color: .blue),
-        FeatureItem(icon: "target", text: "Set income goals, watch them happen", color: .orange),
+        FeatureItem(icon: "target", text: "Set income goals, watch the bar fill", color: .orange),
       ],
-      testimonial: "\"I found 12 hours/week I was giving away for free.\" - Designer"
+      testimonial: "\"Found 11 hours/week I was giving away for free.\" - Designer"
     ),
-    // Invoicing
+    // 2. Gigs & Kanban
+    WalkthroughPage(
+      icon: "rectangle.3.group.fill",
+      iconColors: [.pink, .purple],
+      title: "Gigs on a Board",
+      subtitle: "Drag. Drop. Ship. Repeat.",
+      features: [
+        FeatureItem(icon: "arrow.left.arrow.right", text: "Kanban board - move gigs through stages", color: .purple),
+        FeatureItem(icon: "person.2.fill", text: "Client management in one place", color: .blue),
+        FeatureItem(icon: "doc.badge.clock", text: "Contracts & deadlines auto-tracked", color: .orange),
+      ],
+      testimonial: "\"Moved a card to Done. Felt dopamine. Shipping.\" - Solo Dev"
+    ),
+    // 3. Invoicing
     WalkthroughPage(
       icon: "doc.text.fill",
       iconColors: [.teal, .cyan],
@@ -107,33 +120,59 @@ struct WelcomeWalkthroughView: View {
       features: [
         FeatureItem(icon: "wand.and.stars", text: "Auto-generate from tracked hours", color: .purple),
         FeatureItem(icon: "checkmark.circle.fill", text: "Know who paid, who owes", color: .green),
-        FeatureItem(icon: "rectangle.3.group.fill", text: "Kanban board for all your gigs", color: .pink),
+        FeatureItem(icon: "arrow.clockwise", text: "Recurring invoices on autopilot", color: .teal),
       ],
-      testimonial: "\"No more spreadsheet chaos. Just send and get paid.\" - Freelancer"
+      testimonial: "\"2am invoice. Paid by breakfast.\" - Developer"
     ),
-    // Dig as the powerful "bonus" feature
+    // 4. Hunt - Job Finder
+    WalkthroughPage(
+      icon: "binoculars.fill",
+      iconColors: [.orange, .red],
+      title: "Hunt: Find Work",
+      subtitle: "It hunts while you sleep. Or doom-scroll.",
+      features: [
+        FeatureItem(icon: "magnifyingglass", text: "Aggregates gigs from everywhere", color: .orange),
+        FeatureItem(icon: "bell.badge.fill", text: "Alerts when perfect matches appear", color: .red),
+        FeatureItem(icon: "doc.richtext", text: "One-click proposals with AI", color: .purple),
+      ],
+      testimonial: "\"Found 3 gigs while I was procrastinating.\" - Writer"
+    ),
+    // 5. Focus Mode / Pomodoro
+    WalkthroughPage(
+      icon: "timer",
+      iconColors: [.red, .orange],
+      title: "Focus: Deep Work",
+      subtitle: "25 minutes of silence. A lifetime of productivity.",
+      features: [
+        FeatureItem(icon: "bell.slash.fill", text: "Kill notifications, enter flow state", color: .red),
+        FeatureItem(icon: "clock.badge.checkmark", text: "Pomodoro timer built-in", color: .orange),
+        FeatureItem(icon: "chart.xyaxis.line", text: "Track focus streaks over time", color: .green),
+      ],
+      testimonial: "\"25 mins Focus > my entire previous week.\" - Engineer"
+    ),
+    // 6. Dig - Idea Validation
     WalkthroughPage(
       icon: "lightbulb.max.fill",
       iconColors: [.yellow, .orange],
-      title: "Dig: Validate First",
+      title: "Dig: Validate Ideas",
       subtitle: "10 minutes of truth beats 10 months of hope.",
       features: [
-        FeatureItem(icon: "brain.head.profile", text: "5 expert perspectives tear your idea apart", color: .purple),
-        FeatureItem(icon: "chart.line.uptrend.xyaxis", text: "Revenue projections before line one of code", color: .green),
-        FeatureItem(icon: "exclamationmark.triangle.fill", text: "Devil's Advocate finds your blind spots", color: .red),
+        FeatureItem(icon: "brain.head.profile", text: "5 experts tear your idea apart", color: .purple),
+        FeatureItem(icon: "chart.line.uptrend.xyaxis", text: "Revenue projections before code", color: .green),
+        FeatureItem(icon: "exclamationmark.triangle.fill", text: "Devil's Advocate finds blind spots", color: .red),
       ],
-      testimonial: "\"Saved me from building 3 things nobody wanted.\" - Indie Dev"
+      testimonial: "\"Told me it was Uber for laundry. Again.\" - Idea-Haver"
     ),
-    // Final page with testimonials
+    // 7. Final page - Everything together
     WalkthroughPage(
       icon: "sparkles",
       iconColors: [.green, .teal],
       title: "Your Freelance OS",
-      subtitle: "Track. Invoice. Build. All in one place.",
+      subtitle: "Track. Invoice. Hunt. Focus. Build.",
       features: [
         FeatureItem(icon: "lock.shield.fill", text: "Your data never leaves your device", color: .green),
         FeatureItem(icon: "icloud.fill", text: "Sync across Mac, iPhone, iPad", color: .blue),
-        FeatureItem(icon: "timer", text: "Focus mode when you need flow", color: .orange),
+        FeatureItem(icon: "chart.pie.fill", text: "Reports that actually make sense", color: .purple),
       ],
       isLastPage: true,
       showTestimonials: true

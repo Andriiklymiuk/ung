@@ -244,7 +244,9 @@ suite('Security Test Suite', () => {
     test('rejects short password', () => {
       const result = EncryptionUtils.validatePassword('short');
       assert.strictEqual(result.valid, false);
-      assert.ok(result.errors.includes('Password must be at least 8 characters'));
+      assert.ok(
+        result.errors.includes('Password must be at least 8 characters')
+      );
     });
 
     test('rejects password with null bytes', () => {

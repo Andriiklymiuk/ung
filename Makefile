@@ -19,7 +19,7 @@
 	macosRelease
 
 # Build variables
-BINARY_NAME=ung
+BINARY_NAME=ung-cli
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "0.1.0")
 GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")

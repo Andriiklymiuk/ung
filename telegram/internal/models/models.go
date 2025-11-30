@@ -83,4 +83,8 @@ const (
 	StateHunterProfileSkills    SessionState = "hunter_profile_skills"
 	StateHunterProfileRate      SessionState = "hunter_profile_rate"
 	StateHunterAwaitingPDF      SessionState = "hunter_awaiting_pdf"
+	// Gig states
+	StateGigCreateName          SessionState = "gig_create_name"
+	StateGigCreateSelectClient  SessionState = "gig_create_select_client"
+	StateGigTaskAdd             SessionState = "gig_task_add"
 )

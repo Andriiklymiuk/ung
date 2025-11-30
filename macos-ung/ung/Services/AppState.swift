@@ -1245,6 +1245,7 @@ class AppState: ObservableObject {
 enum SidebarTab: String, CaseIterable, Identifiable {
     case next = "Next"
     case gigs = "Gigs"
+    case dig = "Dig"
     case dashboard = "Dashboard"
     case tracking = "Time Tracking"
     case clients = "Clients"
@@ -1262,6 +1263,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         switch self {
         case .next: return "arrow.right.circle"
         case .gigs: return "rectangle.3.group"
+        case .dig: return "lightbulb.max"
         case .dashboard: return "square.grid.2x2"
         case .tracking: return "clock"
         case .clients: return "person.2"
@@ -1279,6 +1281,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         switch self {
         case .next: return "arrow.right.circle.fill"
         case .gigs: return "rectangle.3.group.fill"
+        case .dig: return "lightbulb.max.fill"
         case .dashboard: return "square.grid.2x2.fill"
         case .tracking: return "clock.fill"
         case .clients: return "person.2.fill"
@@ -1296,6 +1299,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         switch self {
         case .next: return "Next"
         case .gigs: return "Gigs"
+        case .dig: return "Dig"
         case .dashboard: return "Stats"
         case .tracking: return "Track"
         case .clients: return "Clients"

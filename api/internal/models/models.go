@@ -428,3 +428,168 @@ type Application struct {
 	CreatedAt   time.Time         `json:"created_at"`
 	UpdatedAt   time.Time         `json:"updated_at"`
 }
+
+// =====================================
+// Dig Models - Idea Analysis & Incubation
+// =====================================
+
+// DigSessionStatus represents the status of a dig session
+type DigSessionStatus string
+
+const (
+	DigStatusPending   DigSessionStatus = "pending"
+	DigStatusAnalyzing DigSessionStatus = "analyzing"
+	DigStatusCompleted DigSessionStatus = "completed"
+	DigStatusFailed    DigSessionStatus = "failed"
+)
+
+// DigRecommendation represents the final recommendation for an idea
+type DigRecommendation string
+
+const (
+	DigRecommendProceed DigRecommendation = "proceed"
+	DigRecommendPivot   DigRecommendation = "pivot"
+	DigRecommendRefine  DigRecommendation = "refine"
+	DigRecommendAbandon DigRecommendation = "abandon"
+)
+
+// DigPerspective represents analysis perspectives
+type DigPerspective string
+
+const (
+	DigPerspectiveFirstPrinciples DigPerspective = "first_principles"
+	DigPerspectiveDesigner        DigPerspective = "designer"
+	DigPerspectiveMarketing       DigPerspective = "marketing"
+	DigPerspectiveTechnical       DigPerspective = "technical"
+	DigPerspectiveFinancial       DigPerspective = "financial"
+)
+
+// DigSession represents an idea analysis session
+type DigSession struct {
+	ID              uint              `gorm:"primaryKey" json:"id"`
+	Title           string            `json:"title"`
+	RawIdea         string            `gorm:"not null" json:"raw_idea"`
+	RefinedIdea     string            `json:"refined_idea"`
+	Status          DigSessionStatus  `gorm:"default:pending" json:"status"`
+	OverallScore    *float64          `json:"overall_score"`
+	Recommendation  DigRecommendation `json:"recommendation"`
+	CurrentStage    string            `gorm:"default:first_principles" json:"current_stage"`
+	StagesCompleted string            `json:"stages_completed"` // JSON array
+	StartedAt       *time.Time        `json:"started_at"`
+	CompletedAt     *time.Time        `json:"completed_at"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+
+	// Relationships
+	Analyses          []DigAnalysis          `gorm:"foreignKey:SessionID" json:"analyses,omitempty"`
+	ExecutionPlan     *DigExecutionPlan      `gorm:"foreignKey:SessionID" json:"execution_plan,omitempty"`
+	Marketing         *DigMarketing          `gorm:"foreignKey:SessionID" json:"marketing,omitempty"`
+	RevenueProjection *DigRevenueProjection  `gorm:"foreignKey:SessionID" json:"revenue_projection,omitempty"`
+	Alternatives      []DigAlternative       `gorm:"foreignKey:SessionID" json:"alternatives,omitempty"`
+}
+
+// DigAnalysis represents analysis from one perspective
+type DigAnalysis struct {
+	ID               uint           `gorm:"primaryKey" json:"id"`
+	SessionID        uint           `gorm:"not null;index" json:"session_id"`
+	Perspective      DigPerspective `gorm:"not null" json:"perspective"`
+	Summary          string         `json:"summary"`
+	Strengths        string         `json:"strengths"`        // JSON array
+	Weaknesses       string         `json:"weaknesses"`       // JSON array
+	Opportunities    string         `json:"opportunities"`    // JSON array
+	Threats          string         `json:"threats"`          // JSON array
+	Recommendations  string         `json:"recommendations"`  // JSON array
+	Score            *float64       `json:"score"`
+	DetailedAnalysis string         `json:"detailed_analysis"` // JSON
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+}
+
+// DigExecutionPlan represents the implementation roadmap
+type DigExecutionPlan struct {
+	ID               uint      `gorm:"primaryKey" json:"id"`
+	SessionID        uint      `gorm:"not null;index" json:"session_id"`
+	Summary          string    `json:"summary"`
+	MVPScope         string    `json:"mvp_scope"`
+	FullScope        string    `json:"full_scope"`
+	Architecture     string    `json:"architecture"`       // JSON
+	TechStack        string    `json:"tech_stack"`         // JSON
+	Integrations     string    `json:"integrations"`       // JSON
+	Phases           string    `json:"phases"`             // JSON array
+	Milestones       string    `json:"milestones"`         // JSON array
+	TeamRequirements string    `json:"team_requirements"`  // JSON
+	EstimatedCost    string    `json:"estimated_cost"`     // JSON
+	LLMPrompt        string    `json:"llm_prompt"`         // Ready-to-use prompt
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// DigMarketing represents generated marketing materials
+type DigMarketing struct {
+	ID                   uint      `gorm:"primaryKey" json:"id"`
+	SessionID            uint      `gorm:"not null;index" json:"session_id"`
+	ValueProposition     string    `json:"value_proposition"`
+	TargetAudience       string    `json:"target_audience"`        // JSON
+	PositioningStatement string    `json:"positioning_statement"`
+	Taglines             string    `json:"taglines"`               // JSON array
+	ElevatorPitch        string    `json:"elevator_pitch"`
+	Headlines            string    `json:"headlines"`              // JSON array
+	Descriptions         string    `json:"descriptions"`           // JSON array
+	ColorSuggestions     string    `json:"color_suggestions"`      // JSON
+	ImageryPrompts       string    `json:"imagery_prompts"`        // JSON array
+	GeneratedImages      string    `json:"generated_images"`       // JSON array
+	ChannelStrategy      string    `json:"channel_strategy"`       // JSON
+	LaunchStrategy       string    `json:"launch_strategy"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+// DigRevenueProjection represents financial projections
+type DigRevenueProjection struct {
+	ID                uint      `gorm:"primaryKey" json:"id"`
+	SessionID         uint      `gorm:"not null;index" json:"session_id"`
+	MarketSize        string    `json:"market_size"`         // JSON: TAM, SAM, SOM
+	MarketGrowth      string    `json:"market_growth"`
+	Competitors       string    `json:"competitors"`         // JSON array
+	PricingModels     string    `json:"pricing_models"`      // JSON array
+	RecommendedPrice  string    `json:"recommended_price"`
+	PricingRationale  string    `json:"pricing_rationale"`
+	Year1Revenue      string    `json:"year1_revenue"`       // JSON monthly
+	Year2Revenue      string    `json:"year2_revenue"`       // JSON monthly
+	Year3Revenue      string    `json:"year3_revenue"`       // JSON yearly
+	KeyMetrics        string    `json:"key_metrics"`         // JSON
+	BreakEvenAnalysis string    `json:"break_even_analysis"`
+	Assumptions       string    `json:"assumptions"`         // JSON
+	Risks             string    `json:"risks"`               // JSON
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// DigAlternative represents a suggested pivot or alternative idea
+type DigAlternative struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	SessionID       uint      `gorm:"not null;index" json:"session_id"`
+	AlternativeIdea string    `gorm:"not null" json:"alternative_idea"`
+	Rationale       string    `json:"rationale"`
+	Comparison      string    `json:"comparison"`
+	ViabilityScore  *float64  `json:"viability_score"`
+	EffortLevel     string    `json:"effort_level"` // low, medium, high
+	Potential       string    `json:"potential"`    // low, medium, high, very_high
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// DigStartRequest represents the request to start a dig session
+type DigStartRequest struct {
+	Idea     string `json:"idea" validate:"required"`
+	UseOwnAI bool   `json:"use_own_ai"` // If true, use user's API key
+}
+
+// DigProgressResponse represents the progress of a dig session
+type DigProgressResponse struct {
+	SessionID       uint             `json:"session_id"`
+	Status          DigSessionStatus `json:"status"`
+	CurrentStage    string           `json:"current_stage"`
+	StagesCompleted []string         `json:"stages_completed"`
+	Progress        int              `json:"progress"` // 0-100
+	Message         string           `json:"message"`
+}

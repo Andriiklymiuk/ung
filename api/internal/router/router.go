@@ -33,6 +33,7 @@ func SetupRouter(
 	searchController *controllers.SearchController,
 	exportController *controllers.ExportController,
 	hunterController *controllers.HunterController,
+	digController *controllers.DigController,
 	authMiddleware func(http.Handler) http.Handler,
 	tenantMiddleware func(http.Handler) http.Handler,
 	subscriptionMiddleware func(http.Handler) http.Handler,
@@ -262,6 +263,17 @@ func SetupRouter(
 
 					// Stats
 					r.Get("/stats", hunterController.GetStats)
+				})
+
+				// Dig - Idea Analysis & Incubation
+				r.Route("/dig", func(r chi.Router) {
+					r.Get("/", digController.ListSessions)
+					r.Post("/", digController.StartSession)
+					r.Get("/{id}", digController.GetSession)
+					r.Get("/{id}/progress", digController.GetProgress)
+					r.Delete("/{id}", digController.DeleteSession)
+					r.Post("/{id}/images", digController.GenerateImages)
+					r.Get("/{id}/export", digController.ExportSession)
 				})
 			})
 

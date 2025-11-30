@@ -51,6 +51,23 @@ const EncryptionUtils = {
       return false;
     }
 
+    // Check for known file format magic bytes (not encrypted)
+    // SQLite: "SQLite format 3\0"
+    const sqliteMagic = [
+      0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61,
+      0x74, 0x20, 0x33, 0x00,
+    ];
+    let isSqlite = true;
+    for (let i = 0; i < sqliteMagic.length && i < data.length; i++) {
+      if (data[i] !== sqliteMagic[i]) {
+        isSqlite = false;
+        break;
+      }
+    }
+    if (isSqlite) {
+      return false;
+    }
+
     // Check if first SALT_SIZE bytes look like random data
     const salt = data.slice(0, SALT_SIZE);
     let allZeros = true;

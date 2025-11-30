@@ -8,6 +8,72 @@
 
 import SwiftUI
 
+// MARK: - Haptic Feedback Manager
+#if os(iOS)
+import UIKit
+
+class HapticManager {
+    static let shared = HapticManager()
+
+    private let lightImpact = UIImpactFeedbackGenerator(style: .light)
+    private let mediumImpact = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyImpact = UIImpactFeedbackGenerator(style: .heavy)
+    private let softImpact = UIImpactFeedbackGenerator(style: .soft)
+    private let rigidImpact = UIImpactFeedbackGenerator(style: .rigid)
+    private let selectionFeedback = UISelectionFeedbackGenerator()
+    private let notificationFeedback = UINotificationFeedbackGenerator()
+
+    private init() {
+        // Prepare all generators for immediate response
+        prepareAll()
+    }
+
+    func prepareAll() {
+        lightImpact.prepare()
+        mediumImpact.prepare()
+        heavyImpact.prepare()
+        softImpact.prepare()
+        rigidImpact.prepare()
+        selectionFeedback.prepare()
+        notificationFeedback.prepare()
+    }
+
+    func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        switch style {
+        case .light: lightImpact.impactOccurred()
+        case .medium: mediumImpact.impactOccurred()
+        case .heavy: heavyImpact.impactOccurred()
+        case .soft: softImpact.impactOccurred()
+        case .rigid: rigidImpact.impactOccurred()
+        @unknown default: lightImpact.impactOccurred()
+        }
+    }
+
+    func impactWithIntensity(_ intensity: CGFloat) {
+        mediumImpact.impactOccurred(intensity: intensity)
+    }
+
+    func selection() {
+        selectionFeedback.selectionChanged()
+    }
+
+    func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        notificationFeedback.notificationOccurred(type)
+    }
+}
+#endif
+
+// MARK: - Reduce Motion Check
+struct MotionManager {
+    static var reduceMotionEnabled: Bool {
+        #if os(iOS)
+        return UIAccessibility.isReduceMotionEnabled
+        #else
+        return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        #endif
+    }
+}
+
 // MARK: - Testimonial Model
 struct Testimonial {
     let quote: String
@@ -22,11 +88,23 @@ struct FloatingOrb: Identifiable {
     let id = UUID()
     var x: CGFloat
     var y: CGFloat
+    var z: CGFloat // Depth for parallax
     var size: CGFloat
     var color: Color
     var opacity: Double
     var speed: Double
     var phase: Double
+}
+
+// MARK: - Sparkle Particle (for icon effects)
+struct SparkleParticle: Identifiable {
+    let id = UUID()
+    var x: CGFloat
+    var y: CGFloat
+    var scale: CGFloat
+    var rotation: Double
+    var opacity: Double
+    var delay: Double
 }
 
 // MARK: - Confetti Particle
@@ -35,9 +113,16 @@ struct ConfettiParticle: Identifiable {
     var x: CGFloat
     var y: CGFloat
     var rotation: Double
+    var rotationAxis: (x: CGFloat, y: CGFloat, z: CGFloat)
     var scale: CGFloat
     var color: Color
     var speed: Double
+    var shape: ConfettiShape
+    var wobble: Double
+}
+
+enum ConfettiShape: CaseIterable {
+    case rectangle, circle, star, triangle
 }
 
 // MARK: - Welcome Walkthrough View
@@ -47,11 +132,18 @@ struct WelcomeWalkthroughView: View {
   @State private var isAnimating = false
   @State private var floatingOrbs: [FloatingOrb] = []
   @State private var confettiParticles: [ConfettiParticle] = []
+  @State private var sparkleParticles: [SparkleParticle] = []
   @State private var showConfetti = false
   @State private var animationTimer: Timer?
   @State private var dragOffset: CGFloat = 0
+  @State private var dragOffset3D: CGSize = .zero  // For 3D tilt effect
   @State private var progressAnimation: CGFloat = 0
+  @State private var buttonGlowPhase: Double = 0
+  @State private var isButtonPressed = false
   @Namespace private var animation
+
+  // Reduce motion preference
+  private var reduceMotion: Bool { MotionManager.reduceMotionEnabled }
 
   // Testimonials - real outcomes, specific help
   private let testimonials: [Testimonial] = [
@@ -288,11 +380,12 @@ struct WelcomeWalkthroughView: View {
         // MARK: - Animated Background
         AnimatedGradientBackground(
           colors: pages[currentPage].iconColors,
-          geometry: geometry
+          geometry: geometry,
+          reduceMotion: reduceMotion
         )
         .ignoresSafeArea()
 
-        // MARK: - Floating Orbs (Parallax Background)
+        // MARK: - Floating Orbs (Parallax Background with Depth)
         ForEach(floatingOrbs) { orb in
           Circle()
             .fill(
@@ -306,12 +399,25 @@ struct WelcomeWalkthroughView: View {
             .frame(width: orb.size, height: orb.size)
             .position(x: orb.x, y: orb.y)
             .blur(radius: orb.size * 0.1)
+            // 3D Parallax based on depth (z) - farther objects move less
+            .offset(
+              x: reduceMotion ? 0 : dragOffset3D.width * orb.z * 0.02,
+              y: reduceMotion ? 0 : dragOffset3D.height * orb.z * 0.02
+            )
+            .scaleEffect(1.0 + (orb.z * 0.001))
+        }
+
+        // MARK: - Sparkle Effects
+        if !reduceMotion {
+          ForEach(sparkleParticles) { sparkle in
+            SparkleView(particle: sparkle, colors: pages[currentPage].iconColors)
+          }
         }
 
         // MARK: - Confetti (Final Page)
         if showConfetti {
           ForEach(confettiParticles) { particle in
-            ConfettiView(particle: particle)
+            ConfettiView(particle: particle, reduceMotion: reduceMotion)
           }
         }
 
@@ -321,12 +427,13 @@ struct WelcomeWalkthroughView: View {
             currentPage: currentPage,
             totalPages: pages.count,
             colors: pages[currentPage].iconColors,
-            progress: progressAnimation
+            progress: progressAnimation,
+            reduceMotion: reduceMotion
           )
           .padding(.top, 20)
           .padding(.horizontal, 40)
 
-          // MARK: - Page Content
+          // MARK: - Page Content with 3D Perspective
           TabView(selection: $currentPage) {
             ForEach(0..<pages.count, id: \.self) { index in
               WalkthroughPageView(
@@ -334,7 +441,8 @@ struct WelcomeWalkthroughView: View {
                 isAnimating: currentPage == index,
                 testimonials: testimonials,
                 geometry: geometry,
-                pageIndex: index
+                pageIndex: index,
+                reduceMotion: reduceMotion
               )
               .tag(index)
             }
@@ -344,16 +452,35 @@ struct WelcomeWalkthroughView: View {
           #else
           .tabViewStyle(.page(indexDisplayMode: .never))
           #endif
+          // 3D tilt effect on drag (subtle)
+          .rotation3DEffect(
+            .degrees(reduceMotion ? 0 : Double(dragOffset3D.width) * 0.01),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.5
+          )
+          .rotation3DEffect(
+            .degrees(reduceMotion ? 0 : Double(-dragOffset3D.height) * 0.008),
+            axis: (x: 1, y: 0, z: 0),
+            perspective: 0.5
+          )
           .onChange(of: currentPage) { oldValue, newValue in
-            // Haptic feedback on iOS
+            // Rich haptic feedback on iOS
             #if os(iOS)
-            let impact = UIImpactFeedbackGenerator(style: .light)
-            impact.impactOccurred()
+            HapticManager.shared.impact(.light)
+            // Additional subtle haptic as page settles
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+              HapticManager.shared.impact(.soft)
+            }
             #endif
 
             // Animate progress bar
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
               progressAnimation = CGFloat(newValue) / CGFloat(pages.count - 1)
+            }
+
+            // Regenerate sparkles for new page
+            if !reduceMotion {
+              setupSparkles(geometry: geometry)
             }
 
             // Show confetti on last page
@@ -366,16 +493,43 @@ struct WelcomeWalkthroughView: View {
           BottomNavigationView(
             currentPage: $currentPage,
             pages: pages,
-            onComplete: { appState.completeWelcomeWalkthrough() }
+            onComplete: {
+              #if os(iOS)
+              HapticManager.shared.notification(.success)
+              #endif
+              appState.completeWelcomeWalkthrough()
+            },
+            reduceMotion: reduceMotion
           )
           .padding(.bottom, 30)
         }
       }
+      // Track drag for 3D effect
+      .gesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { value in
+            if !reduceMotion {
+              withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.8)) {
+                dragOffset3D = value.translation
+              }
+            }
+          }
+          .onEnded { _ in
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+              dragOffset3D = .zero
+            }
+          }
+      )
     }
     .frame(minWidth: 500, minHeight: 600)
     .onAppear {
       setupFloatingOrbs()
-      startAnimations()
+      if !reduceMotion {
+        startAnimations()
+      }
+      #if os(iOS)
+      HapticManager.shared.prepareAll()
+      #endif
     }
     .onDisappear {
       animationTimer?.invalidate()
@@ -388,11 +542,26 @@ struct WelcomeWalkthroughView: View {
       FloatingOrb(
         x: CGFloat.random(in: 50...450),
         y: CGFloat.random(in: 50...550),
+        z: CGFloat.random(in: 0.5...2.0), // Depth for parallax
         size: CGFloat.random(in: 60...200),
         color: [Color.purple, .blue, .pink, .orange, .teal, .yellow].randomElement()!,
         opacity: Double.random(in: 0.1...0.25),
         speed: Double.random(in: 0.3...0.8),
         phase: Double.random(in: 0...2 * .pi)
+      )
+    }
+  }
+
+  // MARK: - Setup Sparkles
+  private func setupSparkles(geometry: GeometryProxy) {
+    sparkleParticles = (0..<12).map { i in
+      SparkleParticle(
+        x: CGFloat.random(in: geometry.size.width * 0.2...geometry.size.width * 0.8),
+        y: CGFloat.random(in: geometry.size.height * 0.1...geometry.size.height * 0.5),
+        scale: CGFloat.random(in: 0.3...0.8),
+        rotation: Double.random(in: 0...360),
+        opacity: Double.random(in: 0.3...0.7),
+        delay: Double(i) * 0.1
       )
     }
   }
@@ -415,31 +584,83 @@ struct WelcomeWalkthroughView: View {
   // MARK: - Trigger Confetti
   private func triggerConfetti(geometry: GeometryProxy) {
     showConfetti = true
-    confettiParticles = (0..<50).map { _ in
+
+    // Create varied confetti with different shapes and physics
+    confettiParticles = (0..<60).map { i in
       ConfettiParticle(
-        x: geometry.size.width / 2,
-        y: -20,
+        x: geometry.size.width * CGFloat.random(in: 0.2...0.8),
+        y: CGFloat.random(in: -50...(-20)),
         rotation: Double.random(in: 0...360),
+        rotationAxis: (
+          x: CGFloat.random(in: 0...1),
+          y: CGFloat.random(in: 0...1),
+          z: CGFloat.random(in: 0...1)
+        ),
         scale: CGFloat.random(in: 0.5...1.2),
-        color: [.purple, .pink, .orange, .yellow, .green, .blue, .red].randomElement()!,
-        speed: Double.random(in: 2...5)
+        color: [.purple, .pink, .orange, .yellow, .green, .blue, .red, .cyan, .mint].randomElement()!,
+        speed: Double.random(in: 2...5),
+        shape: ConfettiShape.allCases.randomElement()!,
+        wobble: Double.random(in: 0...2 * .pi)
       )
     }
 
-    // Animate confetti falling
-    withAnimation(.easeOut(duration: 3)) {
-      for i in confettiParticles.indices {
-        confettiParticles[i].y = geometry.size.height + 50
-        confettiParticles[i].x += CGFloat.random(in: -200...200)
-        confettiParticles[i].rotation += Double.random(in: 360...1080)
+    // Animate confetti falling with wobble
+    if reduceMotion {
+      // Simple fade for reduce motion
+      withAnimation(.easeOut(duration: 2)) {
+        for i in confettiParticles.indices {
+          confettiParticles[i].y = geometry.size.height + 50
+        }
+      }
+    } else {
+      withAnimation(.easeOut(duration: 4)) {
+        for i in confettiParticles.indices {
+          confettiParticles[i].y = geometry.size.height + 50
+          confettiParticles[i].x += CGFloat.random(in: -250...250)
+          confettiParticles[i].rotation += Double.random(in: 720...1440)
+          confettiParticles[i].wobble += Double.random(in: 4...8) * .pi
+        }
       }
     }
 
-    // Haptic feedback
+    // Rich haptic feedback cascade
     #if os(iOS)
-    let generator = UINotificationFeedbackGenerator()
-    generator.notificationOccurred(.success)
+    HapticManager.shared.notification(.success)
+    // Cascade haptics for celebration feel
+    for i in 1...3 {
+      DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.15) {
+        HapticManager.shared.impact(.light)
+      }
+    }
     #endif
+  }
+}
+
+// MARK: - Sparkle View
+struct SparkleView: View {
+  let particle: SparkleParticle
+  let colors: [Color]
+  @State private var isAnimating = false
+
+  var body: some View {
+    Image(systemName: "sparkle")
+      .font(.system(size: 12 * particle.scale))
+      .foregroundStyle(
+        LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+      )
+      .opacity(isAnimating ? particle.opacity : 0)
+      .scaleEffect(isAnimating ? 1.0 : 0.3)
+      .rotationEffect(.degrees(isAnimating ? particle.rotation + 45 : particle.rotation))
+      .position(x: particle.x, y: particle.y)
+      .onAppear {
+        withAnimation(
+          .easeInOut(duration: 1.5)
+          .repeatForever(autoreverses: true)
+          .delay(particle.delay)
+        ) {
+          isAnimating = true
+        }
+      }
   }
 }
 
@@ -447,7 +668,9 @@ struct WelcomeWalkthroughView: View {
 struct AnimatedGradientBackground: View {
   let colors: [Color]
   let geometry: GeometryProxy
+  var reduceMotion: Bool = false
   @State private var animateGradient = false
+  @State private var meshPhase: CGFloat = 0
 
   var body: some View {
     ZStack {
@@ -458,28 +681,46 @@ struct AnimatedGradientBackground: View {
           colors[1].opacity(0.08),
           Color.clear
         ],
-        startPoint: animateGradient ? .topLeading : .topTrailing,
-        endPoint: animateGradient ? .bottomTrailing : .bottomLeading
+        startPoint: reduceMotion ? .topLeading : (animateGradient ? .topLeading : .topTrailing),
+        endPoint: reduceMotion ? .bottomTrailing : (animateGradient ? .bottomTrailing : .bottomLeading)
       )
 
       // Animated mesh-like overlay
       EllipticalGradient(
-        colors: [colors[0].opacity(0.1), Color.clear],
-        center: animateGradient ? .topLeading : .bottomTrailing,
+        colors: [colors[0].opacity(0.12), Color.clear],
+        center: reduceMotion ? .topLeading : (animateGradient ? .topLeading : .bottomTrailing),
         startRadiusFraction: 0,
         endRadiusFraction: 0.8
       )
 
       // Second animated overlay
       EllipticalGradient(
-        colors: [colors[1].opacity(0.08), Color.clear],
-        center: animateGradient ? .bottomTrailing : .topLeading,
+        colors: [colors[1].opacity(0.1), Color.clear],
+        center: reduceMotion ? .bottomTrailing : (animateGradient ? .bottomTrailing : .topLeading),
         startRadiusFraction: 0,
         endRadiusFraction: 0.6
       )
+
+      // Third layer for more depth (premium feel)
+      if !reduceMotion {
+        EllipticalGradient(
+          colors: [colors[0].opacity(0.05), Color.clear],
+          center: .center,
+          startRadiusFraction: 0,
+          endRadiusFraction: 0.5 + meshPhase * 0.2
+        )
+        .blendMode(.plusLighter)
+      }
     }
-    .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateGradient)
-    .onAppear { animateGradient = true }
+    .animation(reduceMotion ? nil : .easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateGradient)
+    .onAppear {
+      if !reduceMotion {
+        animateGradient = true
+        withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
+          meshPhase = 1
+        }
+      }
+    }
     .animation(.easeInOut(duration: 0.8), value: colors)
   }
 }
@@ -490,10 +731,12 @@ struct ProgressBarView: View {
   let totalPages: Int
   let colors: [Color]
   let progress: CGFloat
+  var reduceMotion: Bool = false
+  @State private var glowPhase: CGFloat = 0
 
   var body: some View {
     VStack(spacing: 8) {
-      // Step indicators
+      // Step indicators with glow effect
       HStack(spacing: 4) {
         ForEach(0..<totalPages, id: \.self) { index in
           Capsule()
@@ -502,6 +745,10 @@ struct ProgressBarView: View {
               LinearGradient(colors: [Color.secondary.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
             )
             .frame(height: 4)
+            .shadow(
+              color: index <= currentPage ? colors[0].opacity(reduceMotion ? 0.3 : 0.3 + glowPhase * 0.2) : .clear,
+              radius: reduceMotion ? 4 : 4 + glowPhase * 2
+            )
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentPage)
         }
       }
@@ -515,11 +762,19 @@ struct ProgressBarView: View {
 
         Spacer()
 
-        // Percentage complete
+        // Percentage complete with animated appearance
         Text("\(Int(progress * 100))% complete")
           .font(.caption)
-          .fontWeight(.medium)
+          .fontWeight(.semibold)
           .foregroundColor(colors[0])
+          .contentTransition(.numericText())
+      }
+    }
+    .onAppear {
+      if !reduceMotion {
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+          glowPhase = 1
+        }
       }
     }
   }
@@ -528,20 +783,94 @@ struct ProgressBarView: View {
 // MARK: - Confetti View
 struct ConfettiView: View {
   let particle: ConfettiParticle
+  var reduceMotion: Bool = false
   @State private var appear = false
 
   var body: some View {
-    RoundedRectangle(cornerRadius: 2)
+    confettiShape
       .fill(particle.color)
-      .frame(width: 8 * particle.scale, height: 12 * particle.scale)
-      .rotationEffect(.degrees(particle.rotation))
+      .frame(width: shapeSize.width * particle.scale, height: shapeSize.height * particle.scale)
+      .rotation3DEffect(
+        .degrees(reduceMotion ? 0 : particle.rotation),
+        axis: (x: particle.rotationAxis.x, y: particle.rotationAxis.y, z: particle.rotationAxis.z)
+      )
+      .offset(x: reduceMotion ? 0 : sin(particle.wobble) * 20)
       .position(x: particle.x, y: particle.y)
-      .opacity(appear ? 0.8 : 0)
+      .opacity(appear ? 0.9 : 0)
+      .shadow(color: particle.color.opacity(0.5), radius: 2)
       .onAppear {
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(.easeOut(duration: 0.3)) {
           appear = true
         }
       }
+  }
+
+  private var shapeSize: CGSize {
+    switch particle.shape {
+    case .rectangle: return CGSize(width: 8, height: 14)
+    case .circle: return CGSize(width: 10, height: 10)
+    case .star: return CGSize(width: 12, height: 12)
+    case .triangle: return CGSize(width: 10, height: 12)
+    }
+  }
+
+  @ViewBuilder
+  private var confettiShape: some Shape {
+    switch particle.shape {
+    case .rectangle:
+      RoundedRectangle(cornerRadius: 2)
+    case .circle:
+      Circle()
+    case .star:
+      StarShape()
+    case .triangle:
+      Triangle()
+    }
+  }
+}
+
+// MARK: - Star Shape
+struct StarShape: Shape {
+  func path(in rect: CGRect) -> Path {
+    let center = CGPoint(x: rect.midX, y: rect.midY)
+    let outerRadius = min(rect.width, rect.height) / 2
+    let innerRadius = outerRadius * 0.4
+    var path = Path()
+
+    for i in 0..<5 {
+      let outerAngle = (CGFloat(i) * 72 - 90) * .pi / 180
+      let innerAngle = (CGFloat(i) * 72 + 36 - 90) * .pi / 180
+
+      let outerPoint = CGPoint(
+        x: center.x + outerRadius * cos(outerAngle),
+        y: center.y + outerRadius * sin(outerAngle)
+      )
+      let innerPoint = CGPoint(
+        x: center.x + innerRadius * cos(innerAngle),
+        y: center.y + innerRadius * sin(innerAngle)
+      )
+
+      if i == 0 {
+        path.move(to: outerPoint)
+      } else {
+        path.addLine(to: outerPoint)
+      }
+      path.addLine(to: innerPoint)
+    }
+    path.closeSubpath()
+    return path
+  }
+}
+
+// MARK: - Triangle Shape
+struct Triangle: Shape {
+  func path(in rect: CGRect) -> Path {
+    var path = Path()
+    path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+    path.closeSubpath()
+    return path
   }
 }
 
@@ -550,6 +879,9 @@ struct BottomNavigationView: View {
   @Binding var currentPage: Int
   let pages: [WalkthroughPage]
   let onComplete: () -> Void
+  var reduceMotion: Bool = false
+  @State private var glowPhase: CGFloat = 0
+  @State private var isButtonPressed = false
 
   var body: some View {
     VStack(spacing: 16) {
@@ -558,6 +890,9 @@ struct BottomNavigationView: View {
         // Back button
         if currentPage > 0 {
           Button(action: {
+            #if os(iOS)
+            HapticManager.shared.impact(.light)
+            #endif
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
               currentPage -= 1
             }
@@ -572,17 +907,24 @@ struct BottomNavigationView: View {
             .frame(width: 90, height: 44)
             .background(
               RoundedRectangle(cornerRadius: 22)
-                .fill(Color.primary.opacity(0.05))
+                .fill(.ultraThinMaterial)  // Glass morphism
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 22)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
             )
           }
-          .buttonStyle(.plain)
+          .buttonStyle(GlassButtonStyle())
           .transition(.opacity.combined(with: .move(edge: .leading)))
         }
 
         Spacer()
 
-        // Next / Get Started button
+        // Next / Get Started button with glow
         Button(action: {
+          #if os(iOS)
+          HapticManager.shared.impact(.medium)
+          #endif
           if pages[currentPage].isLastPage {
             onComplete()
           } else {
@@ -597,7 +939,7 @@ struct BottomNavigationView: View {
 
             Image(systemName: pages[currentPage].isLastPage ? "arrow.right" : "chevron.right")
               .font(.system(size: 14, weight: .semibold))
-              .offset(x: pages[currentPage].isLastPage ? 0 : 0)
+              .symbolEffect(.bounce, value: pages[currentPage].isLastPage)
           }
           .foregroundColor(.white)
           .frame(width: pages[currentPage].isLastPage ? 160 : 140, height: 50)
@@ -610,35 +952,92 @@ struct BottomNavigationView: View {
                 endPoint: .trailing
               )
 
-              // Shine effect
-              LinearGradient(
-                colors: [.white.opacity(0.3), .clear, .clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              )
+              // Animated shine effect
+              if !reduceMotion {
+                LinearGradient(
+                  colors: [.clear, .white.opacity(0.3), .clear],
+                  startPoint: .leading,
+                  endPoint: .trailing
+                )
+                .offset(x: -200 + glowPhase * 400)
+                .mask(Capsule())
+              }
             }
           )
           .clipShape(Capsule())
-          .shadow(color: pages[currentPage].iconColors[0].opacity(0.4), radius: 12, y: 6)
+          // Animated glow
+          .shadow(
+            color: pages[currentPage].iconColors[0].opacity(reduceMotion ? 0.4 : 0.4 + glowPhase * 0.2),
+            radius: reduceMotion ? 12 : 12 + glowPhase * 4,
+            y: 6
+          )
           .scaleEffect(pages[currentPage].isLastPage ? 1.05 : 1.0)
           .animation(.spring(response: 0.3), value: pages[currentPage].isLastPage)
         }
-        .buttonStyle(BounceButtonStyle())
+        .buttonStyle(PremiumButtonStyle())
       }
       .padding(.horizontal, 30)
 
-      // Skip button
+      // Skip button with subtle interaction
       if !pages[currentPage].isLastPage {
-        Button(action: onComplete) {
+        Button(action: {
+          #if os(iOS)
+          HapticManager.shared.selection()
+          #endif
+          onComplete()
+        }) {
           Text("Skip for now")
             .font(.system(size: 14))
             .foregroundColor(.secondary.opacity(0.7))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SubtleButtonStyle())
         .transition(.opacity)
       }
     }
     .animation(.easeInOut(duration: 0.3), value: currentPage)
+    .onAppear {
+      if !reduceMotion {
+        withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+          glowPhase = 1
+        }
+      }
+    }
+  }
+}
+
+// MARK: - Premium Button Style (for main CTA)
+struct PremiumButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+      .brightness(configuration.isPressed ? -0.05 : 0)
+      .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+      .onChange(of: configuration.isPressed) { _, isPressed in
+        if isPressed {
+          #if os(iOS)
+          HapticManager.shared.impact(.soft)
+          #endif
+        }
+      }
+  }
+}
+
+// MARK: - Glass Button Style (for secondary buttons)
+struct GlassButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+      .opacity(configuration.isPressed ? 0.8 : 1.0)
+      .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+  }
+}
+
+// MARK: - Subtle Button Style (for skip)
+struct SubtleButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .opacity(configuration.isPressed ? 0.5 : 1.0)
+      .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
   }
 }
 
@@ -676,6 +1075,7 @@ struct WalkthroughPageView: View {
   var testimonials: [Testimonial] = []
   let geometry: GeometryProxy
   let pageIndex: Int
+  var reduceMotion: Bool = false
 
   @State private var showIcon = false
   @State private var showTitle = false
@@ -683,15 +1083,16 @@ struct WalkthroughPageView: View {
   @State private var currentTestimonialIndex = 0
   @State private var iconRotation: Double = 0
   @State private var iconScale: CGFloat = 0.3
+  @State private var iconPulse: CGFloat = 1.0
   @State private var testimonialTimer: Timer?
 
   var body: some View {
     VStack(spacing: 24) {
       Spacer()
 
-      // MARK: - Animated Icon
+      // MARK: - Animated Icon with 3D Effects
       ZStack {
-        // Outer pulsing ring
+        // Outer pulsing rings with 3D perspective
         ForEach(0..<3) { i in
           Circle()
             .stroke(
@@ -705,13 +1106,18 @@ struct WalkthroughPageView: View {
             .frame(width: 100 + CGFloat(i * 30), height: 100 + CGFloat(i * 30))
             .scaleEffect(showIcon ? 1.0 + CGFloat(i) * 0.1 : 0.5)
             .opacity(showIcon ? 0.6 - Double(i) * 0.2 : 0)
+            .rotation3DEffect(
+              .degrees(reduceMotion ? 0 : Double(i) * 5),
+              axis: (x: 1, y: 0, z: 0),
+              perspective: 0.5
+            )
             .animation(
-              .easeOut(duration: 1.2).delay(Double(i) * 0.15),
+              reduceMotion ? .none : .easeOut(duration: 1.2).delay(Double(i) * 0.15),
               value: showIcon
             )
         }
 
-        // Outer glow
+        // Outer glow with pulse
         Circle()
           .fill(
             RadialGradient(
@@ -722,12 +1128,19 @@ struct WalkthroughPageView: View {
             )
           )
           .frame(width: 140, height: 140)
-          .scaleEffect(isAnimating ? 1.15 : 1.0)
-          .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: isAnimating)
+          .scaleEffect(reduceMotion ? 1.0 : (isAnimating ? 1.15 * iconPulse : 1.0))
+          .animation(reduceMotion ? nil : .easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: isAnimating)
 
-        // Icon background with 3D effect
+        // Icon background with enhanced 3D effect
         ZStack {
-          // Shadow layer
+          // Deep shadow layer
+          Circle()
+            .fill(Color.black.opacity(0.3))
+            .frame(width: 88, height: 88)
+            .offset(y: 8)
+            .blur(radius: 12)
+
+          // Mid shadow layer
           Circle()
             .fill(
               LinearGradient(
@@ -741,7 +1154,7 @@ struct WalkthroughPageView: View {
             .blur(radius: 8)
             .opacity(0.5)
 
-          // Main circle
+          // Main circle with glass effect
           Circle()
             .fill(
               LinearGradient(
@@ -752,28 +1165,47 @@ struct WalkthroughPageView: View {
             )
             .frame(width: 88, height: 88)
             .overlay(
-              // Highlight
+              // Top highlight (glass reflection)
               Circle()
                 .fill(
                   LinearGradient(
-                    colors: [.white.opacity(0.4), .clear],
+                    colors: [.white.opacity(0.5), .white.opacity(0.1), .clear],
                     startPoint: .topLeading,
                     endPoint: .center
                   )
                 )
                 .frame(width: 88, height: 88)
             )
-            .shadow(color: page.iconColors[0].opacity(0.5), radius: 20, y: 10)
+            .overlay(
+              // Inner edge highlight
+              Circle()
+                .stroke(
+                  LinearGradient(
+                    colors: [.white.opacity(0.4), .clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                  ),
+                  lineWidth: 1.5
+                )
+                .frame(width: 86, height: 86)
+            )
+            .shadow(color: page.iconColors[0].opacity(0.6), radius: 20, y: 10)
         }
-        .scaleEffect(iconScale)
+        .scaleEffect(iconScale * (reduceMotion ? 1.0 : iconPulse))
+        .rotation3DEffect(
+          .degrees(reduceMotion ? 0 : iconRotation * 0.1),
+          axis: (x: 0.5, y: 1, z: 0),
+          perspective: 0.3
+        )
         .rotationEffect(.degrees(iconRotation))
 
-        // Icon
+        // Icon with symbol effect
         Image(systemName: page.icon)
           .font(.system(size: 38, weight: .medium))
           .foregroundColor(.white)
           .scaleEffect(iconScale)
-          .symbolEffect(.bounce, options: .repeating.speed(0.3), value: isAnimating)
+          .shadow(color: .black.opacity(0.2), radius: 2, y: 2)
+          .symbolEffect(reduceMotion ? .pulse : .bounce, options: .repeating.speed(0.3), value: isAnimating)
       }
       .frame(height: 180)
 
@@ -876,16 +1308,37 @@ struct WalkthroughPageView: View {
 
   // MARK: - Animation Triggers
   private func triggerEntranceAnimation() {
-    // Icon entrance
+    if reduceMotion {
+      // Instant appearance for reduce motion
+      showIcon = true
+      iconScale = 1.0
+      showTitle = true
+      showFeatures = true
+      return
+    }
+
+    // Icon entrance with spring
     withAnimation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.1)) {
       showIcon = true
       iconScale = 1.0
     }
 
-    // Small rotation for playfulness
+    // 3D rotation for premium feel
     withAnimation(.spring(response: 0.8, dampingFraction: 0.5).delay(0.1)) {
       iconRotation = 360
     }
+
+    // Start subtle pulse animation
+    withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true).delay(0.8)) {
+      iconPulse = 1.03
+    }
+
+    // Haptic on icon appearance
+    #if os(iOS)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+      HapticManager.shared.impact(.soft)
+    }
+    #endif
 
     // Title entrance
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -894,11 +1347,19 @@ struct WalkthroughPageView: View {
       }
     }
 
-    // Features entrance
+    // Features entrance with haptic per feature
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
       withAnimation {
         showFeatures = true
       }
+      #if os(iOS)
+      // Subtle haptics as features appear
+      for i in 0..<page.features.count {
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.12) {
+          HapticManager.shared.impactWithIntensity(0.3)
+        }
+      }
+      #endif
     }
   }
 
@@ -908,6 +1369,7 @@ struct WalkthroughPageView: View {
     showFeatures = false
     iconScale = 0.3
     iconRotation = 0
+    iconPulse = 1.0
 
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
       triggerEntranceAnimation()

@@ -686,6 +686,10 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('ung.createGig', () =>
       gigCommands.createGig()
     ),
+    // Alias for onboarding quick action
+    vscode.commands.registerCommand('ung.addGig', () =>
+      gigCommands.createGig()
+    ),
     vscode.commands.registerCommand('ung.viewGig', (item) =>
       gigCommands.viewGig(item?.itemId)
     ),
@@ -717,6 +721,47 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('ung.toggleSecureMode', () =>
       dashboardWebviewProvider.toggleSecureMode()
     )
+  );
+
+  // Goal commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('ung.setGoal', async () => {
+      const amount = await vscode.window.showInputBox({
+        prompt: 'Set your monthly income goal',
+        placeHolder: 'e.g., 5000',
+        validateInput: (value) => {
+          const num = parseFloat(value);
+          if (isNaN(num) || num <= 0) {
+            return 'Please enter a valid positive number';
+          }
+          return null;
+        },
+      });
+
+      if (amount) {
+        const result = await cli.runCommand(['goal', 'set', amount]);
+        if (result.success) {
+          vscode.window.showInformationMessage(
+            `Monthly goal set to $${amount}`,
+            'View Progress'
+          ).then((choice) => {
+            if (choice === 'View Progress') {
+              vscode.commands.executeCommand('ung.openStatistics');
+            }
+          });
+        } else {
+          vscode.window.showErrorMessage(
+            `Failed to set goal: ${result.stderr || 'Unknown error'}`
+          );
+        }
+      }
+    }),
+    vscode.commands.registerCommand('ung.viewGoalStatus', async () => {
+      const result = await cli.runCommand(['goal', 'status']);
+      if (result.success) {
+        vscode.window.showInformationMessage(result.stdout || 'No goals set');
+      }
+    })
   );
 
   // Export wizard command

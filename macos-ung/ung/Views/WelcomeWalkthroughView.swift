@@ -83,92 +83,138 @@ struct WelcomeWalkthroughView: View {
     ),
   ]
 
-  // 6-page walkthrough covering all major features
+  // Journey-based onboarding: Idea → Find Work → Manage → Do Work → Get Paid
+  // iOS: Simplified 4-page version (mobile-focused)
+  // macOS: Full 6-page version (power user features)
+  #if os(iOS)
   private let pages: [WalkthroughPage] = [
-    // 1. Time Tracking + Goals
+    // 1. QUICK START: Track & Invoice
     WalkthroughPage(
       icon: "clock.badge.checkmark.fill",
       iconColors: [.blue, .purple],
-      title: "Track Time. Get Paid.",
-      subtitle: "Every minute counts. Now they're all counted.",
+      title: "Track. Invoice. Done.",
+      subtitle: "Your time. Your money. One tap away.",
       features: [
-        FeatureItem(icon: "play.circle.fill", text: "One-click tracking - start in a second", color: .green),
-        FeatureItem(icon: "chart.bar.fill", text: "See where your time actually goes", color: .blue),
-        FeatureItem(icon: "target", text: "Set income goals, watch the bar fill", color: .orange),
+        FeatureItem(icon: "play.circle.fill", text: "One-tap tracking - start anywhere", color: .green),
+        FeatureItem(icon: "doc.text.fill", text: "Invoices auto-generated from hours", color: .teal),
+        FeatureItem(icon: "bell.badge.fill", text: "Get paid alerts on your wrist", color: .orange),
       ],
-      testimonial: "\"Billing 4hrs, working 9. Did the math: $11/hr. Raised rates 3x.\" - Jake, Designer"
+      testimonial: "\"Sent invoice from my phone at 2am. Paid by breakfast.\" - Priya"
     ),
-    // 2. Gigs & Kanban
-    WalkthroughPage(
-      icon: "rectangle.3.group.fill",
-      iconColors: [.pink, .purple],
-      title: "Gigs on a Board",
-      subtitle: "Drag. Drop. Ship. Repeat.",
-      features: [
-        FeatureItem(icon: "arrow.left.arrow.right", text: "Kanban board - move gigs through stages", color: .purple),
-        FeatureItem(icon: "person.2.fill", text: "Client management in one place", color: .blue),
-        FeatureItem(icon: "doc.badge.clock", text: "Contracts & deadlines auto-tracked", color: .orange),
-      ],
-      testimonial: "\"23 projects 'in progress.' 19 were dead. Shipped the other 4 in 2 weeks.\" - David"
-    ),
-    // 3. Invoicing
-    WalkthroughPage(
-      icon: "doc.text.fill",
-      iconColors: [.teal, .cyan],
-      title: "Invoice in Seconds",
-      subtitle: "Your time. Your money. On autopilot.",
-      features: [
-        FeatureItem(icon: "wand.and.stars", text: "Auto-generate from tracked hours", color: .purple),
-        FeatureItem(icon: "checkmark.circle.fill", text: "Know who paid, who owes", color: .green),
-        FeatureItem(icon: "arrow.clockwise", text: "Recurring invoices on autopilot", color: .teal),
-      ],
-      testimonial: "\"Client ghosted 47 days. Sent 'overdue' link. Paid in 6 hours.\" - Emma"
-    ),
-    // 4. Hunt - Job Finder
+    // 2. FIND: Gigs on the go
     WalkthroughPage(
       icon: "binoculars.fill",
       iconColors: [.orange, .red],
-      title: "Hunt: Find Work",
-      subtitle: "It hunts while you sleep. Or doom-scroll.",
+      title: "Gigs Find You",
+      subtitle: "Hunt alerts. Even when you're offline.",
       features: [
-        FeatureItem(icon: "magnifyingglass", text: "Aggregates gigs from everywhere", color: .orange),
-        FeatureItem(icon: "bell.badge.fill", text: "Alerts when perfect matches appear", color: .red),
-        FeatureItem(icon: "doc.richtext", text: "One-click proposals with AI", color: .purple),
+        FeatureItem(icon: "bell.badge.fill", text: "Push alerts when perfect gigs drop", color: .red),
+        FeatureItem(icon: "hand.tap.fill", text: "Quick apply from notification", color: .orange),
+        FeatureItem(icon: "icloud.fill", text: "Syncs with your Mac instantly", color: .blue),
       ],
-      testimonial: "\"$8k contract from a gig I never would've found. Alert hit while I slept.\" - Nina"
+      testimonial: "\"$8k contract. Alert hit while I was at the gym.\" - Nina"
     ),
-    // 5. Focus Mode / Pomodoro
+    // 3. FOCUS: Stay in flow
     WalkthroughPage(
       icon: "timer",
       iconColors: [.red, .orange],
-      title: "Focus: Deep Work",
-      subtitle: "25 minutes of silence. A lifetime of productivity.",
+      title: "Stay Focused",
+      subtitle: "Pomodoro timer. Focus mode. Deep work.",
       features: [
-        FeatureItem(icon: "bell.slash.fill", text: "Kill notifications, enter flow state", color: .red),
-        FeatureItem(icon: "clock.badge.checkmark", text: "Pomodoro timer built-in", color: .orange),
-        FeatureItem(icon: "chart.xyaxis.line", text: "Track focus streaks over time", color: .green),
+        FeatureItem(icon: "timer", text: "25-minute focus sessions", color: .red),
+        FeatureItem(icon: "bell.slash.fill", text: "Silence notifications automatically", color: .orange),
+        FeatureItem(icon: "applewatch", text: "Timer on your Apple Watch", color: .green),
       ],
-      testimonial: "\"4.5 hrs/week free time. MVP in 6 weeks. Before: 6 months, failed.\" - Raj"
+      testimonial: "\"Focus mode from my watch. No excuses anymore.\" - Raj"
     ),
-    // 6. Dig - Idea Validation
+    // 4. FINAL: Everything synced
+    WalkthroughPage(
+      icon: "sparkles",
+      iconColors: [.purple, .pink],
+      title: "Your Pocket Office",
+      subtitle: "Track. Invoice. Focus. All synced.",
+      features: [
+        FeatureItem(icon: "icloud.fill", text: "Changes sync to Mac instantly", color: .blue),
+        FeatureItem(icon: "lock.shield.fill", text: "Your data stays on your devices", color: .green),
+        FeatureItem(icon: "applewatch", text: "Works on iPhone, iPad, Watch", color: .purple),
+      ],
+      isLastPage: true,
+      showTestimonials: true
+    ),
+  ]
+  #else
+  private let pages: [WalkthroughPage] = [
+    // 1. START: Got an idea?
     WalkthroughPage(
       icon: "lightbulb.max.fill",
       iconColors: [.yellow, .orange],
-      title: "Dig: Validate Ideas",
-      subtitle: "10 minutes of truth beats 10 months of hope.",
+      title: "Got an Idea?",
+      subtitle: "Let's find out if it's worth your time.",
       features: [
-        FeatureItem(icon: "brain.head.profile", text: "5 experts tear your idea apart", color: .purple),
-        FeatureItem(icon: "chart.line.uptrend.xyaxis", text: "Revenue projections before code", color: .green),
-        FeatureItem(icon: "exclamationmark.triangle.fill", text: "Devil's Advocate finds blind spots", color: .red),
+        FeatureItem(icon: "brain.head.profile", text: "Dig: 5 experts tear your idea apart", color: .purple),
+        FeatureItem(icon: "chart.line.uptrend.xyaxis", text: "Revenue projections before you code", color: .green),
+        FeatureItem(icon: "exclamationmark.triangle.fill", text: "Find the blind spots early", color: .red),
       ],
       testimonial: "\"Killed 6 ideas in one afternoon. The 7th scored 73. Shipping that one.\" - Marcus"
     ),
-    // 7. Final page - Everything together
+    // 2. FIND: Get your next gig
+    WalkthroughPage(
+      icon: "binoculars.fill",
+      iconColors: [.orange, .red],
+      title: "Find Your Next Gig",
+      subtitle: "Hunt searches while you sleep. Or procrastinate.",
+      features: [
+        FeatureItem(icon: "magnifyingglass", text: "Aggregates opportunities from everywhere", color: .orange),
+        FeatureItem(icon: "bell.badge.fill", text: "Alerts when perfect matches drop", color: .red),
+        FeatureItem(icon: "doc.richtext", text: "One-click proposals with AI assist", color: .purple),
+      ],
+      testimonial: "\"$8k contract. Alert hit while I slept. They found ME.\" - Nina"
+    ),
+    // 3. MANAGE: Organize the chaos
+    WalkthroughPage(
+      icon: "rectangle.3.group.fill",
+      iconColors: [.pink, .purple],
+      title: "Manage the Work",
+      subtitle: "Clients. Contracts. Deadlines. One board.",
+      features: [
+        FeatureItem(icon: "arrow.left.arrow.right", text: "Kanban board - drag gigs through stages", color: .purple),
+        FeatureItem(icon: "person.2.fill", text: "Clients & contracts in one place", color: .blue),
+        FeatureItem(icon: "target", text: "Set income goals, watch them fill", color: .orange),
+      ],
+      testimonial: "\"23 projects 'in progress.' 19 were dead. Shipped 4 in 2 weeks.\" - David"
+    ),
+    // 4. DO: Track your time, stay focused
+    WalkthroughPage(
+      icon: "clock.badge.checkmark.fill",
+      iconColors: [.blue, .purple],
+      title: "Do the Work",
+      subtitle: "Track time. Stay focused. Know where every hour goes.",
+      features: [
+        FeatureItem(icon: "play.circle.fill", text: "One-click tracking - start in a second", color: .green),
+        FeatureItem(icon: "timer", text: "Focus mode + Pomodoro built-in", color: .red),
+        FeatureItem(icon: "chart.bar.fill", text: "See where your time actually goes", color: .blue),
+      ],
+      testimonial: "\"Billing 4hrs, working 9. Did the math: $11/hr. Raised rates 3x.\" - Jake"
+    ),
+    // 5. GET PAID: Invoice and collect
+    WalkthroughPage(
+      icon: "dollarsign.circle.fill",
+      iconColors: [.green, .teal],
+      title: "Get Paid",
+      subtitle: "Your time tracked. Your invoice sent. Your money collected.",
+      features: [
+        FeatureItem(icon: "wand.and.stars", text: "Auto-generate invoices from hours", color: .purple),
+        FeatureItem(icon: "arrow.clockwise", text: "Recurring invoices on autopilot", color: .teal),
+        FeatureItem(icon: "checkmark.circle.fill", text: "Track who paid, chase who didn't", color: .green),
+      ],
+      testimonial: "\"Client ghosted 47 days. Sent 'overdue' link. Paid in 6 hours.\" - Emma"
+    ),
+    // 6. FINAL: Your complete workflow
     WalkthroughPage(
       icon: "sparkles",
-      iconColors: [.green, .teal],
-      title: "Your Freelance OS",
-      subtitle: "Track. Invoice. Hunt. Focus. Build.",
+      iconColors: [.purple, .pink],
+      title: "Your Next Gig Starts Here",
+      subtitle: "Idea → Gig → Work → Money. All in ung.",
       features: [
         FeatureItem(icon: "lock.shield.fill", text: "Your data never leaves your device", color: .green),
         FeatureItem(icon: "icloud.fill", text: "Sync across Mac, iPhone, iPad", color: .blue),
@@ -178,6 +224,7 @@ struct WelcomeWalkthroughView: View {
       showTestimonials: true
     ),
   ]
+  #endif
 
   var body: some View {
     GeometryReader { geometry in

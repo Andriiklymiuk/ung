@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andriiklymiuk/ung/api/internal/models"
+	"ung/api/internal/models"
 )
 
 // DigService handles idea analysis and incubation

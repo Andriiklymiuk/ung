@@ -64,6 +64,9 @@ func main() {
 	searchController := controllers.NewSearchController()
 	exportController := controllers.NewExportController()
 	hunterController := controllers.NewHunterController(cfg.UserDataDir)
+	aiService := services.NewAIService()
+	digService := services.NewDigService(aiService)
+	digController := controllers.NewDigController(digService)
 
 	// Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(apiDB, cfg.JWTSecret)
@@ -91,6 +94,7 @@ func main() {
 		searchController,
 		exportController,
 		hunterController,
+		digController,
 		authMiddleware,
 		tenantMiddleware,
 		subscriptionMiddleware,

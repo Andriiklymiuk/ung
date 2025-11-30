@@ -312,3 +312,142 @@ type Application struct {
 	CreatedAt    time.Time         `json:"created_at"`
 	UpdatedAt    time.Time         `json:"updated_at"`
 }
+
+// =====================================
+// Gig Models - Central Work Unit
+// =====================================
+
+// GigStatus represents the workflow status of a gig
+type GigStatus string
+
+const (
+	GigStatusPipeline    GigStatus = "pipeline"    // Potential work (from hunter)
+	GigStatusNegotiating GigStatus = "negotiating" // In discussion
+	GigStatusActive      GigStatus = "active"      // Currently working
+	GigStatusDelivered   GigStatus = "delivered"   // Work done, awaiting approval
+	GigStatusInvoiced    GigStatus = "invoiced"    // Invoice sent
+	GigStatusComplete    GigStatus = "complete"    // Paid and done
+	GigStatusOnHold      GigStatus = "on_hold"     // Paused
+	GigStatusCancelled   GigStatus = "cancelled"   // Cancelled
+)
+
+// GigType represents the type of work arrangement
+type GigType string
+
+const (
+	GigTypeHourly   GigType = "hourly"
+	GigTypeFixed    GigType = "fixed"
+	GigTypeRetainer GigType = "retainer"
+)
+
+// GigPriority represents urgency level
+type GigPriority int
+
+const (
+	GigPriorityNormal GigPriority = 0
+	GigPriorityHigh   GigPriority = 1
+	GigPriorityUrgent GigPriority = 2
+)
+
+// Gig represents a work project/engagement - the central unit connecting hunter → work → invoice
+type Gig struct {
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	Name          string    `gorm:"not null" json:"name"`
+	ClientID      *uint     `gorm:"index" json:"client_id"`
+	Client        *Client   `gorm:"foreignKey:ClientID" json:"-"`
+	ContractID    *uint     `gorm:"index" json:"contract_id"`
+	Contract      *Contract `gorm:"foreignKey:ContractID" json:"-"`
+	ApplicationID *uint     `gorm:"index" json:"application_id"` // From hunter
+
+	Status   GigStatus `gorm:"not null;default:pipeline" json:"status"`
+	GigType  GigType   `gorm:"default:hourly" json:"gig_type"`
+	Priority GigPriority `gorm:"default:0" json:"priority"`
+
+	// Financial
+	EstimatedHours  *float64 `json:"estimated_hours"`
+	EstimatedAmount *float64 `json:"estimated_amount"`
+	HourlyRate      *float64 `json:"hourly_rate"`
+	Currency        string   `gorm:"default:USD" json:"currency"`
+
+	// Tracking aggregation
+	TotalHoursTracked float64    `gorm:"default:0" json:"total_hours_tracked"`
+	LastTrackedAt     *time.Time `json:"last_tracked_at"`
+
+	// Billing
+	TotalInvoiced   float64    `gorm:"default:0" json:"total_invoiced"`
+	LastInvoicedAt  *time.Time `json:"last_invoiced_at"`
+
+	// Dates
+	StartDate   *time.Time `json:"start_date"`
+	DueDate     *time.Time `json:"due_date"`
+	CompletedAt *time.Time `json:"completed_at"`
+
+	// Metadata
+	Description string `json:"description"`
+	Notes       string `json:"notes"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// WorkLogType represents the type of work log entry
+type WorkLogType string
+
+const (
+	WorkLogTypeNote      WorkLogType = "note"
+	WorkLogTypeDecision  WorkLogType = "decision"
+	WorkLogTypeMeeting   WorkLogType = "meeting"
+	WorkLogTypeBlocker   WorkLogType = "blocker"
+	WorkLogTypeMilestone WorkLogType = "milestone"
+)
+
+// WorkLog represents a note/log entry attached to work
+type WorkLog struct {
+	ID                uint             `gorm:"primaryKey" json:"id"`
+	GigID             *uint            `gorm:"index" json:"gig_id"`
+	Gig               *Gig             `gorm:"foreignKey:GigID" json:"-"`
+	ClientID          *uint            `gorm:"index" json:"client_id"`
+	Client            *Client          `gorm:"foreignKey:ClientID" json:"-"`
+	TrackingSessionID *uint            `gorm:"index" json:"tracking_session_id"`
+	TrackingSession   *TrackingSession `gorm:"foreignKey:TrackingSessionID" json:"-"`
+
+	Content string      `gorm:"not null" json:"content"`
+	LogType WorkLogType `gorm:"default:note" json:"log_type"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// =====================================
+// Enhanced Goals
+// =====================================
+
+// GoalType represents different types of goals
+type GoalType string
+
+const (
+	GoalTypeIncome  GoalType = "income"
+	GoalTypeHours   GoalType = "hours"
+	GoalTypeClients GoalType = "clients"
+	GoalTypeSavings GoalType = "savings"
+)
+
+// IncomeGoal represents an enhanced income/hours/client goal
+type IncomeGoal struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Amount      float64   `gorm:"not null" json:"amount"`
+	Period      string    `gorm:"not null" json:"period"` // monthly, quarterly, yearly
+	Year        int       `gorm:"not null" json:"year"`
+	Month       int       `json:"month"`   // for monthly goals
+	Quarter     int       `json:"quarter"` // for quarterly goals
+	Description string    `json:"description"`
+	GoalType    GoalType  `gorm:"default:income" json:"goal_type"`
+
+	// For different goal types
+	TargetHours   *float64 `json:"target_hours"`   // hours goal
+	TargetClients *int     `json:"target_clients"` // clients goal
+	SavingsPercent *float64 `json:"savings_percent"` // savings goal (e.g., 30%)
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

@@ -846,3 +846,131 @@ struct HunterStats: Codable {
         self.recentJobs = recentJobs
     }
 }
+
+// MARK: - Gig Status
+
+enum GigStatus: String, Codable, CaseIterable {
+    case pipeline
+    case negotiating
+    case active
+    case delivered
+    case invoiced
+    case complete
+    case onHold = "on_hold"
+    case cancelled
+
+    var displayName: String {
+        switch self {
+        case .pipeline: return "Pipeline"
+        case .negotiating: return "Negotiating"
+        case .active: return "Active"
+        case .delivered: return "Delivered"
+        case .invoiced: return "Invoiced"
+        case .complete: return "Complete"
+        case .onHold: return "On Hold"
+        case .cancelled: return "Cancelled"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .pipeline: return "gray"
+        case .negotiating: return "purple"
+        case .active: return "blue"
+        case .delivered: return "orange"
+        case .invoiced: return "cyan"
+        case .complete: return "green"
+        case .onHold: return "yellow"
+        case .cancelled: return "red"
+        }
+    }
+}
+
+// MARK: - Gig
+
+struct Gig: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: Int64?
+    var name: String
+    var clientId: Int64?
+    var contractId: Int64?
+    var applicationId: Int64?
+    var status: String
+    var gigType: String?
+    var priority: Int
+    var estimatedHours: Double?
+    var estimatedAmount: Double?
+    var hourlyRate: Double?
+    var currency: String?
+    var totalHoursTracked: Double
+    var lastTrackedAt: Date?
+    var totalInvoiced: Double
+    var lastInvoicedAt: Date?
+    var startDate: Date?
+    var dueDate: Date?
+    var completedAt: Date?
+    var description: String?
+    var notes: String?
+    var createdAt: Date?
+    var updatedAt: Date?
+
+    static let databaseTableName = "gigs"
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, status, priority, currency, description, notes
+        case clientId = "client_id"
+        case contractId = "contract_id"
+        case applicationId = "application_id"
+        case gigType = "gig_type"
+        case estimatedHours = "estimated_hours"
+        case estimatedAmount = "estimated_amount"
+        case hourlyRate = "hourly_rate"
+        case totalHoursTracked = "total_hours_tracked"
+        case lastTrackedAt = "last_tracked_at"
+        case totalInvoiced = "total_invoiced"
+        case lastInvoicedAt = "last_invoiced_at"
+        case startDate = "start_date"
+        case dueDate = "due_date"
+        case completedAt = "completed_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+
+    var gigStatus: GigStatus {
+        GigStatus(rawValue: status) ?? .pipeline
+    }
+
+    static let client = belongsTo(ClientModel.self)
+}
+
+// MARK: - Work Log
+
+struct WorkLog: Codable, FetchableRecord, PersistableRecord, Identifiable {
+    var id: Int64?
+    var gigId: Int64?
+    var clientId: Int64?
+    var trackingSessionId: Int64?
+    var content: String
+    var logType: String
+    var createdAt: Date?
+    var updatedAt: Date?
+
+    static let databaseTableName = "work_logs"
+
+    enum CodingKeys: String, CodingKey {
+        case id, content
+        case gigId = "gig_id"
+        case clientId = "client_id"
+        case trackingSessionId = "tracking_session_id"
+        case logType = "log_type"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+}

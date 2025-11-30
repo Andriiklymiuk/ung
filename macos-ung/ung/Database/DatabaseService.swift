@@ -1278,4 +1278,167 @@ actor DatabaseService {
         // Reinitialize
         try await initialize()
     }
+
+    // MARK: - Gig Operations
+
+    func getGigs() async throws -> [Gig] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try Gig.order(Column("priority").desc, Column("updated_at").desc).fetchAll(db)
+        }
+    }
+
+    func getActiveGig() async throws -> Gig? {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try Gig
+                .filter(Column("status") == "active")
+                .order(Column("updated_at").desc)
+                .fetchOne(db)
+        }
+    }
+
+    func getActiveGigsCount() async throws -> Int {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try Gig
+                .filter(Column("status") == "active")
+                .fetchCount(db)
+        }
+    }
+
+    func getGig(id: Int64) async throws -> Gig? {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try Gig.fetchOne(db, key: id)
+        }
+    }
+
+    func createGig(_ gig: Gig) async throws -> Gig {
+        let db = try getDatabase()
+        return try await db.write { db in
+            var newGig = gig
+            newGig.createdAt = Date()
+            newGig.updatedAt = Date()
+            try newGig.insert(db)
+            return newGig
+        }
+    }
+
+    func updateGig(_ gig: Gig) async throws {
+        let db = try getDatabase()
+        try await db.write { db in
+            var updated = gig
+            updated.updatedAt = Date()
+            try updated.update(db)
+        }
+    }
+
+    func updateGigStatus(id: Int64, status: String) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try db.execute(
+                sql: "UPDATE gigs SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                arguments: [status, id]
+            )
+        }
+    }
+
+    func deleteGig(id: Int64) async throws {
+        let db = try getDatabase()
+        _ = try await db.write { db in
+            try Gig.deleteOne(db, key: id)
+        }
+    }
+
+    // MARK: - Work Log Operations
+
+    func getWorkLogs(gigId: Int64?, clientId: Int64?, limit: Int = 20) async throws -> [WorkLog] {
+        let db = try getDatabase()
+        return try await db.read { db in
+            var query = WorkLog.order(Column("created_at").desc)
+            if let gigId = gigId {
+                query = query.filter(Column("gig_id") == gigId)
+            }
+            if let clientId = clientId {
+                query = query.filter(Column("client_id") == clientId)
+            }
+            return try query.limit(limit).fetchAll(db)
+        }
+    }
+
+    func createWorkLog(_ log: WorkLog) async throws -> WorkLog {
+        let db = try getDatabase()
+        return try await db.write { db in
+            var newLog = log
+            newLog.createdAt = Date()
+            newLog.updatedAt = Date()
+            try newLog.insert(db)
+            return newLog
+        }
+    }
+
+    // MARK: - Next View Helpers
+
+    func getUnbilledHours() async throws -> Double {
+        let db = try getDatabase()
+        return try await db.read { db in
+            // Get hours from completed sessions that haven't been invoiced
+            // Simple heuristic: sessions from the current month that are completed
+            let startOfMonth = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: Date()))!
+
+            let sql = """
+                SELECT COALESCE(SUM(hours), 0) as total_hours
+                FROM tracking_sessions
+                WHERE end_time IS NOT NULL
+                  AND deleted_at IS NULL
+                  AND billable = 1
+                  AND start_time >= ?
+            """
+            let row = try Row.fetchOne(db, sql: sql, arguments: [startOfMonth])
+            return row?["total_hours"] as? Double ?? 0
+        }
+    }
+
+    func getTopJobMatch() async throws -> HunterJob? {
+        let db = try getDatabase()
+        return try await db.read { db in
+            try HunterJob
+                .filter(Column("match_score") > 0)
+                .order(Column("match_score").desc, Column("posted_at").desc)
+                .fetchOne(db)
+        }
+    }
+
+    struct SimpleGoal: Codable, FetchableRecord {
+        let amount: Double
+        let period: String
+    }
+
+    func getCurrentGoal() async throws -> SimpleGoal? {
+        let db = try getDatabase()
+        return try await db.read { db in
+            // Try to get a current month goal first, then quarterly, then yearly
+            let now = Date()
+            let calendar = Calendar.current
+            let year = calendar.component(.year, from: now)
+            let month = calendar.component(.month, from: now)
+
+            // Check if income_goals table exists
+            let tableExists = try Bool.fetchOne(db, sql: """
+                SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='income_goals'
+            """) ?? false
+
+            if !tableExists { return nil }
+
+            let sql = """
+                SELECT amount, period FROM income_goals
+                WHERE year = ? AND (month = ? OR month IS NULL OR month = 0)
+                ORDER BY
+                    CASE period WHEN 'monthly' THEN 1 WHEN 'quarterly' THEN 2 WHEN 'yearly' THEN 3 ELSE 4 END
+                LIMIT 1
+            """
+            return try SimpleGoal.fetchOne(db, sql: sql, arguments: [year, month])
+        }
+    }
 }

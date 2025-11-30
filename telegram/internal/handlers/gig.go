@@ -116,6 +116,9 @@ func (h *GigHandler) HandleMenu(message *tgbotapi.Message) error {
 			text.WriteString("*In Progress:*\n")
 			for _, gig := range inProgress {
 				text.WriteString(fmt.Sprintf("• %s", gig.Name))
+				if gig.Project != "" {
+					text.WriteString(fmt.Sprintf(" [%s]", gig.Project))
+				}
 				if gig.TotalHoursTracked > 0 {
 					text.WriteString(fmt.Sprintf(" _%.1fh_", gig.TotalHoursTracked))
 				}
@@ -132,7 +135,11 @@ func (h *GigHandler) HandleMenu(message *tgbotapi.Message) error {
 					text.WriteString(fmt.Sprintf("_+%d more_\n", len(todo)-3))
 					break
 				}
-				text.WriteString(fmt.Sprintf("• %s\n", gig.Name))
+				text.WriteString(fmt.Sprintf("• %s", gig.Name))
+				if gig.Project != "" {
+					text.WriteString(fmt.Sprintf(" [%s]", gig.Project))
+				}
+				text.WriteString("\n")
 			}
 		}
 	}
@@ -348,6 +355,11 @@ func (h *GigHandler) HandleView(callbackQuery *tgbotapi.CallbackQuery, gigID uin
 	// Client
 	if gig.ClientName != "" {
 		text.WriteString(fmt.Sprintf("👤 Client: %s\n", gig.ClientName))
+	}
+
+	// Project
+	if gig.Project != "" {
+		text.WriteString(fmt.Sprintf("📁 Project: %s\n", gig.Project))
 	}
 
 	// Stats

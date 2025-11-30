@@ -60,6 +60,7 @@ interface ParsedGig {
   status: string;
   hours: number;
   type: string;
+  project: string;
 }
 
 /**
@@ -432,6 +433,7 @@ export class GigCommands {
       const line = lines[i].trim();
       if (!line || line.startsWith('--')) continue;
 
+      // CLI output columns: ID, NAME, CLIENT, PROJECT, STATUS, HOURS
       const parts = line.split(/\s{2,}/).filter((p) => p.trim());
       if (parts.length >= 5) {
         const id = parseInt(parts[0], 10);
@@ -440,9 +442,10 @@ export class GigCommands {
             id,
             name: parts[1] || '',
             client: parts[2] || '-',
-            status: parts[3] || 'pipeline',
-            hours: parseFloat(parts[4]) || 0,
-            type: parts[5] || 'hourly',
+            project: parts[3] || '-',
+            status: parts[4] || 'todo',
+            hours: parseFloat(parts[5]) || 0,
+            type: 'hourly', // Default type, not in CLI output
           });
         }
       }

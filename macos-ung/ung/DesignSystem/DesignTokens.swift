@@ -62,43 +62,47 @@ enum Design {
     static let monoSmall = Font.system(size: 14, weight: .medium, design: .monospaced)
   }
 
-  // MARK: - Colors (Semantic)
+  // MARK: - Colors (Semantic) - Now Theme-Aware
   enum Colors {
-    // Brand - Professional blue
-    static let brand = Color(red: 0.20, green: 0.45, blue: 0.90)
-    static let brandLight = Color(red: 0.20, green: 0.45, blue: 0.90).opacity(0.15)
-    static let brandDark = Color(red: 0.15, green: 0.35, blue: 0.75)
+    // Theme-aware colors using ThemeManager
+    private static var theme: ThemeColors { ThemeManager.shared.colors }
+
+    // Brand colors
+    static var brand: Color { theme.brand }
+    static var brandLight: Color { theme.brandLight }
+    static var brandDark: Color { theme.brandDark }
 
     // Primary (using brand color)
-    static let primary = brand
-    static let primaryLight = brandLight
-    static let primaryMuted = brand.opacity(0.6)
+    static var primary: Color { theme.primary }
+    static var primaryLight: Color { theme.primaryLight }
+    static var primaryMuted: Color { theme.primaryMuted }
 
-    // Accent colors - refined, warmer palette
-    static let success = Color(red: 0.20, green: 0.65, blue: 0.45)
-    static let successLight = Color(red: 0.20, green: 0.65, blue: 0.45).opacity(0.1)
-    static let warning = Color(red: 0.95, green: 0.60, blue: 0.25)
-    static let warningLight = Color(red: 0.95, green: 0.60, blue: 0.25).opacity(0.1)
-    static let error = Color(red: 0.90, green: 0.35, blue: 0.35)
-    static let errorLight = Color(red: 0.90, green: 0.35, blue: 0.35).opacity(0.1)
+    // Accent colors
+    static var success: Color { theme.success }
+    static var successLight: Color { theme.successLight }
+    static var warning: Color { theme.warning }
+    static var warningLight: Color { theme.warningLight }
+    static var error: Color { theme.error }
+    static var errorLight: Color { theme.errorLight }
 
-    // Neutrals
+    // Neutrals - Theme-aware backgrounds
     static func backgroundPrimary(_ scheme: ColorScheme) -> Color {
-      scheme == .dark ? Color(white: 0.11) : Color.white
+      theme.backgroundPrimary(scheme)
     }
 
     static func backgroundSecondary(_ scheme: ColorScheme) -> Color {
-      scheme == .dark ? Color(white: 0.15) : Color(white: 0.97)
+      theme.backgroundSecondary(scheme)
     }
 
     static func backgroundTertiary(_ scheme: ColorScheme) -> Color {
-      scheme == .dark ? Color(white: 0.18) : Color(white: 0.94)
+      theme.backgroundTertiary(scheme)
     }
 
     static func surfaceElevated(_ scheme: ColorScheme) -> Color {
-      scheme == .dark ? Color(white: 0.14) : Color.white
+      theme.surfaceElevated(scheme)
     }
 
+    // Text colors (neutral, not theme-dependent)
     static let textPrimary = Color.primary
     static let textSecondary = Color.secondary
     static let textTertiary = Color.secondary.opacity(0.6)
@@ -106,18 +110,18 @@ enum Design {
     static let border = Color.gray.opacity(0.2)
     static let divider = Color.gray.opacity(0.15)
 
-    // Additional accent colors - refined palette
-    static let purple = Color(red: 0.55, green: 0.35, blue: 0.70)
-    static let indigo = Color(red: 0.35, green: 0.40, blue: 0.75)
-    static let teal = brand
+    // Additional accent colors
+    static var purple: Color { theme.purple }
+    static var indigo: Color { theme.indigo }
+    static var teal: Color { theme.teal }
 
-    // Feature colors - cohesive with brand
-    static let tracking = success
-    static let pomodoro = warning
-    static let invoice = brand
-    static let expense = warning
-    static let client = purple
-    static let contract = indigo
+    // Feature colors - cohesive with theme
+    static var tracking: Color { theme.tracking }
+    static var pomodoro: Color { theme.pomodoro }
+    static var invoice: Color { theme.invoice }
+    static var expense: Color { theme.expense }
+    static var client: Color { theme.client }
+    static var contract: Color { theme.contract }
 
     // Cross-platform system colors
     static var windowBackground: Color {

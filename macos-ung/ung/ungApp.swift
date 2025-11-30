@@ -12,6 +12,7 @@ import UserNotifications
 @main
 struct ungApp: App {
   @StateObject private var appState = AppState()
+  @StateObject private var themeManager = ThemeManager.shared
   @State private var importedFileURL: URL?
   @State private var showImportPasswordPrompt = false
   @State private var showImportConfirmation = false
@@ -66,6 +67,7 @@ struct ungApp: App {
     WindowGroup("UNG", id: "main-window") {
       MainWindowView()
         .environmentObject(appState)
+        .environmentObject(themeManager)
         .onOpenURL { url in
           handleOpenURL(url)
         }
@@ -253,6 +255,7 @@ struct ungApp: App {
         }
       })
       .environmentObject(appState)
+      .environmentObject(themeManager)
     } label: {
       MenuBarLabel()
         .environmentObject(appState)

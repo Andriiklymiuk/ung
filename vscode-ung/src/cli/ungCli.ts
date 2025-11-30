@@ -1004,4 +1004,75 @@ export class UngCli {
     // Encrypted but no password in keychain - need VSCode to provide it
     return false;
   }
+
+  // ========== Gig Commands ==========
+
+  /**
+   * List all gigs
+   */
+  async listGigs(status?: string): Promise<CliResult> {
+    const args = ['gig', 'list'];
+    if (status) args.push('--status', status);
+    return this.exec(args);
+  }
+
+  /**
+   * Show gig details
+   */
+  async showGig(id: number): Promise<CliResult> {
+    return this.exec(['gig', 'show', id.toString()]);
+  }
+
+  /**
+   * Create a new gig
+   */
+  async createGig(data: {
+    name: string;
+    clientId?: number;
+    status?: string;
+    type?: string;
+    rate?: number;
+  }): Promise<CliResult> {
+    const args = ['gig', 'add', data.name];
+    if (data.clientId) args.push('--client', data.clientId.toString());
+    if (data.status) args.push('--status', data.status);
+    if (data.type) args.push('--type', data.type);
+    if (data.rate) args.push('--rate', data.rate.toString());
+    return this.exec(args);
+  }
+
+  /**
+   * Move gig to a different status
+   */
+  async moveGig(id: number, status: string): Promise<CliResult> {
+    return this.exec(['gig', 'move', id.toString(), status]);
+  }
+
+  /**
+   * Delete a gig
+   */
+  async deleteGig(id: number): Promise<CliResult> {
+    return this.exec(['gig', 'delete', id.toString()]);
+  }
+
+  /**
+   * Add task to a gig
+   */
+  async addGigTask(gigId: number, title: string): Promise<CliResult> {
+    return this.exec(['gig', 'task', 'add', gigId.toString(), title]);
+  }
+
+  /**
+   * Toggle task completion
+   */
+  async toggleGigTask(taskId: number): Promise<CliResult> {
+    return this.exec(['gig', 'task', 'done', taskId.toString()]);
+  }
+
+  /**
+   * Delete a task
+   */
+  async deleteGigTask(taskId: number): Promise<CliResult> {
+    return this.exec(['gig', 'task', 'delete', taskId.toString()]);
+  }
 }

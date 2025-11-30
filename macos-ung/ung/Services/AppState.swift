@@ -266,6 +266,7 @@ class AppState: ObservableObject {
     // Dashboard data
     @Published var metrics: DashboardMetrics = DashboardMetrics()
     @Published var setupStatus: SetupStatus = SetupStatus()
+    @Published var onboardingSkipped: Bool = false
     @Published var recentInvoices: [RecentInvoice] = []
     @Published var recentSessions: [RecentSession] = []
     @Published var recentExpenses: [RecentExpense] = []
@@ -350,6 +351,7 @@ class AppState: ObservableObject {
         loadAppLockSettings()
         loadICloudSettings()
         loadEncryptionSettings()
+        loadOnboardingStatus()
         checkStatus()
     }
 
@@ -657,6 +659,26 @@ class AppState: ObservableObject {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             showToast = false
         }
+    }
+
+    // MARK: - Onboarding
+
+    /// Skip onboarding and show main dashboard
+    /// User can always complete setup later from Settings
+    func skipOnboarding() {
+        onboardingSkipped = true
+        UserDefaults.standard.set(true, forKey: "onboardingSkipped")
+    }
+
+    /// Check if user has previously skipped onboarding
+    func loadOnboardingStatus() {
+        onboardingSkipped = UserDefaults.standard.bool(forKey: "onboardingSkipped")
+    }
+
+    /// Reset onboarding skip (useful if user wants to see onboarding again)
+    func resetOnboardingSkip() {
+        onboardingSkipped = false
+        UserDefaults.standard.set(false, forKey: "onboardingSkipped")
     }
 
     // MARK: - Dashboard Refresh

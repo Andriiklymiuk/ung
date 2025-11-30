@@ -14,8 +14,8 @@ struct MainDashboardContent: View {
   private let compactWidthThreshold: CGFloat = 700
 
   var body: some View {
-    // Show full-screen onboarding when setup is incomplete
-    if !appState.setupStatus.isComplete {
+    // Show full-screen onboarding when setup is incomplete AND user hasn't skipped
+    if !appState.setupStatus.isComplete && !appState.onboardingSkipped {
       OnboardingDashboardView()
     } else {
       regularDashboard
@@ -675,21 +675,48 @@ struct OnboardingDashboardView: View {
           )
 
           OnboardingQuickAction(
+            icon: "list.clipboard.fill",
+            title: "Manage Gigs",
+            color: .blue,
+            action: { appState.selectedTab = .gigs }
+          )
+
+          OnboardingQuickAction(
+            icon: "chart.bar.fill",
+            title: "Goals & Reports",
+            color: .purple,
+            action: { appState.selectedTab = .reports }
+          )
+
+          OnboardingQuickAction(
             icon: "brain.head.profile",
             title: "Focus Mode",
             color: .orange,
             action: { appState.selectedTab = .pomodoro }
           )
-
-          OnboardingQuickAction(
-            icon: "chart.bar.fill",
-            title: "View Reports",
-            color: .blue,
-            action: { appState.selectedTab = .reports }
-          )
         }
       }
-      .frame(maxWidth: 480)
+      .frame(maxWidth: 580)
+
+      // Skip option with explore later
+      HStack {
+        Spacer()
+        Button(action: {
+          // Mark setup as "skipped" to show main dashboard
+          appState.skipOnboarding()
+        }) {
+          HStack(spacing: 4) {
+            Text("Explore first, set up later")
+              .font(.system(size: 12))
+            Image(systemName: "arrow.right")
+              .font(.system(size: 10))
+          }
+          .foregroundColor(.secondary)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 8)
+        Spacer()
+      }
 
       Spacer()
     }
@@ -707,8 +734,24 @@ struct OnboardingStepCard: View {
   let isComplete: Bool
   let isEnabled: Bool
   let action: () -> Void
+  var prerequisiteText: String? = nil
   @Environment(\.colorScheme) var colorScheme
   @State private var isHovered = false
+
+  // Default prerequisite messages based on step number
+  private var unlockMessage: String {
+    if let custom = prerequisiteText {
+      return custom
+    }
+    switch stepNumber {
+    case 2:
+      return "After adding company"
+    case 3:
+      return "After adding client"
+    default:
+      return "Coming up next"
+    }
+  }
 
   var body: some View {
     Button(action: {
@@ -760,17 +803,18 @@ struct OnboardingStepCard: View {
             .foregroundColor(.green)
         } else if isEnabled {
           HStack(spacing: 6) {
-            Text("Set Up")
+            Text("Get Started")
               .font(.system(size: 13, weight: .medium))
             Image(systemName: "arrow.right")
               .font(.system(size: 11))
           }
           .foregroundColor(.accentColor)
         } else {
+          // Positive framing instead of "Complete step X"
           HStack(spacing: 4) {
-            Image(systemName: "lock.fill")
+            Image(systemName: "clock")
               .font(.system(size: 10))
-            Text("Complete step \(stepNumber - 1)")
+            Text(unlockMessage)
               .font(.system(size: 11))
           }
           .foregroundColor(.secondary)

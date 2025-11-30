@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -473,26 +474,68 @@ func parseCategory(s string) models.ExpenseCategory {
 func runImportDB(cmd *cobra.Command, args []string) error {
 	dbFile := args[0]
 
+	// Expand ~ to home directory
+	if strings.HasPrefix(dbFile, "~/") {
+		dbFile = strings.Replace(dbFile, "~", os.Getenv("HOME"), 1)
+	}
+
 	// Check if file exists
 	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
 		return fmt.Errorf("database file not found: %s", dbFile)
 	}
 
 	fmt.Printf("\nImporting from SQLite database: %s\n", dbFile)
-	if importPassword != "" {
-		fmt.Println("Using password for encrypted database")
-	}
 
-	// Build connection string
-	dsn := dbFile
-	if importPassword != "" {
-		dsn = fmt.Sprintf("%s?_pragma_key=%s", dbFile, importPassword)
+	// Check if it's a .db.encrypted file (AES-256-GCM encrypted)
+	isAESEncrypted := strings.HasSuffix(dbFile, ".encrypted") || strings.HasSuffix(dbFile, ".db.encrypted")
+	var tempDecryptedPath string
+
+	if isAESEncrypted {
+		// Need password for AES-encrypted files
+		if importPassword == "" {
+			// Prompt for password
+			var pw string
+			pwForm := huh.NewForm(
+				huh.NewGroup(
+					huh.NewInput().
+						Title("Database Password").
+						Description("This database is encrypted. Enter password to decrypt:").
+						EchoMode(huh.EchoModePassword).
+						Value(&pw),
+				),
+			)
+			if err := pwForm.Run(); err != nil {
+				return fmt.Errorf("cancelled: %w", err)
+			}
+			importPassword = pw
+		}
+
+		fmt.Println("Decrypting AES-256-GCM encrypted database...")
+
+		// Create temp file for decrypted database
+		tempDecryptedPath = filepath.Join(os.TempDir(), fmt.Sprintf("ung_import_%d.db", time.Now().UnixNano()))
+
+		if err := db.DecryptDatabase(dbFile, tempDecryptedPath, importPassword); err != nil {
+			return fmt.Errorf("failed to decrypt database: %w", err)
+		}
+		defer os.Remove(tempDecryptedPath)
+
+		dbFile = tempDecryptedPath
+		fmt.Println("Database decrypted successfully")
+	} else if importPassword != "" {
+		fmt.Println("Using password for SQLCipher encrypted database")
 	}
 
 	// Open source database using raw SQL
-	sourceDB, err := openSourceDB(dsn, importPassword)
+	sourceDB, err := openSourceDB(dbFile, importPassword)
 	if err != nil {
-		return fmt.Errorf("failed to open source database: %w", err)
+		// If decryption already happened, don't pass password again
+		if tempDecryptedPath != "" {
+			sourceDB, err = openSourceDB(dbFile, "")
+		}
+		if err != nil {
+			return fmt.Errorf("failed to open source database: %w", err)
+		}
 	}
 	defer sourceDB.Close()
 
@@ -593,20 +636,29 @@ func runImportDBInteractive() error {
 		return fmt.Errorf("database file not found: %s", dbPath)
 	}
 
-	// Ask about encryption
-	encryptForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Is the database encrypted?").
-				Description("If the database is password-protected").
-				Affirmative("Yes").
-				Negative("No").
-				Value(&usePassword),
-		),
-	)
+	// Auto-detect .db.encrypted files
+	isAESEncrypted := strings.HasSuffix(dbPath, ".encrypted") || strings.HasSuffix(dbPath, ".db.encrypted")
 
-	if err := encryptForm.Run(); err != nil {
-		return fmt.Errorf("cancelled: %w", err)
+	if isAESEncrypted {
+		// AES-encrypted files always need a password
+		usePassword = true
+		fmt.Println("\n🔒 Detected AES-256-GCM encrypted database")
+	} else {
+		// Ask about encryption for regular .db files
+		encryptForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Is the database encrypted?").
+					Description("If the database is password-protected (SQLCipher)").
+					Affirmative("Yes").
+					Negative("No").
+					Value(&usePassword),
+			),
+		)
+
+		if err := encryptForm.Run(); err != nil {
+			return fmt.Errorf("cancelled: %w", err)
+		}
 	}
 
 	if usePassword {

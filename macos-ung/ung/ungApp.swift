@@ -85,7 +85,7 @@ struct ungApp: App {
           .environmentObject(appState)
         }
         .alert("Import Database?", isPresented: $showImportConfirmation) {
-          Button("Import") {
+          Button("Import & Merge") {
             Task {
               await importPlainDatabase(url: importedFileURL!)
             }
@@ -94,7 +94,7 @@ struct ungApp: App {
             importedFileURL = nil
           }
         } message: {
-          Text("This will replace your current database with the imported one. Make sure you have a backup.")
+          Text("Data from the imported database will be merged with your existing data. Existing records will be kept, new records will be added.")
         }
     }
     .windowStyle(.hiddenTitleBar)
@@ -314,7 +314,7 @@ struct ungApp: App {
     }
   }
 
-  /// Import an encrypted database file
+  /// Import an encrypted database file with merge strategy
   @MainActor
   private func importEncryptedDatabase(url: URL, password: String) async {
     defer {
@@ -324,14 +324,27 @@ struct ungApp: App {
     }
 
     do {
-      try await appState.importEncryptedDatabase(from: url, password: password)
-      appState.showToastMessage("Database imported successfully", type: .success)
+      // Use merge import to combine data instead of replacing
+      let result = try await appState.database.mergeImportEncryptedDatabase(from: url, password: password)
+
+      // Save password to keychain for future use
+      _ = appState.saveEncryptionPasswordToKeychain(password)
+
+      // Refresh dashboard to show new data
+      await appState.refreshDashboard()
+
+      // Show import result
+      var message = result.summary
+      if !result.skippedSummary.isEmpty {
+        message += "\n" + result.skippedSummary
+      }
+      appState.showToastMessage(message, type: .success)
     } catch {
       appState.showError("Failed to import database: \(error.localizedDescription)")
     }
   }
 
-  /// Import a plain (unencrypted) database file
+  /// Import a plain (unencrypted) database file with merge strategy
   @MainActor
   private func importPlainDatabase(url: URL) async {
     defer {
@@ -341,9 +354,18 @@ struct ungApp: App {
     }
 
     do {
-      try await appState.database.importDatabase(from: url)
-      appState.checkStatus()
-      appState.showToastMessage("Database imported successfully", type: .success)
+      // Use merge import to combine data instead of replacing
+      let result = try await appState.database.mergeImportDatabase(from: url)
+
+      // Refresh dashboard to show new data
+      await appState.refreshDashboard()
+
+      // Show import result
+      var message = result.summary
+      if !result.skippedSummary.isEmpty {
+        message += "\n" + result.skippedSummary
+      }
+      appState.showToastMessage(message, type: .success)
     } catch {
       appState.showError("Failed to import database: \(error.localizedDescription)")
     }

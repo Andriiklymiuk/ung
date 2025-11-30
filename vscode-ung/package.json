@@ -434,6 +434,12 @@
         "icon": "$(folder-opened)"
       },
       {
+        "command": "ung.importDatabase",
+        "title": "Import Database (Merge)",
+        "category": "UNG",
+        "icon": "$(database)"
+      },
+      {
         "command": "ung.setIncomeGoal",
         "title": "Set Income Goal",
         "category": "UNG",

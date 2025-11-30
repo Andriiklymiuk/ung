@@ -144,15 +144,18 @@ class KeychainManager: @unchecked Sendable {
     static let shared = KeychainManager()
     private let service = "com.ung.ung"
     private let passwordKey = "database_password"
+    private let encryptionPasswordKey = "encryption_password"
 
-    func savePassword(_ password: String) -> Bool {
-        guard let data = password.data(using: .utf8) else { return false }
+    // MARK: - Generic Password Operations
+
+    private func saveItem(_ key: String, value: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
 
         // Delete existing
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: passwordKey,
+            kSecAttrAccount as String: key,
         ]
         SecItemDelete(deleteQuery as CFDictionary)
 
@@ -160,7 +163,7 @@ class KeychainManager: @unchecked Sendable {
         let addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: passwordKey,
+            kSecAttrAccount as String: key,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
         ]
@@ -169,11 +172,11 @@ class KeychainManager: @unchecked Sendable {
         return status == errSecSuccess
     }
 
-    func getPassword() -> String? {
+    private func getItem(_ key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: passwordKey,
+            kSecAttrAccount as String: key,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -183,27 +186,67 @@ class KeychainManager: @unchecked Sendable {
 
         guard status == errSecSuccess,
             let data = result as? Data,
-            let password = String(data: data, encoding: .utf8)
+            let value = String(data: data, encoding: .utf8)
         else {
             return nil
         }
 
-        return password
+        return value
     }
 
-    func deletePassword() -> Bool {
+    private func deleteItem(_ key: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: passwordKey,
+            kSecAttrAccount as String: key,
         ]
 
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
+    private func hasItem(_ key: String) -> Bool {
+        return getItem(key) != nil
+    }
+
+    // MARK: - Database Password (Legacy)
+
+    func savePassword(_ password: String) -> Bool {
+        return saveItem(passwordKey, value: password)
+    }
+
+    func getPassword() -> String? {
+        return getItem(passwordKey)
+    }
+
+    func deletePassword() -> Bool {
+        return deleteItem(passwordKey)
+    }
+
     func hasPassword() -> Bool {
-        return getPassword() != nil
+        return hasItem(passwordKey)
+    }
+
+    // MARK: - Encryption Password
+
+    /// Save the database encryption password to keychain
+    func saveEncryptionPassword(_ password: String) -> Bool {
+        return saveItem(encryptionPasswordKey, value: password)
+    }
+
+    /// Get the database encryption password from keychain
+    func getEncryptionPassword() -> String? {
+        return getItem(encryptionPasswordKey)
+    }
+
+    /// Delete the database encryption password from keychain
+    func deleteEncryptionPassword() -> Bool {
+        return deleteItem(encryptionPasswordKey)
+    }
+
+    /// Check if encryption password is stored in keychain
+    func hasEncryptionPassword() -> Bool {
+        return hasItem(encryptionPasswordKey)
     }
 }
 
@@ -259,6 +302,17 @@ class AppState: ObservableObject {
     // Settings
     @Published var hasStoredPassword: Bool = false
     @Published var databaseEncrypted: Bool = false
+    @Published var hasEncryptionPassword: Bool = false
+    @Published var encryptionStatus: EncryptionStatus = .disabled
+    @Published var showPasswordPrompt: Bool = false
+    @Published var pendingPasswordAction: PasswordAction?
+
+    enum PasswordAction {
+        case unlock
+        case enable
+        case disable
+        case change
+    }
 
     // iCloud Sync
     @Published var iCloudEnabled: Bool = false
@@ -292,9 +346,113 @@ class AppState: ObservableObject {
 
     init() {
         hasStoredPassword = keychain.hasPassword()
+        hasEncryptionPassword = keychain.hasEncryptionPassword()
         loadAppLockSettings()
         loadICloudSettings()
+        loadEncryptionSettings()
         checkStatus()
+    }
+
+    // MARK: - Encryption Settings
+    private func loadEncryptionSettings() {
+        databaseEncrypted = UserDefaults.standard.bool(forKey: "databaseEncryptionEnabled")
+        Task {
+            encryptionStatus = await database.checkEncryptionStatus()
+            databaseEncrypted = encryptionStatus.isEnabled
+        }
+    }
+
+    /// Check if database needs password to unlock
+    func checkNeedsPassword() async -> Bool {
+        return await database.needsPassword
+    }
+
+    /// Enable database encryption
+    func enableEncryption(password: String) async {
+        do {
+            try await database.enableEncryption(password: password)
+            // Save password to keychain
+            _ = keychain.saveEncryptionPassword(password)
+            hasEncryptionPassword = true
+            databaseEncrypted = true
+            encryptionStatus = .enabled
+            showToastMessage("Database encryption enabled", type: .success)
+        } catch {
+            showError("Failed to enable encryption: \(error.localizedDescription)")
+        }
+    }
+
+    /// Disable database encryption
+    func disableEncryption(password: String) async {
+        do {
+            try await database.disableEncryption(password: password)
+            // Remove password from keychain
+            _ = keychain.deleteEncryptionPassword()
+            hasEncryptionPassword = false
+            databaseEncrypted = false
+            encryptionStatus = .disabled
+            showToastMessage("Database encryption disabled", type: .success)
+        } catch {
+            showError("Failed to disable encryption: \(error.localizedDescription)")
+        }
+    }
+
+    /// Change encryption password
+    func changeEncryptionPassword(currentPassword: String, newPassword: String) async {
+        do {
+            try await database.changePassword(currentPassword: currentPassword, newPassword: newPassword)
+            // Update keychain
+            _ = keychain.saveEncryptionPassword(newPassword)
+            showToastMessage("Encryption password changed", type: .success)
+        } catch {
+            showError("Failed to change password: \(error.localizedDescription)")
+        }
+    }
+
+    /// Unlock encrypted database with password
+    func unlockDatabase(password: String) async -> Bool {
+        let verified = await database.verifyPassword(password)
+        if verified {
+            await database.setPassword(password)
+            do {
+                try await database.initialize()
+                // Save password to keychain for convenience
+                _ = keychain.saveEncryptionPassword(password)
+                hasEncryptionPassword = true
+                showToastMessage("Database unlocked", type: .success)
+                await refreshDashboard()
+                return true
+            } catch {
+                showError("Failed to unlock database: \(error.localizedDescription)")
+                return false
+            }
+        } else {
+            showError("Incorrect password")
+            return false
+        }
+    }
+
+    /// Save encryption password to keychain
+    func saveEncryptionPasswordToKeychain(_ password: String) -> Bool {
+        let success = keychain.saveEncryptionPassword(password)
+        if success {
+            hasEncryptionPassword = true
+        }
+        return success
+    }
+
+    /// Clear encryption password from keychain
+    func clearEncryptionPasswordFromKeychain() -> Bool {
+        let success = keychain.deleteEncryptionPassword()
+        if success {
+            hasEncryptionPassword = false
+        }
+        return success
+    }
+
+    /// Get stored encryption password
+    func getStoredEncryptionPassword() -> String? {
+        return keychain.getEncryptionPassword()
     }
 
     // MARK: - iCloud Settings
@@ -419,15 +577,49 @@ class AppState: ObservableObject {
         status = .loading
 
         Task {
-            // Auto-initialize the database - no CLI required!
-            do {
-                try await database.initialize()
-                print("[AppState] Database initialized successfully")
-                status = .ready
-                await refreshDashboard()
-            } catch {
-                print("[AppState] Failed to initialize database: \(error)")
-                status = .notInitialized
+            // Check if database is encrypted and needs password
+            let needsPassword = await database.needsPassword
+
+            if needsPassword {
+                // Try to use stored password from keychain
+                if let storedPassword = keychain.getEncryptionPassword() {
+                    await database.setPassword(storedPassword)
+                    do {
+                        try await database.initialize()
+                        print("[AppState] Database initialized with stored password")
+                        encryptionStatus = .enabled
+                        databaseEncrypted = true
+                        status = .ready
+                        await refreshDashboard()
+                    } catch {
+                        print("[AppState] Failed to initialize with stored password: \(error)")
+                        // Password might be wrong, prompt user
+                        showPasswordPrompt = true
+                        pendingPasswordAction = .unlock
+                        status = .notInitialized
+                    }
+                } else {
+                    // No stored password, prompt user
+                    print("[AppState] Encrypted database found, password required")
+                    showPasswordPrompt = true
+                    pendingPasswordAction = .unlock
+                    encryptionStatus = .enabled
+                    databaseEncrypted = true
+                    status = .notInitialized
+                }
+            } else {
+                // Auto-initialize the database - no CLI required!
+                do {
+                    try await database.initialize()
+                    print("[AppState] Database initialized successfully")
+                    encryptionStatus = await database.checkEncryptionStatus()
+                    databaseEncrypted = encryptionStatus.isEnabled
+                    status = .ready
+                    await refreshDashboard()
+                } catch {
+                    print("[AppState] Failed to initialize database: \(error)")
+                    status = .notInitialized
+                }
             }
         }
     }

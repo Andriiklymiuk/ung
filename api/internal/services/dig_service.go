@@ -174,6 +174,205 @@ Provide analysis in this JSON format:
 	}
 }
 
+// GetHarshPerspectives returns harsh/critical analysis perspectives for deeper analysis
+func (s *DigService) GetHarshPerspectives() []AnalysisPerspective {
+	return []AnalysisPerspective{
+		{
+			Name:        models.DigPerspectiveDevilsAdvocate,
+			Description: "Devil's Advocate - Harsh critic",
+			Prompt: `You are a BRUTAL DEVIL'S ADVOCATE. Your job is to DESTROY this idea.
+
+Be harsh. Be critical. Find EVERY flaw. Assume the worst. Play the skeptic.
+Your goal: If this idea can survive your criticism, it might actually work.
+
+For the idea: "%s"
+
+Attack from every angle:
+- Why will this FAIL?
+- What are they NOT seeing?
+- Why won't customers care?
+- Why is the timing wrong?
+- What will kill this before it starts?
+
+Provide analysis in this JSON format:
+{
+  "summary": "2-3 sentence brutal assessment",
+  "fatal_flaws": ["reasons this will definitely fail"],
+  "blind_spots": ["things the founder isn't seeing"],
+  "customer_objections": ["why customers won't buy"],
+  "timing_problems": ["why the timing is wrong"],
+  "competition_will_crush": ["how competitors will destroy this"],
+  "execution_nightmares": ["implementation problems that will kill it"],
+  "weaknesses": ["consolidated list of all weaknesses"],
+  "survival_requirements": ["what MUST be true for this to work"],
+  "recommendations": ["harsh but actionable advice"],
+  "score": 0-100,
+  "verdict": "This idea will fail because..."
+}`,
+		},
+		{
+			Name:        models.DigPerspectiveCopycat,
+			Description: "Copycat Analysis - Can copycats succeed?",
+			Prompt: `You are analyzing this idea from a COPYCAT perspective.
+
+Key question: If someone copies this idea tomorrow, can THEY still succeed?
+This reveals how defensible the idea is and if there's room in the market.
+
+For the idea: "%s"
+
+Consider:
+- How easy is it to copy?
+- Can a well-funded competitor crush the original?
+- Is this a "winner takes all" market?
+- What would a copycat need to succeed?
+- Are there successful copycats in similar markets?
+
+Provide analysis in this JSON format:
+{
+  "summary": "2-3 sentence copycat viability assessment",
+  "copy_difficulty": "trivial/easy/moderate/hard/very_hard",
+  "time_to_copy": "how long for a competitor to replicate",
+  "moat_analysis": {
+    "network_effects": "none/weak/moderate/strong",
+    "switching_costs": "none/low/medium/high",
+    "brand_value": "none/low/medium/high",
+    "data_advantage": "none/low/medium/high",
+    "economies_of_scale": "none/low/medium/high"
+  },
+  "copycat_success_chance": "0-100% chance a copycat succeeds",
+  "successful_copycat_examples": ["examples of copycats that won"],
+  "market_room": "is there room for multiple players?",
+  "first_mover_advantage": "low/medium/high with reasoning",
+  "weaknesses": ["defensibility weaknesses"],
+  "strengths": ["what makes this hard to copy"],
+  "recommendations": ["how to become uncopyable"],
+  "score": 0-100
+}`,
+		},
+		{
+			Name:        models.DigPerspectiveUserPsychology,
+			Description: "User Psychology - Behavioral analysis",
+			Prompt: `You are a BEHAVIORAL PSYCHOLOGIST analyzing this idea.
+
+Focus on: Human behavior, habits, motivation, cognitive biases, behavior change.
+Ask: Will people ACTUALLY do this? Not "would they say yes in a survey" but WILL THEY?
+
+For the idea: "%s"
+
+Analyze:
+- What behavior change is required?
+- What habits need to form or break?
+- What's the motivation (pain vs gain)?
+- What friction will stop adoption?
+- Does this align with how humans actually behave?
+
+Provide analysis in this JSON format:
+{
+  "summary": "2-3 sentence psychological analysis",
+  "behavior_change_required": "none/minor/moderate/major/extreme",
+  "habit_formation": {
+    "trigger": "what triggers the behavior",
+    "action": "what the user must do",
+    "reward": "what reward reinforces it",
+    "difficulty": "how hard to form this habit"
+  },
+  "motivation_type": "pain_avoidance/pleasure_seeking/social/aspirational",
+  "psychological_barriers": ["mental obstacles to adoption"],
+  "cognitive_biases_helping": ["biases that help adoption"],
+  "cognitive_biases_hurting": ["biases that hurt adoption"],
+  "addiction_potential": "will users come back naturally?",
+  "social_proof_dependency": "how much does this need social proof?",
+  "weaknesses": ["psychological weaknesses"],
+  "strengths": ["psychological strengths"],
+  "recommendations": ["how to align with human psychology"],
+  "score": 0-100,
+  "will_users_actually": "honest assessment of real behavior"
+}`,
+		},
+		{
+			Name:        models.DigPerspectiveScalability,
+			Description: "Scalability Stress Test",
+			Prompt: `You are running a SCALABILITY STRESS TEST on this idea.
+
+Assume it works. Assume people love it. Now: CAN IT SCALE?
+10x users. 100x users. Global expansion. What breaks?
+
+For the idea: "%s"
+
+Stress test:
+- What happens at 10x scale?
+- What happens at 100x scale?
+- What's the unit economics at scale?
+- What operational nightmares emerge?
+- What regulatory/legal issues appear at scale?
+
+Provide analysis in this JSON format:
+{
+  "summary": "2-3 sentence scalability assessment",
+  "current_model_max": "maximum scale with current approach",
+  "scale_10x": {
+    "breaks": ["what breaks at 10x"],
+    "cost_change": "how costs change",
+    "quality_impact": "impact on quality"
+  },
+  "scale_100x": {
+    "breaks": ["what breaks at 100x"],
+    "cost_change": "how costs change",
+    "requires": ["what's needed to reach this"]
+  },
+  "global_expansion_issues": ["international scaling problems"],
+  "operational_bottlenecks": ["what operations can't scale"],
+  "regulatory_at_scale": ["legal issues that appear at scale"],
+  "unit_economics_at_scale": "do margins improve or collapse?",
+  "weaknesses": ["scalability weaknesses"],
+  "strengths": ["scalability strengths"],
+  "recommendations": ["how to build for scale from day 1"],
+  "score": 0-100,
+  "scale_ceiling": "realistic maximum scale"
+}`,
+		},
+		{
+			Name:        models.DigPerspectiveWorstCase,
+			Description: "Worst Case Scenario",
+			Prompt: `You are a WORST CASE SCENARIO analyst.
+
+Murphy's Law: Everything that can go wrong, will go wrong.
+Your job: Map out exactly how this fails in the worst possible way.
+
+For the idea: "%s"
+
+Consider:
+- Technical disasters (security breaches, outages, data loss)
+- Market disasters (competitor launches, market crashes, regulation)
+- Operational disasters (key person leaves, supplier fails, PR crisis)
+- Financial disasters (funding dries up, costs explode, no revenue)
+- Legal disasters (lawsuits, regulation, IP issues)
+
+Provide analysis in this JSON format:
+{
+  "summary": "2-3 sentence worst case overview",
+  "nightmare_scenarios": [
+    {
+      "scenario": "what happens",
+      "probability": "low/medium/high",
+      "impact": "minor/major/catastrophic",
+      "recovery": "impossible/hard/possible/easy"
+    }
+  ],
+  "single_points_of_failure": ["things that could kill everything"],
+  "black_swan_risks": ["unlikely but devastating events"],
+  "cascading_failures": ["how one problem triggers others"],
+  "weaknesses": ["vulnerability points"],
+  "survival_playbook": ["how to survive worst cases"],
+  "insurance_options": ["ways to protect against disaster"],
+  "recommendations": ["how to de-risk"],
+  "score": 0-100,
+  "existential_risk": "low/medium/high - chance of total failure"
+}`,
+		},
+	}
+}
+
 // AnalyzeIdea performs a single perspective analysis
 func (s *DigService) AnalyzeIdea(idea string, perspective AnalysisPerspective) (*models.DigAnalysis, error) {
 	prompt := fmt.Sprintf(perspective.Prompt, idea)

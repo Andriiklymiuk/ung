@@ -1,5 +1,104 @@
 # Dig - Marketing Materials
 
+---
+
+## Who Uses Dig? (The Real People)
+
+### Marcus Chen - The 3 AM Architect
+*San Francisco, 34, Senior Software Engineer at a Series B startup*
+
+Marcus lies awake at 3 AM. Again. His wife sleeps beside him, unaware that his mind is racing through another app idea - the fourth one this month.
+
+He's been at his startup for three years. Good salary. Stock options. But every day he watches founders younger than him raise money for ideas worse than his. The difference? They shipped. He didn't.
+
+His Notes app has 47 ideas. Some are good. Some are garbage. The problem is he can't tell which is which. Last year he spent four months building a "revolutionary" habit tracker before realizing Habitica existed with 5 million users.
+
+Four months. Gone.
+
+His morning routine now: Coffee. Dig. 10 minutes of brutal honesty about whether today's shower thought is worth tomorrow's weekends.
+
+**"Dig told me my habit tracker idea scored 34. Devil's Advocate said I was solving a solved problem with no differentiation. It hurt. But it would have hurt more to waste another four months."**
+
+---
+
+### Sarah Okonkwo - The Corporate Escapee
+*Lagos → London, 29, Ex-McKinsey, Now Full-Time Idea Machine*
+
+Sarah quit McKinsey six months ago. She told everyone it was to "build something." The truth? She has no idea what.
+
+She has $80,000 saved. Eighteen months of runway if she's careful. But every week that passes without shipping something, the clock ticks louder.
+
+Back at McKinsey, she had frameworks for everything. MECE. Porter's Five Forces. Decision matrices. But entrepreneurship doesn't have frameworks. It has gut feelings. And her gut has been wrong before.
+
+Her therapist says she's "paralyzed by optionality." She has seven Notion databases full of startup ideas, competitor analyses, and market sizing spreadsheets. What she doesn't have is a launched product.
+
+Dig became her forcing function. Every idea gets 10 minutes. A score. A recommendation. Move on or dig deeper.
+
+**"The Copycat Analysis changed everything. It showed me that even if my idea wasn't original, there was room in the market. That 85% of billion-dollar companies are copycats of something else. It gave me permission to stop seeking novelty and start seeking execution."**
+
+---
+
+### Raj Patel - The Side Project Survivor
+*Austin, 41, Engineering Manager, Two Kids, Zero Free Time*
+
+Raj has 4.5 hours of free time per week. Total. He's calculated it.
+
+His kids go to bed at 8:30. His wife wants to watch one show together. He's asleep by 11 because the 6 AM alarm is non-negotiable.
+
+That leaves Tuesday and Thursday nights, 8:30-10:30, after dishes. Four hours. Plus Saturday morning while his wife does yoga. Half hour.
+
+4.5 hours to build his empire.
+
+He can't afford to waste a single minute on the wrong idea. Every side project has to count. Last year he built half an app before realizing the technical complexity required 40 hours of work - 9 weeks of his time - just for MVP.
+
+Dig's Technical Analysis changed his calculus. Now he knows the scope before he writes a line of code.
+
+**"I ran my idea through Dig and the Scalability Stress Test said my architecture would break at 1,000 users. I would have found that out in month 3. Now I found out in minute 7."**
+
+---
+
+### Emma Lindqvist - The First-Time Founder
+*Stockholm, 26, Designer at Spotify, Dreams of More*
+
+Emma designs systems that 400 million people use. She's good at it. Great, even. But she designs someone else's vision.
+
+Every Friday, she sketches app ideas on her iPad. Little utilities. Beautiful things. Things that would make one person's day slightly better.
+
+But every Monday, she talks herself out of them. "That already exists." "No one would pay for that." "Who am I to start a company?"
+
+Her designer friends just nod and agree. Her engineer friends offer to "help build it someday." Someday never comes.
+
+Dig doesn't nod. Dig doesn't agree. Dig tears her ideas apart - then tells her exactly which parts are worth saving.
+
+**"The User Psychology analysis said my idea required 'major behavior change' and had low 'addiction potential.' Harsh? Yes. True? Also yes. It made me redesign the core loop. Now the same analysis says 'moderate behavior change' with 'natural return triggers.' That's the difference between a graveyard app and a daily habit."**
+
+---
+
+### David Morrison - The Serial Failure
+*Denver, 38, Three Failed Startups, One More Shot*
+
+David has started three companies. Three failures.
+
+Company 1: Great idea, wrong timing. The market wasn't ready.
+Company 2: Wrong idea, great team. Pivoted four times before running out of money.
+Company 3: Right idea, wrong execution. Beat by a competitor with more funding.
+
+He's not bitter. He's educated. But he's running out of runway - both financial and emotional.
+
+His wife believes in him. His kids think he's "working on something cool." His parents have stopped asking.
+
+This time has to be different. Not because he wants it to be, but because he can't survive another failure. His marriage can't. His savings can't.
+
+Dig is his sanity check. Every decision gets run through the gauntlet. Devil's Advocate tries to kill it. Worst Case Scenario maps the disaster. If the idea survives both, it might survive the market.
+
+**"The Worst Case Scenario analysis listed 'cascading failures' I never considered. My last startup died from exactly one of those cascades. This time I saw it coming before I wrote a line of code."**
+
+---
+
+*These aren't user personas. These are real people with real dreams and real constraints. Dig isn't just software to them - it's the difference between another wasted year and the year everything changed.*
+
+---
+
 ## The Elon Musk Pitch
 
 **"Most people have ideas. Very few know if they're worth pursuing."**

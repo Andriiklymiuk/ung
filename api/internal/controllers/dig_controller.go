@@ -70,7 +70,7 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 	var analyses []models.DigAnalysis
 	stagesCompleted := []string{}
 
-	// Run each perspective analysis
+	// Phase 1: Run core perspective analyses
 	for _, perspective := range perspectives {
 		// Update current stage
 		session.CurrentStage = string(perspective.Name)
@@ -95,37 +95,72 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 		db.Save(session)
 	}
 
-	// Generate execution plan
-	session.CurrentStage = "execution_plan"
-	db.Save(session)
+	// Calculate initial score to determine if we should run harsh analysis
+	initialScore := c.digService.CalculateOverallScore(analyses)
 
-	executionPlan, err := c.digService.GenerateExecutionPlan(session.RawIdea, analyses)
-	if err == nil {
-		executionPlan.SessionID = session.ID
-		db.Create(executionPlan)
+	// Phase 2: Run harsh/critical perspectives (for all ideas - provides valuable feedback)
+	// These perspectives stress-test the idea and reveal blind spots
+	harshPerspectives := c.digService.GetHarshPerspectives()
+	for _, perspective := range harshPerspectives {
+		session.CurrentStage = string(perspective.Name)
+		db.Save(session)
+
+		analysis, err := c.digService.AnalyzeIdea(session.RawIdea, perspective)
+		if err != nil {
+			continue
+		}
+
+		analysis.SessionID = session.ID
+		if err := db.Create(analysis).Error; err != nil {
+			continue
+		}
+
+		analyses = append(analyses, *analysis)
+		stagesCompleted = append(stagesCompleted, string(perspective.Name))
+
+		stagesJSON, _ := json.Marshal(stagesCompleted)
+		session.StagesCompleted = string(stagesJSON)
+		db.Save(session)
 	}
 
-	// Generate marketing materials
-	session.CurrentStage = "marketing"
-	db.Save(session)
+	// Phase 3: Generate outputs only if initial analysis looks promising (score >= 40)
+	// Even mediocre ideas get execution plans so founders know what it would take
+	if initialScore >= 40 {
+		// Generate execution plan
+		session.CurrentStage = "execution_plan"
+		db.Save(session)
 
-	marketing, err := c.digService.GenerateMarketing(session.RawIdea, analyses)
-	if err == nil {
-		marketing.SessionID = session.ID
-		db.Create(marketing)
+		executionPlan, err := c.digService.GenerateExecutionPlan(session.RawIdea, analyses)
+		if err == nil {
+			executionPlan.SessionID = session.ID
+			db.Create(executionPlan)
+		}
+		stagesCompleted = append(stagesCompleted, "execution_plan")
+
+		// Generate marketing materials
+		session.CurrentStage = "marketing"
+		db.Save(session)
+
+		marketing, err := c.digService.GenerateMarketing(session.RawIdea, analyses)
+		if err == nil {
+			marketing.SessionID = session.ID
+			db.Create(marketing)
+		}
+		stagesCompleted = append(stagesCompleted, "marketing")
+
+		// Generate revenue projections
+		session.CurrentStage = "revenue"
+		db.Save(session)
+
+		revenue, err := c.digService.GenerateRevenueProjections(session.RawIdea, analyses)
+		if err == nil {
+			revenue.SessionID = session.ID
+			db.Create(revenue)
+		}
+		stagesCompleted = append(stagesCompleted, "revenue")
 	}
 
-	// Generate revenue projections
-	session.CurrentStage = "revenue"
-	db.Save(session)
-
-	revenue, err := c.digService.GenerateRevenueProjections(session.RawIdea, analyses)
-	if err == nil {
-		revenue.SessionID = session.ID
-		db.Create(revenue)
-	}
-
-	// Generate alternatives
+	// Always generate alternatives - helps founders find better directions
 	session.CurrentStage = "alternatives"
 	db.Save(session)
 
@@ -136,8 +171,13 @@ func (c *DigController) runAnalysis(db *gorm.DB, session *models.DigSession) {
 			db.Create(&alternatives[i])
 		}
 	}
+	stagesCompleted = append(stagesCompleted, "alternatives")
 
-	// Calculate overall score and recommendation
+	// Update final stages
+	stagesJSON, _ := json.Marshal(stagesCompleted)
+	session.StagesCompleted = string(stagesJSON)
+
+	// Calculate overall score (including harsh perspectives) and recommendation
 	overallScore := c.digService.CalculateOverallScore(analyses)
 	recommendation := c.digService.DetermineRecommendation(overallScore, analyses)
 

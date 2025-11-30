@@ -402,8 +402,45 @@ struct DigContent: View {
     private var analysisTab: some View {
         VStack(alignment: .leading, spacing: Design.Spacing.lg) {
             if let analyses = digState.currentSession?.analyses {
-                ForEach(analyses) { analysis in
-                    AnalysisCard(analysis: analysis)
+                // Core Perspectives
+                let coreAnalyses = analyses.filter { !$0.perspective.isHarsh }
+                if !coreAnalyses.isEmpty {
+                    VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.blue)
+                            Text("Core Analysis")
+                                .font(Design.Typography.headingSmall)
+                            Spacer()
+                        }
+                        .padding(.bottom, Design.Spacing.xs)
+
+                        ForEach(coreAnalyses) { analysis in
+                            AnalysisCard(analysis: analysis)
+                        }
+                    }
+                }
+
+                // Harsh Perspectives
+                let harshAnalyses = analyses.filter { $0.perspective.isHarsh }
+                if !harshAnalyses.isEmpty {
+                    VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                            Text("Stress Test Analysis")
+                                .font(Design.Typography.headingSmall)
+                            Spacer()
+                            Text("The harsh truth")
+                                .font(Design.Typography.labelSmall)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.bottom, Design.Spacing.xs)
+
+                        ForEach(harshAnalyses) { analysis in
+                            AnalysisCard(analysis: analysis)
+                        }
+                    }
                 }
             }
         }

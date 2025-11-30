@@ -17,6 +17,17 @@ struct WelcomeWalkthroughView: View {
   // Streamlined 3-page walkthrough (research shows 3-4 pages optimal)
   private let pages: [WalkthroughPage] = [
     WalkthroughPage(
+      icon: "lightbulb.max.fill",
+      iconColors: [.yellow, .orange],
+      title: "Dig Into Your Ideas",
+      subtitle: "Validate before you build",
+      features: [
+        FeatureItem(icon: "brain.head.profile", text: "AI analyzes from 5+ expert perspectives", color: .purple),
+        FeatureItem(icon: "chart.line.uptrend.xyaxis", text: "Get revenue projections & market fit", color: .green),
+        FeatureItem(icon: "doc.text.fill", text: "LLM-ready prompt to help you build", color: .blue),
+      ]
+    ),
+    WalkthroughPage(
       icon: "clock.badge.checkmark.fill",
       iconColors: [.blue, .purple],
       title: "Track Your Time",

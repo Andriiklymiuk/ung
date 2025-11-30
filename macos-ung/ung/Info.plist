@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Document Types - Files the app can open -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<!-- UNG Encrypted Database -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>UNG Encrypted Database</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.ung.database.encrypted</string>
+			</array>
+		</dict>
+		<!-- SQLite Database -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>UNG Database</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.ung.database</string>
+				<string>public.database</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- Exported Type Declarations - Custom file types we define -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<!-- UNG Encrypted Database Type -->
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ung.database.encrypted</string>
+			<key>UTTypeDescription</key>
+			<string>UNG Encrypted Database</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>db.encrypted</string>
+					<string>encrypted</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/x-ung-encrypted-database</string>
+			</dict>
+		</dict>
+		<!-- UNG Database Type -->
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ung.database</string>
+			<key>UTTypeDescription</key>
+			<string>UNG Database</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.database</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>db</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/x-sqlite3</string>
+			</dict>
+		</dict>
+	</array>
+
+	<!-- Imported Type Declarations - Types we recognize from other apps -->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>public.database</string>
+			<key>UTTypeDescription</key>
+			<string>Database</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>db</string>
+					<string>sqlite</string>
+					<string>sqlite3</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+
+	<!-- iOS: Enable Files app integration -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+
+	<!-- URL Schemes for deep linking -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.ung.ung</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ung</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

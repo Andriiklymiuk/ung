@@ -1537,7 +1537,7 @@ actor DatabaseService {
     }
 
     func importDatabase(from url: URL) async throws {
-        close()
+        await close()
 
         // Backup existing
         let backupPath = databasePath + ".backup"
@@ -1546,11 +1546,89 @@ actor DatabaseService {
             try fileManager.removeItem(atPath: databasePath)
         }
 
+        // Remove any encrypted database
+        if fileManager.fileExists(atPath: encryptedDatabasePath) {
+            try? fileManager.removeItem(atPath: encryptedDatabasePath)
+        }
+
         // Copy new database
         try fileManager.copyItem(at: url, to: URL(fileURLWithPath: databasePath))
 
+        // Reset encryption state
+        encryptionEnabled = false
+        encryptionStatus = .disabled
+        currentPassword = nil
+        workingDatabasePath = nil
+        UserDefaults.standard.set(false, forKey: "databaseEncryptionEnabled")
+
         // Reinitialize
         try await initialize()
+    }
+
+    /// Import an encrypted database file
+    /// The file will be copied to the app's encrypted database location
+    func importEncryptedDatabase(from url: URL, password: String) async throws {
+        await close()
+
+        // Verify password first by trying to decrypt
+        let tempDecryptPath = databasePath + ".import_verify"
+        do {
+            try await encryption.decryptDatabase(
+                inputPath: url.path,
+                outputPath: tempDecryptPath,
+                password: password
+            )
+            // Clean up verification file
+            try? fileManager.removeItem(atPath: tempDecryptPath)
+        } catch {
+            try? fileManager.removeItem(atPath: tempDecryptPath)
+            throw DatabaseError.migrationFailed("Invalid password or corrupted file")
+        }
+
+        // Backup existing databases
+        let backupPath = databasePath + ".backup"
+        if fileManager.fileExists(atPath: databasePath) {
+            try? fileManager.removeItem(atPath: backupPath)
+            try? fileManager.copyItem(atPath: databasePath, toPath: backupPath)
+            try? fileManager.removeItem(atPath: databasePath)
+        }
+        if fileManager.fileExists(atPath: encryptedDatabasePath) {
+            let encBackupPath = encryptedDatabasePath + ".backup"
+            try? fileManager.removeItem(atPath: encBackupPath)
+            try? fileManager.copyItem(atPath: encryptedDatabasePath, toPath: encBackupPath)
+            try? fileManager.removeItem(atPath: encryptedDatabasePath)
+        }
+
+        // Copy the encrypted database
+        try fileManager.copyItem(at: url, to: URL(fileURLWithPath: encryptedDatabasePath))
+
+        // Set up encryption state
+        currentPassword = password
+        encryptionEnabled = true
+        encryptionStatus = .enabled
+        UserDefaults.standard.set(true, forKey: "databaseEncryptionEnabled")
+
+        // Reinitialize (will decrypt and open)
+        try await initialize()
+    }
+
+    /// Export the current database
+    /// If encryption is enabled, exports the encrypted version
+    func exportEncryptedDatabase(to url: URL) async throws {
+        guard encryptionEnabled else {
+            throw DatabaseError.invalidData("Database is not encrypted")
+        }
+
+        let encPath = encryptedDatabasePath
+        guard fileManager.fileExists(atPath: encPath) else {
+            throw DatabaseError.notInitialized
+        }
+
+        // Copy the encrypted database
+        if fileManager.fileExists(atPath: url.path) {
+            try fileManager.removeItem(at: url)
+        }
+        try fileManager.copyItem(atPath: encPath, toPath: url.path)
     }
 
     // MARK: - Gig Operations

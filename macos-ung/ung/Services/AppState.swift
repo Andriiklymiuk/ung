@@ -455,6 +455,29 @@ class AppState: ObservableObject {
         return keychain.getEncryptionPassword()
     }
 
+    /// Import an encrypted database from a file URL
+    func importEncryptedDatabase(from url: URL, password: String) async throws {
+        // Close current database
+        await database.close()
+
+        // Import the encrypted database
+        try await database.importEncryptedDatabase(from: url, password: password)
+
+        // Save password to keychain
+        _ = keychain.saveEncryptionPassword(password)
+        hasEncryptionPassword = true
+        databaseEncrypted = true
+        encryptionStatus = .enabled
+
+        // Reinitialize
+        checkStatus()
+    }
+
+    /// Export the current database (encrypted if encryption is enabled)
+    func exportDatabase(to url: URL, includeEncryption: Bool = true) async throws {
+        try await database.exportDatabase(to: url)
+    }
+
     // MARK: - iCloud Settings
     private func loadICloudSettings() {
         iCloudEnabled = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")

@@ -6,11 +6,15 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 import UserNotifications
 
 @main
 struct ungApp: App {
   @StateObject private var appState = AppState()
+  @State private var importedFileURL: URL?
+  @State private var showImportPasswordPrompt = false
+  @State private var showImportConfirmation = false
 
   init() {
     // Set up notification delegate
@@ -62,6 +66,36 @@ struct ungApp: App {
     WindowGroup("UNG", id: "main-window") {
       MainWindowView()
         .environmentObject(appState)
+        .onOpenURL { url in
+          handleOpenURL(url)
+        }
+        .sheet(isPresented: $showImportPasswordPrompt) {
+          DatabaseImportPasswordView(
+            fileURL: importedFileURL,
+            onImport: { password in
+              Task {
+                await importEncryptedDatabase(url: importedFileURL!, password: password)
+              }
+            },
+            onCancel: {
+              showImportPasswordPrompt = false
+              importedFileURL = nil
+            }
+          )
+          .environmentObject(appState)
+        }
+        .alert("Import Database?", isPresented: $showImportConfirmation) {
+          Button("Import") {
+            Task {
+              await importPlainDatabase(url: importedFileURL!)
+            }
+          }
+          Button("Cancel", role: .cancel) {
+            importedFileURL = nil
+          }
+        } message: {
+          Text("This will replace your current database with the imported one. Make sure you have a backup.")
+        }
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentMinSize)
@@ -224,6 +258,95 @@ struct ungApp: App {
         .environmentObject(appState)
     }
     .menuBarExtraStyle(.window)
+  }
+
+  // MARK: - File Import Handling
+
+  /// Handle opening a URL (file or deep link)
+  private func handleOpenURL(_ url: URL) {
+    // Check if it's a file URL
+    guard url.isFileURL else {
+      // Handle deep links (ung:// scheme)
+      handleDeepLink(url)
+      return
+    }
+
+    // Start accessing security-scoped resource
+    guard url.startAccessingSecurityScopedResource() else {
+      appState.showError("Cannot access the file. Permission denied.")
+      return
+    }
+
+    importedFileURL = url
+
+    // Check if it's an encrypted database
+    let pathExtension = url.pathExtension.lowercased()
+    let fileName = url.lastPathComponent.lowercased()
+
+    if fileName.hasSuffix(".db.encrypted") || pathExtension == "encrypted" {
+      // Encrypted database - need password
+      showImportPasswordPrompt = true
+    } else if pathExtension == "db" || pathExtension == "sqlite" || pathExtension == "sqlite3" {
+      // Plain database - confirm import
+      showImportConfirmation = true
+    } else {
+      url.stopAccessingSecurityScopedResource()
+      appState.showError("Unsupported file type: \(pathExtension)")
+      importedFileURL = nil
+    }
+  }
+
+  /// Handle deep links (ung:// scheme)
+  private func handleDeepLink(_ url: URL) {
+    guard let host = url.host else { return }
+
+    switch host {
+    case "tracking":
+      appState.selectedTab = .tracking
+    case "invoices":
+      appState.selectedTab = .invoices
+    case "clients":
+      appState.selectedTab = .clients
+    case "settings":
+      appState.selectedTab = .settings
+    default:
+      break
+    }
+  }
+
+  /// Import an encrypted database file
+  @MainActor
+  private func importEncryptedDatabase(url: URL, password: String) async {
+    defer {
+      url.stopAccessingSecurityScopedResource()
+      importedFileURL = nil
+      showImportPasswordPrompt = false
+    }
+
+    do {
+      try await appState.importEncryptedDatabase(from: url, password: password)
+      appState.showToastMessage("Database imported successfully", type: .success)
+    } catch {
+      appState.showError("Failed to import database: \(error.localizedDescription)")
+    }
+  }
+
+  /// Import a plain (unencrypted) database file
+  @MainActor
+  private func importPlainDatabase(url: URL) async {
+    defer {
+      url.stopAccessingSecurityScopedResource()
+      importedFileURL = nil
+      showImportConfirmation = false
+    }
+
+    do {
+      try await appState.database.importDatabase(from: url)
+      appState.checkStatus()
+      appState.showToastMessage("Database imported successfully", type: .success)
+    } catch {
+      appState.showError("Failed to import database: \(error.localizedDescription)")
+    }
   }
 }
 

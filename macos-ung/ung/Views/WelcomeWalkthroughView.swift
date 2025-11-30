@@ -23,35 +23,63 @@ struct WelcomeWalkthroughView: View {
   @State private var isAnimating = false
   @Namespace private var animation
 
-  // Testimonials from real user personas
+  // Testimonials - funky, feature-specific
   private let testimonials: [Testimonial] = [
     Testimonial(
-      quote: "Dig told me my habit tracker idea scored 34. It hurt. But it would have hurt more to waste another four months.",
-      name: "Marcus Chen",
-      role: "Senior Engineer, SF",
-      feature: "Dig",
-      color: .yellow
-    ),
-    Testimonial(
-      quote: "I ran my idea through the Scalability Stress Test - it said my architecture would break at 1,000 users. Found out in minute 7, not month 3.",
-      name: "Raj Patel",
-      role: "Engineering Manager",
-      feature: "Dig",
-      color: .orange
-    ),
-    Testimonial(
-      quote: "Finally, one app that tracks my time AND generates invoices from it. No more spreadsheet juggling.",
-      name: "Emma L.",
+      quote: "Tracked myself for a week. Turns out I spend 11 hours on 'quick emails.' I'm basically an unpaid mailman with a design degree.",
+      name: "Jake Rivera",
       role: "Freelance Designer",
       feature: "Tracking",
       color: .blue
     ),
     Testimonial(
-      quote: "The Copycat Analysis showed me 85% of billion-dollar companies are copycats. It gave me permission to stop seeking novelty and start seeking execution.",
-      name: "Sarah Okonkwo",
-      role: "Ex-McKinsey Founder",
+      quote: "Sent an invoice at 2am in my underwear. Got paid by breakfast. This is the future our ancestors dreamed of.",
+      name: "Priya K.",
+      role: "Developer",
+      feature: "Invoicing",
+      color: .teal
+    ),
+    Testimonial(
+      quote: "Dig told me my 'revolutionary' idea was just Uber for laundry. Again. Fourth time. I might have a problem.",
+      name: "Marcus Chen",
+      role: "Serial Idea-Haver",
       feature: "Dig",
+      color: .yellow
+    ),
+    Testimonial(
+      quote: "Hunt found me 3 gigs while I was doom-scrolling. It's hunting while I'm procrastinating. Terrifying. Also: rent paid.",
+      name: "Nina Volkov",
+      role: "Freelance Writer",
+      feature: "Hunt",
+      color: .orange
+    ),
+    Testimonial(
+      quote: "Moved a card to 'Done' and felt more dopamine than my entire childhood. Is this addiction? Don't care. Shipping.",
+      name: "David Morrison",
+      role: "Solo Developer",
+      feature: "Kanban",
       color: .purple
+    ),
+    Testimonial(
+      quote: "Set a $10k monthly goal as a joke. Hit it by accident because the red progress bar made me feel broke every morning.",
+      name: "Sarah Okonkwo",
+      role: "Consultant",
+      feature: "Goals",
+      color: .green
+    ),
+    Testimonial(
+      quote: "25 minutes of Focus mode and I wrote more code than the entire previous week. My phone might be the actual enemy.",
+      name: "Raj Patel",
+      role: "Engineer",
+      feature: "Focus",
+      color: .red
+    ),
+    Testimonial(
+      quote: "Client said 'we'll pay eventually.' I showed them my Invoices dashboard. They paid in 4 hours. Fear is a motivator.",
+      name: "Emma Lindqvist",
+      role: "Photographer",
+      feature: "Invoicing",
+      color: .pink
     ),
   ]
 

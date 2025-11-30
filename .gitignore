@@ -19,6 +19,7 @@ go.work
 
 # Build output
 dist/
+/ung
 
 # IDE
 .vscode/

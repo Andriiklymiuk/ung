@@ -267,7 +267,7 @@ class AppState: ObservableObject {
     @Published var showSyncBanner: Bool = false
 
     // Main window navigation
-    @Published var selectedTab: SidebarTab = .dashboard {
+    @Published var selectedTab: SidebarTab = .next {
         willSet {
             if newValue != selectedTab {
                 objectWillChange.send()
@@ -992,6 +992,7 @@ class AppState: ObservableObject {
 
 // MARK: - Sidebar Tab
 enum SidebarTab: String, CaseIterable, Identifiable {
+    case next = "Next"
     case dashboard = "Dashboard"
     case tracking = "Time Tracking"
     case clients = "Clients"
@@ -1007,6 +1008,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .next: return "arrow.right.circle"
         case .dashboard: return "square.grid.2x2"
         case .tracking: return "clock"
         case .clients: return "person.2"
@@ -1022,6 +1024,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
 
     var iconFilled: String {
         switch self {
+        case .next: return "arrow.right.circle.fill"
         case .dashboard: return "square.grid.2x2.fill"
         case .tracking: return "clock.fill"
         case .clients: return "person.2.fill"
@@ -1037,7 +1040,8 @@ enum SidebarTab: String, CaseIterable, Identifiable {
 
     var shortLabel: String {
         switch self {
-        case .dashboard: return "Home"
+        case .next: return "Next"
+        case .dashboard: return "Stats"
         case .tracking: return "Track"
         case .clients: return "Clients"
         case .contracts: return "Contracts"
